@@ -10,19 +10,9 @@ import { motion } from "motion/react";
 import { Info } from "lucide-react";
 import type { CriteriaCategory } from "@/lib/criteria";
 import { GRADE_BANDS } from "@/lib/criteria";
-import { TrendingUp, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 type Score = number | "AVERAGE_OUT";
-
-type Slab = {
-  id: string;
-  label: string;
-  grade: string;
-  minRating: number;
-  maxRating: number;
-  hikePercent: number;
-  salaryTier: string;
-};
 
 export function RateForm({
   cycleId,
@@ -30,18 +20,12 @@ export function RateForm({
   categories,
   totalMaxPoints,
   peerRatingExists,
-  slabs,
-  grossAnnum,
-  employeeSalaryTier,
 }: {
   cycleId: string;
   role: "HR" | "TL" | "MANAGER";
   categories: CriteriaCategory[];
   totalMaxPoints: number;
   peerRatingExists: boolean;
-  slabs?: Slab[];
-  grossAnnum?: number | null;
-  employeeSalaryTier?: string | null;
 }) {
   const [scores, setScores] = useState<Record<string, Score>>(
     Object.fromEntries(categories.map((c) => [c.name, 0])),
@@ -79,24 +63,9 @@ export function RateForm({
   const normalizedScore = (totalRaw / totalMaxPoints) * 100;
   const normalizedPreview = normalizedScore.toFixed(1);
 
-  // Dynamic slab lookup based on current score
-  const matchedSlab = slabs && employeeSalaryTier
-    ? slabs.find(
-        (s) =>
-          normalizedScore >= s.minRating &&
-          normalizedScore <= s.maxRating &&
-          (s.salaryTier === employeeSalaryTier || s.salaryTier === "ALL"),
-      ) ?? null
-    : null;
-
   const currentGrade = GRADE_BANDS.find(
     (b) => normalizedScore >= b.minNormalized && normalizedScore <= b.maxNormalized,
   ) ?? null;
-
-  const hikeAmount =
-    matchedSlab && grossAnnum
-      ? Math.round((grossAnnum * matchedSlab.hikePercent) / 100)
-      : null;
 
   const gradeColorMap: Record<string, string> = {
     "A+": "text-emerald-600 bg-emerald-50 border-emerald-200",
@@ -197,11 +166,6 @@ export function RateForm({
                 {currentGrade.grade} · {currentGrade.label}
               </span>
             )}
-            {matchedSlab && (
-              <span className="flex items-center gap-1 text-xs font-bold text-green-600">
-                <TrendingUp className="size-3" />{matchedSlab.hikePercent}%
-              </span>
-            )}
             <div className="text-right">
               <div className="text-xl font-bold text-[#008993]">{normalizedPreview}</div>
               <div className="text-[10px] text-slate-400">/ 100</div>
@@ -228,7 +192,6 @@ export function RateForm({
 
       {/* Full score card (non-sticky reference) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 space-y-3">
-        {/* Dynamic slab feedback */}
         {currentGrade && (
           <div className={`rounded-lg border px-3 py-2 flex items-center justify-between gap-3 ${gradeColorMap[currentGrade.grade] ?? "bg-slate-50 border-slate-200 text-slate-600"}`}>
             <div className="flex items-center gap-2">
@@ -238,25 +201,10 @@ export function RateForm({
                 <div className="text-[10px] opacity-70">Score {currentGrade.minNormalized}–{currentGrade.maxNormalized}</div>
               </div>
             </div>
-            {matchedSlab ? (
-              <div className="text-right">
-                <div className="flex items-center gap-1 justify-end">
-                  <TrendingUp className="size-3" />
-                  <span className="text-sm font-bold">{matchedSlab.hikePercent}% hike</span>
-                </div>
-                {hikeAmount !== null && (
-                  <div className="text-[10px] opacity-70 mt-0.5">
-                    +₹{hikeAmount.toLocaleString("en-IN")}/yr
-                  </div>
-                )}
-                <div className="text-[9px] opacity-60 mt-0.5">{matchedSlab.label}</div>
-              </div>
-            ) : slabs && slabs.length > 0 ? (
-              <div className="flex items-center gap-1 text-[10px] opacity-70">
-                <AlertCircle className="size-3" />
-                No slab match
-              </div>
-            ) : null}
+            <div className="flex items-center gap-1 text-[10px] opacity-70">
+              <AlertCircle className="size-3" />
+              Increments are decided by Admin/Management
+            </div>
           </div>
         )}
       </div>

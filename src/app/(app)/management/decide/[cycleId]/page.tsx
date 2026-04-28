@@ -5,10 +5,15 @@ import { FadeIn } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { DecisionForm } from "./decision-form";
 import { CheckCircle, FileText } from "lucide-react";
-import { CRITERIA_CATEGORIES, getCriteriaForRole } from "@/lib/criteria";
+import { CRITERIA_CATEGORIES, getCriteriaForRole, getSalaryTier } from "@/lib/criteria";
+import { auth } from "@/lib/auth";
+import { ClaimPanel } from "./claim-panel";
 
 export default async function DecidePage({ params }: { params: Promise<{ cycleId: string }> }) {
   const { cycleId } = await params;
+  const session = await auth();
+  const actorId = session?.user?.id ?? null;
+  const actorRole = session?.user?.role ?? null;
 
   const cycle = await prisma.appraisalCycle.findUnique({
     where: { id: cycleId },
@@ -24,6 +29,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
       },
       decision: { include: { slab: true } },
       assignments: { include: { reviewer: { select: { name: true } } } },
+      claimedBy: { select: { id: true, name: true } },
       ratingReviews: {
         include: { reviewer: { select: { name: true, role: true } } },
         orderBy: { updatedAt: "desc" },
@@ -38,8 +44,12 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
     ? cycle.ratings.reduce((s, r) => s + r.averageScore, 0) / cycle.ratings.length
     : 0;
 
-  const suggestedSlab = slabs.find((s) => avg >= s.minRating && avg <= s.maxRating);
   const grossAnnum = cycle.user.salary ? Number(cycle.user.salary.grossAnnum) : 0;
+  const monthlyGross = grossAnnum ? grossAnnum / 12 : 0;
+  const tierKey = monthlyGross ? getSalaryTier(monthlyGross) : null;
+  const dbTier =
+    tierKey === "upto15k" ? "UPTO_15K" : tierKey === "upto30k" ? "BTW_15K_30K" : "ABOVE_30K";
+  const suggestedSlab = slabs.find((s) => avg >= s.minRating && avg <= s.maxRating && (s.salaryTier === dbTier || s.salaryTier === "ALL"));
 
   // Build per-reviewer rating data with criteria breakdown
   const reviewerRatings = cycle.ratings.map((r) => {
@@ -77,6 +87,9 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
 
   // Criteria management can rate (excludes Accountability & Attendance, Organisational Contribution & Engagement)
   const mgmtCriteria = getCriteriaForRole(CRITERIA_CATEGORIES, "MANAGEMENT");
+
+  const claimedByOther =
+    !!cycle.claimedById && actorId && cycle.claimedById !== actorId && actorRole !== "ADMIN";
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -130,15 +143,47 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
         </FadeIn>
       ) : (
         <FadeIn delay={0.1}>
-          <DecisionForm
-            cycleId={cycleId}
-            avgRating={avg}
-            suggestedHikePercent={suggestedSlab?.hikePercent ?? 0}
-            grossAnnum={grossAnnum}
-            reviewerRatings={reviewerRatings}
-            selfAnswers={selfAnswers}
-            mgmtCriteria={mgmtCriteria.map((c) => ({ name: c.name, maxPoints: c.maxPoints, items: c.items }))}
-          />
+          <div className="space-y-3">
+            {!cycle.claimedById && <ClaimPanel cycleId={cycleId} />}
+
+            {cycle.claimedById && (
+              <Card className="border border-border shadow-sm bg-card">
+                <CardContent className="p-3 text-sm flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-foreground">Claim status</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Claimed by <span className="font-medium text-foreground">{toTitleCase(cycle.claimedBy?.name ?? "Unknown")}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {cycle.claimedAt ? new Date(cycle.claimedAt).toLocaleString("en-IN") : ""}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {claimedByOther ? (
+              <Card className="border border-border shadow-sm bg-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-foreground">Locked</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-muted-foreground">
+                  This appraisal is claimed by another management user. You can view it from the dashboard,
+                  but you can’t edit/finalize it.
+                </CardContent>
+              </Card>
+            ) : (
+              <DecisionForm
+                cycleId={cycleId}
+                avgRating={avg}
+                suggestedHikePercent={suggestedSlab?.hikePercent ?? 0}
+                grossAnnum={grossAnnum}
+                reviewerRatings={reviewerRatings}
+                selfAnswers={selfAnswers}
+                mgmtCriteria={mgmtCriteria.map((c) => ({ name: c.name, maxPoints: c.maxPoints, items: c.items }))}
+              />
+            )}
+          </div>
         </FadeIn>
       )}
     </div>
