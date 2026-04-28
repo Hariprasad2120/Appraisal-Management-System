@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { deleteEmployeeAction, deleteSalaryAction, toggleActiveAction } from "../actions";
 import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
-import { canBeAppraised } from "@/lib/rbac";
+import { canBeAppraised, isAdmin } from "@/lib/rbac";
 import {
   User, Calendar, Briefcase, MapPin, Phone, Mail,
   IndianRupee, ChevronRight, ShieldOff, ShieldCheck,
@@ -14,6 +15,8 @@ import {
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await auth();
+  const canEdit = session?.user ? isAdmin(session.user.role, session.user.secondaryRole) : false;
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
@@ -50,33 +53,35 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
               ← Employees
             </Link>
           </div>
-          <div className="flex gap-2">
-            <Link href={`/admin/employees/${user.id}/edit`}>
-              <Button variant="outline" size="sm">Edit</Button>
-            </Link>
-            <form action={toggleActiveAction}>
-              <input type="hidden" name="id" value={user.id} />
-              <input type="hidden" name="active" value={String(user.active)} />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                className={user.active
-                  ? "text-orange-600 border-orange-300 hover:bg-orange-50"
-                  : "text-green-600 border-green-300 hover:bg-green-50"}
-              >
-                {user.active ? (
-                  <><ShieldOff className="size-3.5 mr-1.5" /> Revoke Access</>
-                ) : (
-                  <><ShieldCheck className="size-3.5 mr-1.5" /> Restore Access</>
-                )}
-              </Button>
-            </form>
-            <form action={deleteEmployeeAction}>
-              <input type="hidden" name="id" value={user.id} />
-              <Button type="submit" variant="destructive" size="sm">Delete</Button>
-            </form>
-          </div>
+          {canEdit && (
+            <div className="flex gap-2">
+              <Link href={`/admin/employees/${user.id}/edit`}>
+                <Button variant="outline" size="sm">Edit</Button>
+              </Link>
+              <form action={toggleActiveAction}>
+                <input type="hidden" name="id" value={user.id} />
+                <input type="hidden" name="active" value={String(user.active)} />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className={user.active
+                    ? "text-orange-600 border-orange-300 hover:bg-orange-50"
+                    : "text-green-600 border-green-300 hover:bg-green-50"}
+                >
+                  {user.active ? (
+                    <><ShieldOff className="size-3.5 mr-1.5" /> Revoke Access</>
+                  ) : (
+                    <><ShieldCheck className="size-3.5 mr-1.5" /> Restore Access</>
+                  )}
+                </Button>
+              </form>
+              <form action={deleteEmployeeAction}>
+                <input type="hidden" name="id" value={user.id} />
+                <Button type="submit" variant="destructive" size="sm">Delete</Button>
+              </form>
+            </div>
+          )}
         </div>
       </FadeIn>
 
@@ -91,11 +96,17 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   {isAppraisable ? (
-                    <Link href={`/admin/employees/${user.id}/assign`}>
-                      <h1 className="text-xl font-bold text-slate-900 dark:text-white hover:text-[#008993] transition-colors cursor-pointer">
+                    canEdit ? (
+                      <Link href={`/admin/employees/${user.id}/assign`}>
+                        <h1 className="text-xl font-bold text-slate-900 dark:text-white hover:text-[#008993] transition-colors cursor-pointer">
+                          {toTitleCase(user.name)}
+                        </h1>
+                      </Link>
+                    ) : (
+                      <h1 className="text-xl font-bold text-slate-900 dark:text-white">
                         {toTitleCase(user.name)}
                       </h1>
-                    </Link>
+                    )
                   ) : (
                     <h1 className="text-xl font-bold text-slate-900 dark:text-white">
                       {toTitleCase(user.name)}
@@ -249,7 +260,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                     <span className="flex items-center gap-2">
                       <Calendar className="size-4" /> Appraisal Cycles
                     </span>
-                    {isAppraisable && (
+                    {isAppraisable && canEdit && (
                       <Link href={`/admin/employees/${user.id}/assign`} className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
                         Assign <ChevronRight className="size-3" />
                       </Link>

@@ -8,16 +8,12 @@ import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
 import {
   SUPPLEMENTARY_SECTIONS,
-  GRADE_BANDS,
-  HIKE_TABLE,
-  getSalaryTier,
   getCriteriaForRole,
 } from "@/lib/criteria";
 import { getMergedCriteria } from "@/lib/criteria-overrides";
 import {
   TrendingUp,
   User,
-  Briefcase,
   IndianRupee,
   FileText,
 } from "lucide-react";
@@ -57,10 +53,9 @@ export default async function RatePage({
   });
   if (existing) redirect(`/reviewer/${cycleId}`);
 
-  const [peerRatingExistsCount, allMergedCategories, allSlabs] = await Promise.all([
+  const [peerRatingExistsCount, allMergedCategories] = await Promise.all([
     prisma.rating.count({ where: { cycleId } }),
     getMergedCriteria(),
-    prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } }),
   ]);
   const peerRatingExists = peerRatingExistsCount > 0;
   const mergedCategories = getCriteriaForRole(allMergedCategories, assignment.role);
@@ -79,14 +74,6 @@ export default async function RatePage({
   const emp = assignment.cycle.user;
   const sal = emp.salary;
   const grossAnnum = sal ? Number(sal.grossAnnum) : null;
-  const grossMonthly = grossAnnum ? grossAnnum / 12 : null;
-  const salaryTier = grossMonthly ? getSalaryTier(grossMonthly) : null;
-  // Map criteria salaryTier key → DB IncrementSlab salaryTier value
-  const dbSalaryTier =
-    salaryTier === "upto15k" ? "UPTO_15K"
-    : salaryTier === "upto30k" ? "BTW_15K_30K"
-    : salaryTier === "above30k" ? "ABOVE_30K"
-    : null;
 
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
   const fmtMonth = (d: Date) =>
@@ -246,144 +233,7 @@ export default async function RatePage({
             </FadeIn>
           )}
 
-          {/* Grade & Increment reference */}
-          <FadeIn delay={0.1}>
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Briefcase className="size-4 text-[#008993]" /> Grade & Increment Reference
-                  {salaryTier && (
-                    <span className="ml-auto text-[10px] font-normal text-slate-400">
-                      This employee:{" "}
-                      <span className="font-semibold text-[#008993]">
-                        {salaryTier === "upto15k"
-                          ? "≤ ₹15k/mo"
-                          : salaryTier === "upto30k"
-                          ? "₹15k–30k/mo"
-                          : "> ₹30k/mo"}
-                      </span>
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 pb-3">
-                <div className="overflow-x-auto">
-                  <table className="text-xs w-full">
-                    <thead>
-                      <tr className="text-left text-slate-400 border-b bg-slate-50 dark:bg-slate-800/50">
-                        <th className="py-2 px-4 font-medium">Grade</th>
-                        <th className="py-2 px-4 font-medium">Score</th>
-                        <th className="py-2 px-4 font-medium">Label</th>
-                        <th className="py-2 px-4 font-medium">≤ ₹15k/mo</th>
-                        <th className="py-2 px-4 font-medium">₹15k–30k/mo</th>
-                        <th className="py-2 px-4 font-medium">&gt; ₹30k/mo</th>
-                        {grossAnnum && salaryTier && (
-                          <th className="py-2 px-4 font-medium">+₹/yr (this emp)</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {GRADE_BANDS.map((b) => {
-                        const hike = HIKE_TABLE[b.grade] ?? {
-                          upto15k: 0,
-                          upto30k: 0,
-                          above30k: 0,
-                        };
-                        const isEmpTier = (t: string) => salaryTier === t;
-                        const empHike = salaryTier ? hike[salaryTier] : null;
-                        const hikeAmt =
-                          grossAnnum && empHike
-                            ? Math.round((grossAnnum * empHike) / 100)
-                            : null;
-                        const gradeColor =
-                          b.grade === "A+"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : b.grade === "A"
-                            ? "bg-green-100 text-green-700"
-                            : b.grade === "B+"
-                            ? "bg-blue-100 text-blue-700"
-                            : b.grade === "B"
-                            ? "bg-sky-100 text-sky-700"
-                            : b.grade === "C+"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : b.grade === "C"
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-red-100 text-red-700";
-                        return (
-                          <tr
-                            key={b.grade}
-                            className={
-                              salaryTier && empHike !== null && empHike > 0
-                                ? "bg-[#008993]/5"
-                                : ""
-                            }
-                          >
-                            <td className="py-2 px-4">
-                              <span
-                                className={`font-semibold px-2 py-0.5 rounded text-[10px] ${gradeColor}`}
-                              >
-                                {b.grade}
-                              </span>
-                            </td>
-                            <td className="py-2 px-4 text-slate-500">
-                              {b.minNormalized}–{b.maxNormalized}
-                            </td>
-                            <td className="py-2 px-4 text-slate-600">{b.label}</td>
-                            <td
-                              className={`py-2 px-4 font-medium ${
-                                isEmpTier("upto15k")
-                                  ? "text-[#008993] font-bold"
-                                  : "text-slate-500"
-                              }`}
-                            >
-                              {hike.upto15k > 0 ? (
-                                `${hike.upto15k}%`
-                              ) : (
-                                <span className="text-red-400">Nil</span>
-                              )}
-                            </td>
-                            <td
-                              className={`py-2 px-4 font-medium ${
-                                isEmpTier("upto30k")
-                                  ? "text-[#008993] font-bold"
-                                  : "text-slate-500"
-                              }`}
-                            >
-                              {hike.upto30k > 0 ? (
-                                `${hike.upto30k}%`
-                              ) : (
-                                <span className="text-red-400">Nil</span>
-                              )}
-                            </td>
-                            <td
-                              className={`py-2 px-4 font-medium ${
-                                isEmpTier("above30k")
-                                  ? "text-[#008993] font-bold"
-                                  : "text-slate-500"
-                              }`}
-                            >
-                              {hike.above30k > 0 ? (
-                                `${hike.above30k}%`
-                              ) : (
-                                <span className="text-red-400">Nil</span>
-                              )}
-                            </td>
-                            {grossAnnum && salaryTier && (
-                              <td className="py-2 px-4 font-semibold text-green-600">
-                                {hikeAmt && hikeAmt > 0
-                                  ? `+₹${hikeAmt.toLocaleString()}`
-                                  : "—"}
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </FadeIn>
+          {/* NOTE: Salary slabs/increments are hidden from reviewers by RBAC policy */}
 
           {/* Self-assessment answers */}
           {selfAnswers && (
@@ -489,17 +339,7 @@ export default async function RatePage({
               categories={mergedCategories}
               totalMaxPoints={roleMaxPoints}
               peerRatingExists={peerRatingExists}
-              slabs={allSlabs.map((s) => ({
-                id: s.id,
-                label: s.label,
-                grade: s.grade,
-                minRating: s.minRating,
-                maxRating: s.maxRating,
-                hikePercent: s.hikePercent,
-                salaryTier: s.salaryTier,
-              }))}
-              grossAnnum={grossAnnum}
-              employeeSalaryTier={dbSalaryTier}
+              isAdmin={true}
             />
           </FadeIn>
         </div>

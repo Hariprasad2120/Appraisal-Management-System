@@ -14,16 +14,24 @@ const schema = z.object({
   employeeId: z.string(),
   hrId: z.string(),
   tlId: z.string().optional(),
-  mgrId: z.string(),
+  mgrId: z.string().optional(),
+  /** Backward-compat (legacy UI): true meant "exclude TL reviewer". */
   isManagerCycle: z.boolean().optional(),
+  /** New UI toggles (preferred). If omitted, derived from legacy fields. */
+  includeTlReviewer: z.boolean().optional(),
+  includeManagerReviewer: z.boolean().optional(),
 });
 
 const specialSchema = z.object({
   employeeId: z.string(),
   hrId: z.string(),
   tlId: z.string().optional(),
-  mgrId: z.string(),
+  mgrId: z.string().optional(),
+  /** Backward-compat (legacy UI): true meant "exclude TL reviewer". */
   isManagerCycle: z.boolean().optional(),
+  /** New UI toggles (preferred). If omitted, derived from legacy fields. */
+  includeTlReviewer: z.boolean().optional(),
+  includeManagerReviewer: z.boolean().optional(),
 });
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -39,6 +47,19 @@ async function createOrReuseAssignments(
   const notifyIds: string[] = [];
 
   await prisma.$transaction(async (tx) => {
+    const desiredRoles = new Set(assignments.map((a) => a.role));
+    // Remove stale assignments for roles that are no longer desired,
+    // but only if that role hasn't already submitted a rating (to avoid breaking in-progress cycles).
+    const [existingAssignments, existingRatings] = await Promise.all([
+      tx.cycleAssignment.findMany({ where: { cycleId }, select: { id: true, role: true } }),
+      tx.rating.findMany({ where: { cycleId }, select: { role: true } }),
+    ]);
+    const ratedRoles = new Set(existingRatings.map((r) => r.role));
+    const removable = existingAssignments.filter((a) => !desiredRoles.has(a.role) && !ratedRoles.has(a.role));
+    if (removable.length > 0) {
+      await tx.cycleAssignment.deleteMany({ where: { id: { in: removable.map((r) => r.id) } } });
+    }
+
     for (const a of assignments) {
       const existing = await tx.cycleAssignment.findUnique({
         where: { cycleId_role: { cycleId, role: a.role } },
@@ -112,13 +133,39 @@ export async function assignReviewersAction(input: z.infer<typeof schema>): Prom
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid input" };
 
-  const { employeeId, hrId, tlId, mgrId, isManagerCycle } = parsed.data;
+  const {
+    employeeId,
+    hrId,
+    tlId,
+    mgrId,
+    isManagerCycle,
+    includeTlReviewer,
+    includeManagerReviewer,
+  } = parsed.data;
 
   const employee = await prisma.user.findUnique({ where: { id: employeeId } });
   if (!employee || !canBeAppraised(employee.role)) return { ok: false, error: "Employee not found" };
 
-  // For manager cycles: TL not required, MANAGEMENT will rate
-  if (!isManagerCycle && !tlId) return { ok: false, error: "TL reviewer required for non-manager cycles" };
+  // Derive toggles from legacy input when not provided.
+  const derivedIncludeTL = includeTlReviewer ?? (!isManagerCycle && Boolean(tlId));
+  const derivedIncludeManager = includeManagerReviewer ?? Boolean(mgrId);
+
+  // Role-based rules:
+  // - HR appraisee: HR only
+  // - MANAGER appraisee: HR only
+  // - TL appraisee: HR + MANAGER (no TL reviewer)
+  // - Others: HR + optional TL + optional MANAGER (via toggles)
+  const appraiseeRole = employee.role;
+  const mustExcludeTL = appraiseeRole === "HR" || appraiseeRole === "MANAGER" || appraiseeRole === "TL";
+  const mustExcludeManager = appraiseeRole === "HR" || appraiseeRole === "MANAGER";
+
+  const effectiveIncludeTL = mustExcludeTL ? false : derivedIncludeTL;
+  const effectiveIncludeManager = mustExcludeManager ? false : derivedIncludeManager;
+
+  if (!hrId) return { ok: false, error: "HR reviewer required" };
+  if (appraiseeRole === "TL" && !mgrId) return { ok: false, error: "Manager reviewer required for TL appraisee" };
+  if (effectiveIncludeTL && !tlId) return { ok: false, error: "TL reviewer required (toggle enabled)" };
+  if (effectiveIncludeManager && !mgrId) return { ok: false, error: "Manager reviewer required (toggle enabled)" };
 
   // Auto-determine cycle type from joining date
   const cycleType = autoCycleType(employee.joiningDate);
@@ -135,25 +182,26 @@ export async function assignReviewersAction(input: z.infer<typeof schema>): Prom
         type: cycleType,
         startDate: new Date(),
         status: "PENDING_SELF",
-        isManagerCycle: !!isManagerCycle,
+        // Legacy field: treated as "no TL reviewer included"
+        isManagerCycle: !effectiveIncludeTL,
         self: {
           create: { answers: {}, editableUntil: addBusinessDays(new Date(), 3) },
         },
       },
     });
-  } else if (isManagerCycle !== undefined) {
+  } else if (isManagerCycle !== undefined || includeTlReviewer !== undefined) {
     await prisma.appraisalCycle.update({
       where: { id: cycle.id },
-      data: { isManagerCycle: !!isManagerCycle },
+      data: { isManagerCycle: !effectiveIncludeTL },
     });
   }
 
-  const assignments: { role: "HR" | "TL" | "MANAGER"; reviewerId: string }[] = [
-    { role: "HR", reviewerId: hrId },
-    { role: "MANAGER", reviewerId: mgrId },
-  ];
-  if (!isManagerCycle && tlId) {
-    assignments.push({ role: "TL", reviewerId: tlId });
+  const assignments: { role: "HR" | "TL" | "MANAGER"; reviewerId: string }[] = [{ role: "HR", reviewerId: hrId }];
+  if (appraiseeRole === "TL") {
+    assignments.push({ role: "MANAGER", reviewerId: mgrId! });
+  } else {
+    if (effectiveIncludeTL && tlId) assignments.push({ role: "TL", reviewerId: tlId });
+    if (effectiveIncludeManager && mgrId) assignments.push({ role: "MANAGER", reviewerId: mgrId });
   }
 
   const loginUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/login`;
@@ -173,12 +221,34 @@ export async function startSpecialAppraisalAction(input: z.infer<typeof specialS
   const parsed = specialSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid input" };
 
-  const { employeeId, hrId, tlId, mgrId, isManagerCycle } = parsed.data;
+  const {
+    employeeId,
+    hrId,
+    tlId,
+    mgrId,
+    isManagerCycle,
+    includeTlReviewer,
+    includeManagerReviewer,
+  } = parsed.data;
 
   const employee = await prisma.user.findUnique({ where: { id: employeeId } });
   if (!employee || !canBeAppraised(employee.role)) return { ok: false, error: "Employee not found" };
 
-  if (!isManagerCycle && !tlId) return { ok: false, error: "TL reviewer required for non-manager cycles" };
+  // Derive toggles from legacy input when not provided.
+  const derivedIncludeTL = includeTlReviewer ?? (!isManagerCycle && Boolean(tlId));
+  const derivedIncludeManager = includeManagerReviewer ?? Boolean(mgrId);
+
+  const appraiseeRole = employee.role;
+  const mustExcludeTL = appraiseeRole === "HR" || appraiseeRole === "MANAGER" || appraiseeRole === "TL";
+  const mustExcludeManager = appraiseeRole === "HR" || appraiseeRole === "MANAGER";
+
+  const effectiveIncludeTL = mustExcludeTL ? false : derivedIncludeTL;
+  const effectiveIncludeManager = mustExcludeManager ? false : derivedIncludeManager;
+
+  if (!hrId) return { ok: false, error: "HR reviewer required" };
+  if (appraiseeRole === "TL" && !mgrId) return { ok: false, error: "Manager reviewer required for TL appraisee" };
+  if (effectiveIncludeTL && !tlId) return { ok: false, error: "TL reviewer required (toggle enabled)" };
+  if (effectiveIncludeManager && !mgrId) return { ok: false, error: "Manager reviewer required (toggle enabled)" };
 
   const activeCycle = await prisma.appraisalCycle.findFirst({
     where: { userId: employeeId, status: { notIn: ["CLOSED", "DECIDED"] } },
@@ -191,7 +261,8 @@ export async function startSpecialAppraisalAction(input: z.infer<typeof specialS
       type: "SPECIAL",
       startDate: new Date(),
       status: "PENDING_SELF",
-      isManagerCycle: !!isManagerCycle,
+      // Legacy field: treated as "no TL reviewer included"
+      isManagerCycle: !effectiveIncludeTL,
       self: {
         create: { answers: {}, editableUntil: addBusinessDays(new Date(), 3) },
       },
@@ -207,12 +278,12 @@ export async function startSpecialAppraisalAction(input: z.infer<typeof specialS
     },
   });
 
-  const assignments: { role: "HR" | "TL" | "MANAGER"; reviewerId: string }[] = [
-    { role: "HR", reviewerId: hrId },
-    { role: "MANAGER", reviewerId: mgrId },
-  ];
-  if (!isManagerCycle && tlId) {
-    assignments.push({ role: "TL", reviewerId: tlId });
+  const assignments: { role: "HR" | "TL" | "MANAGER"; reviewerId: string }[] = [{ role: "HR", reviewerId: hrId }];
+  if (appraiseeRole === "TL") {
+    assignments.push({ role: "MANAGER", reviewerId: mgrId! });
+  } else {
+    if (effectiveIncludeTL && tlId) assignments.push({ role: "TL", reviewerId: tlId });
+    if (effectiveIncludeManager && mgrId) assignments.push({ role: "MANAGER", reviewerId: mgrId });
   }
 
   const loginUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/login`;

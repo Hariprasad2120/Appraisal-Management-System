@@ -37,9 +37,14 @@ export function isManagement(role: Role, secondaryRole?: Role | null): boolean {
 
 export function canAccessPath(role: Role, pathname: string, secondaryRole?: Role | null): boolean {
   // Management and partners may view employee pages (read-only server actions enforce roles)
+  if (pathname.startsWith("/admin/employees/") && pathname.includes("/assign")) {
+    return isAdmin(role, secondaryRole);
+  }
   if (pathname.startsWith("/admin/employees")) return isAdmin(role, secondaryRole) || role === "MANAGEMENT" || role === "PARTNER";
   if (pathname.startsWith("/admin/cycles/")) return isAdmin(role, secondaryRole) || role === "MANAGEMENT" || role === "PARTNER";
+  if (pathname.startsWith("/admin/mom/")) return isAdmin(role, secondaryRole) || role === "MANAGEMENT" || role === "HR" || secondaryRole === "HR";
   if (pathname.startsWith("/admin")) return isAdmin(role, secondaryRole);
+  if (pathname.startsWith("/management/slabs")) return isManagement(role, secondaryRole);
   if (pathname.startsWith("/management")) return isManagement(role, secondaryRole);
   if (pathname.startsWith("/reviewer")) return isReviewer(role) || isAdmin(role, secondaryRole) || secondaryRole === "HR" || secondaryRole === "TL" || secondaryRole === "MANAGER";
   if (pathname.startsWith("/employee")) return canBeAppraised(role);

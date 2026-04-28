@@ -35,6 +35,7 @@ enum CycleStatus {
   AWAITING_AVAILABILITY
   RATING_IN_PROGRESS
   RATINGS_COMPLETE
+  MANAGEMENT_REVIEW
   DATE_VOTING
   SCHEDULED
   DECIDED
@@ -123,6 +124,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   cyclesAsEmployee  AppraisalCycle[]    @relation("EmpCycles")
+  cyclesClaimed     AppraisalCycle[]    @relation("CycleClaimedBy")
   assignmentsMade   CycleAssignment[]   @relation("AssignedBy")
   assignments       CycleAssignment[]   @relation("Reviewer")
   ratings           Rating[]
@@ -191,8 +193,13 @@ model AppraisalCycle {
   startDate        DateTime
   status           CycleStatus @default(PENDING_SELF)
   scheduledDate    DateTime?
+  tentativeDate1   DateTime?
+  tentativeDate2   DateTime?
   isManagerCycle   Boolean     @default(false)
   ratingDeadline   DateTime?
+  claimedById      String?
+  claimedBy        User?       @relation("CycleClaimedBy", fields: [claimedById], references: [id])
+  claimedAt        DateTime?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -209,6 +216,7 @@ model AppraisalCycle {
 
   @@index([userId, status])
   @@index([startDate])
+  @@index([status, claimedById])
 }
 
 model SelfAssessment {

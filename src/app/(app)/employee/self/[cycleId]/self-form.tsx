@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { submitSelfAction } from "./actions";
 import { motion } from "motion/react";
+import { Wand2 } from "lucide-react";
 import type { CriteriaCategory, SupplementarySection } from "@/lib/criteria";
 
 type CategoryAnswer = {
@@ -61,7 +62,18 @@ export function SelfForm({
   const [pending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(!!submittedAt);
   const [reviewing, setReviewing] = useState(false);
+  const [highlightedCriteria, setHighlightedCriteria] = useState<string | null>(null);
+  const criteriaRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const router = useRouter();
+
+  function scrollToMissed(catName: string) {
+    const el = criteriaRefs.current[catName];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedCriteria(catName);
+      setTimeout(() => setHighlightedCriteria(null), 2500);
+    }
+  }
 
   const deadline = new Date(editableUntil);
   const now = new Date();
@@ -89,18 +101,66 @@ export function SelfForm({
     setSuppAnswers((prev) => ({ ...prev, [id]: value }));
   }
 
+  type PerformerPreset = "high" | "average" | "low";
+  const [performerPreset, setPerformerPreset] = useState<PerformerPreset>("high");
+
+  function demoFill() {
+    const multipliers: Record<PerformerPreset, number> = { high: 0.9, average: 0.65, low: 0.4 };
+    const base = multipliers[performerPreset];
+    const COMMENTS: Record<PerformerPreset, (cat: string) => string> = {
+      high: (c) => `I consistently delivered high-quality results in ${c.toLowerCase()}, exceeding expectations.`,
+      average: (c) => `I met expectations in ${c.toLowerCase()} and am working to improve further.`,
+      low: (c) => `I faced challenges in ${c.toLowerCase()} and am actively seeking guidance to improve.`,
+    };
+    const QUESTION_ANSWER: Record<PerformerPreset, string> = {
+      high: "I proactively took ownership, collaborated effectively, and delivered results ahead of schedule.",
+      average: "I completed assigned tasks on time and collaborated with the team when needed.",
+      low: "I completed the basic requirements but struggled with some areas that need improvement.",
+    };
+    const newAnswers: Record<string, CategoryAnswer> = {};
+    employeeCategories.forEach((cat, i) => {
+      const jitter = ((i % 3) - 1) * 0.05;
+      const ratio = Math.min(1, Math.max(0.1, base + jitter));
+      const score = Math.round(cat.maxPoints * ratio);
+      const qAnswers: Record<string, string> = {};
+      cat.questions.forEach((q) => { qAnswers[q] = QUESTION_ANSWER[performerPreset]; });
+      newAnswers[cat.name] = { score, comment: COMMENTS[performerPreset](cat.name), questionAnswers: qAnswers };
+    });
+    setAnswers(newAnswers);
+    const newSupp: Record<string, string> = {};
+    for (const sec of supplementary) {
+      for (const q of sec.questions) {
+        if (q.numericOnly) {
+          newSupp[q.id] = performerPreset === "high" ? "50000" : performerPreset === "average" ? "30000" : "15000";
+        } else if (q.type === "choice" && q.choices) {
+          newSupp[q.id] = q.choices[performerPreset === "high" ? 0 : performerPreset === "average" ? 1 : 2] ?? q.choices[0];
+        } else {
+          newSupp[q.id] = QUESTION_ANSWER[performerPreset];
+        }
+      }
+    }
+    setSuppAnswers(newSupp);
+    toast.success("Demo data filled — review before submitting");
+  }
+
   function submit() {
     for (const cat of employeeCategories) {
       const ans = answers[cat.name];
-      if (!ans?.comment?.trim()) {
-        toast.error(`Add summary comment for: ${cat.name}`);
-        return;
-      }
       for (const q of cat.questions) {
         if (!ans.questionAnswers?.[q]?.trim()) {
-          toast.error(`Answer all questions in: ${cat.name}`);
+          toast.error(`Answer all questions in: ${cat.name}`, {
+            action: { label: "Go there", onClick: () => scrollToMissed(cat.name) },
+          });
+          scrollToMissed(cat.name);
           return;
         }
+      }
+      if (!ans?.comment?.trim()) {
+        toast.error(`Add summary comment for: ${cat.name}`, {
+          action: { label: "Go there", onClick: () => scrollToMissed(cat.name) },
+        });
+        scrollToMissed(cat.name);
+        return;
       }
     }
     for (const sec of supplementary) {
@@ -187,13 +247,19 @@ export function SelfForm({
         <div className="space-y-4">
           {employeeCategories.map((cat, idx) => {
             const ans = answers[cat.name] ?? { score: 0, comment: "", questionAnswers: {} };
+            const isHighlighted = highlightedCriteria === cat.name;
             return (
               <motion.div
                 key={cat.name}
+                ref={(el) => { criteriaRefs.current[cat.name] = el; }}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4"
+                className={`bg-white dark:bg-slate-900 border rounded-xl p-4 space-y-4 transition-all duration-500 ${
+                  isHighlighted
+                    ? "border-amber-400 shadow-lg shadow-amber-100 dark:shadow-amber-900/20 ring-2 ring-amber-300 dark:ring-amber-600"
+                    : "border-slate-200 dark:border-slate-700"
+                }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -369,6 +435,39 @@ export function SelfForm({
               {editCount > 0 && ` · ${editCount} edit${editCount !== 1 ? "s" : ""} made`}
             </div>
           )}
+
+          {/* Demo Fill */}
+          <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+              <Wand2 className="size-3.5" />
+              Demo Fill — auto-fill all fields
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {(["high", "average", "low"] as PerformerPreset[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPerformerPreset(p)}
+                  className={`text-[10px] px-2.5 py-1 rounded-full border transition-colors font-medium ${
+                    performerPreset === p
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                  }`}
+                >
+                  {p === "high" ? "High Performer" : p === "average" ? "Average Performer" : "Low Performer"}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={demoFill}
+              className="w-full text-xs border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 rounded-lg py-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center justify-center gap-1.5 font-medium transition-colors"
+            >
+              <Wand2 className="size-3" />
+              Auto-fill all fields
+            </button>
+          </div>
+
           <Button onClick={submit} disabled={pending} className="w-full h-11">
             {pending
               ? (submitted ? "Saving..." : "Submitting...")

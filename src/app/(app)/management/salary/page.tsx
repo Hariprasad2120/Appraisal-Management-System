@@ -7,7 +7,7 @@ export default async function SalaryPage() {
   const [slabs, readyCycles] = await Promise.all([
     prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } }),
     prisma.appraisalCycle.findMany({
-      where: { status: { in: ["RATINGS_COMPLETE", "DATE_VOTING", "SCHEDULED", "DECIDED"] } },
+      where: { status: { in: ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"] } },
       include: {
         user: { include: { salary: true } },
         ratings: true,

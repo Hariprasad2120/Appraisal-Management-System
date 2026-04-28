@@ -4,7 +4,7 @@ import { ROLE_HOME } from "@/lib/rbac";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/db";
 import type { Role } from "@/generated/prisma/enums";
-import { LogOut, Bell } from "lucide-react";
+import { LogOut, Bell, FlaskConical } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PersistentPopup } from "@/components/persistent-popup";
@@ -33,6 +33,17 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const unread = await prisma.notification.count({
     where: { userId: id, read: false },
   });
+
+  const isAdmin = role === "ADMIN" || secondaryRole === "ADMIN";
+  let isSimulationActive = false;
+  if (isAdmin) {
+    const lastSimLog = await prisma.auditLog.findFirst({
+      where: { action: "SIMULATION_MODE" },
+      orderBy: { createdAt: "desc" },
+    });
+    const after = lastSimLog?.after as { active?: boolean } | null;
+    isSimulationActive = after?.active === true;
+  }
 
   const persistentNotifications = await prisma.notification.findMany({
     where: { userId: id, persistent: true, dismissed: false },
@@ -153,6 +164,17 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
+
+        {/* Simulation mode banner */}
+        {isSimulationActive && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/90 text-white text-xs font-semibold z-50">
+            <FlaskConical className="size-3.5 shrink-0" />
+            Simulation Mode Active — deadlines modified for testing
+            <Link href="/admin/simulation" className="ml-auto underline underline-offset-2 hover:opacity-80">
+              Manage →
+            </Link>
+          </div>
+        )}
 
         {/* Main content */}
         <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>

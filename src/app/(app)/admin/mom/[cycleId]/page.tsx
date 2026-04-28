@@ -9,7 +9,8 @@ import { MomEditor } from "./mom-editor";
 export default async function MomPage({ params }: { params: Promise<{ cycleId: string }> }) {
   const { cycleId } = await params;
   const session = await auth();
-  if (!session?.user || (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN")) return null;
+  const allowed = ["ADMIN", "MANAGEMENT", "HR"];
+  if (!session?.user || (!allowed.includes(session.user.role) && !(session.user.secondaryRole && allowed.includes(session.user.secondaryRole)))) return null;
 
   const cycle = await prisma.appraisalCycle.findUnique({
     where: { id: cycleId },

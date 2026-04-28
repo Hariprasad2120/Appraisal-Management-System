@@ -20,6 +20,7 @@ import {
   TrendingUp,
   ListChecks,
   Ticket,
+  FlaskConical,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
@@ -43,6 +44,7 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
       { href: "/admin/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
       { href: "/admin/salary-sheet", label: "Salary Sheet", icon: <BarChart3 className="size-4" /> },
       { href: "/admin/salary-revisions", label: "Salary Revisions", icon: <TrendingUp className="size-4" /> },
+      { href: "/admin/simulation", label: "Simulation / Time Travel", icon: <FlaskConical className="size-4" /> },
       { href: "/employee", label: "My Appraisal", icon: <Star className="size-4" /> },
       { href: "/history", label: "History", icon: <History className="size-4" /> },
       { href: "/tickets", label: "My Tickets", icon: <Ticket className="size-4" /> },
@@ -52,6 +54,7 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
     return [
       dashboard,
       { href: "/management/salary", label: "Salary Calculator", icon: <BarChart3 className="size-4" /> },
+      { href: "/management/slabs", label: "Increment Slabs", icon: <Layers className="size-4" /> },
       { href: "/admin/employees", label: "Employees", icon: <Users className="size-4" /> },
       { href: "/history", label: "History", icon: <History className="size-4" /> },
       { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },

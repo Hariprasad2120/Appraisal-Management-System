@@ -19,6 +19,7 @@ import { ManagementCharts } from "./management-charts";
 
 const STATUS_BADGE: Record<string, string> = {
   RATINGS_COMPLETE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  MANAGEMENT_REVIEW: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   DATE_VOTING: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   SCHEDULED: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
   DECIDED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
@@ -31,6 +32,7 @@ const ALL_STATUSES: CycleStatus[] = [
   "AWAITING_AVAILABILITY",
   "RATING_IN_PROGRESS",
   "RATINGS_COMPLETE",
+  "MANAGEMENT_REVIEW",
   "DATE_VOTING",
   "SCHEDULED",
   "DECIDED",
@@ -47,6 +49,7 @@ export default async function ManagementDashboard() {
             salaryRevisions: { orderBy: { effectiveFrom: "desc" }, take: 3 },
           },
         },
+        claimedBy: { select: { name: true } },
         ratings: true,
         decision: { include: { slab: true } },
         assignments: { select: { reviewer: { select: { name: true } }, role: true } },
@@ -66,10 +69,10 @@ export default async function ManagementDashboard() {
   ]);
 
   const actionableCycles = cycles.filter((c) =>
-    ["RATINGS_COMPLETE", "DATE_VOTING", "SCHEDULED", "DECIDED"].includes(c.status)
+    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"].includes(c.status)
   );
   const totalDecided = cycles.filter((c) => c.status === "DECIDED").length;
-  const totalPending = cycles.filter((c) => c.status === "RATINGS_COMPLETE").length;
+  const totalPending = cycles.filter((c) => c.status === "MANAGEMENT_REVIEW" || c.status === "RATINGS_COMPLETE").length;
   const totalClosed = cycles.filter((c) => c.status === "CLOSED").length;
 
   const decidedCycles = cycles
@@ -295,6 +298,7 @@ export default async function ManagementDashboard() {
                     <th className="px-4 font-medium">Est. Hike</th>
                     <th className="px-4 font-medium">Current Gross</th>
                     <th className="px-4 font-medium">Reviewers</th>
+                    <th className="px-4 font-medium">Claim</th>
                     <th className="px-4 font-medium">Action</th>
                   </tr>
                 </thead>
@@ -383,9 +387,18 @@ export default async function ManagementDashboard() {
                         <td className="px-4 text-muted-foreground text-xs">
                           {grossAnnum ? fmt(grossAnnum) : "—"}
                         </td>
-                        <td className="px-4 text-muted-foreground text-xs">
+                      <td className="px-4 text-muted-foreground text-xs">
                           {reviewerNames || "—"}
                         </td>
+                      <td className="px-4 text-muted-foreground text-xs">
+                        {c.claimedBy?.name ? (
+                          <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full px-2 py-0.5">
+                            {toTitleCase(c.claimedBy.name)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                         <td className="px-4">
                           <Link
                             href={`/management/decide/${c.id}`}

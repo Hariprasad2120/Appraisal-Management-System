@@ -7,22 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { submitRatingAction } from "./actions";
 import { motion } from "motion/react";
-import { Info } from "lucide-react";
+import { Info, Wand2 } from "lucide-react";
 import type { CriteriaCategory } from "@/lib/criteria";
 import { GRADE_BANDS } from "@/lib/criteria";
-import { TrendingUp, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+
+type PerformerPreset = "high" | "average" | "low";
 
 type Score = number | "AVERAGE_OUT";
-
-type Slab = {
-  id: string;
-  label: string;
-  grade: string;
-  minRating: number;
-  maxRating: number;
-  hikePercent: number;
-  salaryTier: string;
-};
 
 export function RateForm({
   cycleId,
@@ -30,18 +22,14 @@ export function RateForm({
   categories,
   totalMaxPoints,
   peerRatingExists,
-  slabs,
-  grossAnnum,
-  employeeSalaryTier,
+  isAdmin = false,
 }: {
   cycleId: string;
   role: "HR" | "TL" | "MANAGER";
   categories: CriteriaCategory[];
   totalMaxPoints: number;
   peerRatingExists: boolean;
-  slabs?: Slab[];
-  grossAnnum?: number | null;
-  employeeSalaryTier?: string | null;
+  isAdmin?: boolean;
 }) {
   const [scores, setScores] = useState<Record<string, Score>>(
     Object.fromEntries(categories.map((c) => [c.name, 0])),
@@ -55,7 +43,36 @@ export function RateForm({
   const router = useRouter();
   const criteriaRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  const [performerPreset, setPerformerPreset] = useState<PerformerPreset>("high");
   const isTL = role === "TL";
+
+  function demoFill() {
+    const multipliers: Record<PerformerPreset, number> = { high: 0.9, average: 0.65, low: 0.4 };
+    const base = multipliers[performerPreset];
+    const DEMO_COMMENTS: Record<PerformerPreset, string> = {
+      high: "Consistently exceeds expectations with outstanding quality of work.",
+      average: "Meets expectations reliably; shows good potential for growth.",
+      low: "Requires improvement in key areas; additional support recommended.",
+    };
+    const CAT_COMMENTS: Record<PerformerPreset, (cat: string) => string> = {
+      high: (c) => `Strong performance in ${c.toLowerCase()}. Sets a benchmark for the team.`,
+      average: (c) => `Adequate performance in ${c.toLowerCase()}. Room for further development.`,
+      low: (c) => `Needs focused improvement in ${c.toLowerCase()}. Coaching recommended.`,
+    };
+    // Vary scores slightly across categories for realism
+    const newScores: Record<string, Score> = {};
+    categories.forEach((cat, i) => {
+      const jitter = ((i % 3) - 1) * 0.07;
+      const ratio = Math.min(1, Math.max(0.1, base + jitter));
+      newScores[cat.name] = Math.round(cat.maxPoints * ratio * 2) / 2;
+    });
+    setScores(newScores);
+    const newCatComments: Record<string, string> = {};
+    categories.forEach((cat) => { newCatComments[cat.name] = CAT_COMMENTS[performerPreset](cat.name); });
+    setCatComments(newCatComments);
+    setOverallComments(DEMO_COMMENTS[performerPreset]);
+    toast.success("Demo data filled — review before submitting");
+  }
 
   function setScore(name: string, value: Score) {
     if (value === "AVERAGE_OUT") {
@@ -79,24 +96,9 @@ export function RateForm({
   const normalizedScore = (totalRaw / totalMaxPoints) * 100;
   const normalizedPreview = normalizedScore.toFixed(1);
 
-  // Dynamic slab lookup based on current score
-  const matchedSlab = slabs && employeeSalaryTier
-    ? slabs.find(
-        (s) =>
-          normalizedScore >= s.minRating &&
-          normalizedScore <= s.maxRating &&
-          (s.salaryTier === employeeSalaryTier || s.salaryTier === "ALL"),
-      ) ?? null
-    : null;
-
   const currentGrade = GRADE_BANDS.find(
     (b) => normalizedScore >= b.minNormalized && normalizedScore <= b.maxNormalized,
   ) ?? null;
-
-  const hikeAmount =
-    matchedSlab && grossAnnum
-      ? Math.round((grossAnnum * matchedSlab.hikePercent) / 100)
-      : null;
 
   const gradeColorMap: Record<string, string> = {
     "A+": "text-emerald-600 bg-emerald-50 border-emerald-200",
@@ -197,11 +199,6 @@ export function RateForm({
                 {currentGrade.grade} · {currentGrade.label}
               </span>
             )}
-            {matchedSlab && (
-              <span className="flex items-center gap-1 text-xs font-bold text-green-600">
-                <TrendingUp className="size-3" />{matchedSlab.hikePercent}%
-              </span>
-            )}
             <div className="text-right">
               <div className="text-xl font-bold text-[#008993]">{normalizedPreview}</div>
               <div className="text-[10px] text-slate-400">/ 100</div>
@@ -228,7 +225,6 @@ export function RateForm({
 
       {/* Full score card (non-sticky reference) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 space-y-3">
-        {/* Dynamic slab feedback */}
         {currentGrade && (
           <div className={`rounded-lg border px-3 py-2 flex items-center justify-between gap-3 ${gradeColorMap[currentGrade.grade] ?? "bg-slate-50 border-slate-200 text-slate-600"}`}>
             <div className="flex items-center gap-2">
@@ -238,25 +234,10 @@ export function RateForm({
                 <div className="text-[10px] opacity-70">Score {currentGrade.minNormalized}–{currentGrade.maxNormalized}</div>
               </div>
             </div>
-            {matchedSlab ? (
-              <div className="text-right">
-                <div className="flex items-center gap-1 justify-end">
-                  <TrendingUp className="size-3" />
-                  <span className="text-sm font-bold">{matchedSlab.hikePercent}% hike</span>
-                </div>
-                {hikeAmount !== null && (
-                  <div className="text-[10px] opacity-70 mt-0.5">
-                    +₹{hikeAmount.toLocaleString("en-IN")}/yr
-                  </div>
-                )}
-                <div className="text-[9px] opacity-60 mt-0.5">{matchedSlab.label}</div>
-              </div>
-            ) : slabs && slabs.length > 0 ? (
-              <div className="flex items-center gap-1 text-[10px] opacity-70">
-                <AlertCircle className="size-3" />
-                No slab match
-              </div>
-            ) : null}
+            <div className="flex items-center gap-1 text-[10px] opacity-70">
+              <AlertCircle className="size-3" />
+              Increments are decided by Admin/Management
+            </div>
           </div>
         )}
       </div>
@@ -369,6 +350,41 @@ export function RateForm({
         <div className="flex gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
           <Info className="size-3.5 shrink-0 mt-0.5" />
           As TL, Average Out is not available to you.
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            <Wand2 className="size-3.5" />
+            Demo Fill (Admin only)
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {(["high", "average", "low"] as PerformerPreset[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPerformerPreset(p)}
+                className={`text-[10px] px-2.5 py-1 rounded-full border transition-colors font-medium capitalize ${
+                  performerPreset === p
+                    ? "bg-amber-500 text-white border-amber-500"
+                    : "border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                }`}
+              >
+                {p === "high" ? "High Performer" : p === "average" ? "Average Performer" : "Low Performer"}
+              </button>
+            ))}
+          </div>
+          <Button
+            type="button"
+            onClick={demoFill}
+            variant="outline"
+            size="sm"
+            className="w-full text-xs border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400"
+          >
+            <Wand2 className="size-3 mr-1.5" />
+            Auto-fill all fields
+          </Button>
         </div>
       )}
 

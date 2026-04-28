@@ -69,6 +69,30 @@ export async function submitAvailabilityAction(input: z.infer<typeof schema>): P
     },
   });
 
+  // Notify the appraisee about reviewer availability update
+  {
+    const cycle = await prisma.appraisalCycle.findUnique({
+      where: { id: assignment.cycleId },
+      select: { userId: true },
+    });
+    const reviewer = await prisma.user.findUnique({
+      where: { id: assignment.reviewerId },
+      select: { name: true },
+    });
+    if (cycle && reviewer) {
+      const statusLabel = parsed.data.choice === "AVAILABLE" ? "available" : "not available";
+      await prisma.notification.create({
+        data: {
+          userId: cycle.userId,
+          type: "REVIEWER_AVAILABILITY",
+          message: `${reviewer.name} (${assignment.role}) has marked themselves as ${statusLabel} for your appraisal.`,
+          link: "/employee",
+          persistent: false,
+        },
+      });
+    }
+  }
+
   if (parsed.data.choice === "NOT_AVAILABLE") {
     // Fetch reviewer name and cycle employee for context
     const reviewer = await prisma.user.findUnique({

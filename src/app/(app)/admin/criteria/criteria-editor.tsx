@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useEffect, useState, useTransition, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,11 +24,14 @@ export function CriteriaEditor({
   reviewerOnly?: boolean;
 }) {
   const nextId = useRef(0);
-  const makeEntries = (qs: string[]): QuestionEntry[] =>
-    qs.map((text) => ({ id: nextId.current++, text }));
+  const baseQuestions = existingOverride ? existingOverride.questions : [...category.questions];
   const [questions, setQuestions] = useState<QuestionEntry[]>(() =>
-    makeEntries(existingOverride ? existingOverride.questions : [...category.questions]),
+    baseQuestions.map((text, i) => ({ id: i + 1, text })),
   );
+  useEffect(() => {
+    nextId.current = questions.length + 1;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [maxPoints, setMaxPoints] = useState<number>(
     existingOverride?.maxPoints ?? category.maxPoints,
   );
@@ -85,7 +88,8 @@ export function CriteriaEditor({
     startReset(async () => {
       const res = await resetCriteriaOverrideAction(category.name);
       if (res.ok) {
-        setQuestions(makeEntries([...category.questions]));
+        nextId.current = category.questions.length + 1;
+        setQuestions(category.questions.map((text, i) => ({ id: i + 1, text })));
         setMaxPoints(category.maxPoints);
         toast.success("Reset to defaults");
       } else {
