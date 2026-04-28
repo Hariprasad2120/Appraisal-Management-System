@@ -22,6 +22,7 @@ const STATUS_COLORS: Record<string, string> = {
   AWAITING_AVAILABILITY: "bg-yellow-400",
   RATING_IN_PROGRESS: "bg-blue-400",
   RATINGS_COMPLETE: "bg-cyan-400",
+  MANAGEMENT_REVIEW: "bg-cyan-400",
   DATE_VOTING: "bg-indigo-400",
   SCHEDULED: "bg-purple-400",
   DECIDED: "bg-green-400",

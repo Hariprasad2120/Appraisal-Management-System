@@ -13,6 +13,8 @@ const STATUS_COLORS: Record<string, string> = {
     "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
   RATINGS_COMPLETE:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  MANAGEMENT_REVIEW:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   SCHEDULED:
     "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
   PENDING_SELF:

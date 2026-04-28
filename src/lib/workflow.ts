@@ -71,8 +71,13 @@ export function getVisibleAverageForReviewer(
   return ratings.reduce((sum, rating) => sum + rating.averageScore, 0) / ratings.length;
 }
 
-export function computeCycleStatus(cycle: WorkflowCycle, now = new Date()): CycleStatus {
-  if (cycle.status === "DECIDED" || cycle.status === "CLOSED" || cycle.status === "SCHEDULED") {
+export function computeCycleStatus(cycle: WorkflowCycle): CycleStatus {
+  if (
+    cycle.status === "DECIDED" ||
+    cycle.status === "CLOSED" ||
+    cycle.status === "SCHEDULED" ||
+    cycle.status === "MANAGEMENT_REVIEW"
+  ) {
     return cycle.status;
   }
 
@@ -81,7 +86,9 @@ export function computeCycleStatus(cycle: WorkflowCycle, now = new Date()): Cycl
   );
 
   if (availableAssignments.length > 0 && cycle.ratings.length >= availableAssignments.length) {
-    return "RATINGS_COMPLETE";
+    // New explicit final stage: management reviews once all assigned reviewers submitted.
+    // Backward-compat: older cycles may already be RATINGS_COMPLETE; callers should treat both as equivalent.
+    return "MANAGEMENT_REVIEW";
   }
 
   if (cycle.ratings.length > 0) {
@@ -98,7 +105,7 @@ export function computeCycleStatus(cycle: WorkflowCycle, now = new Date()): Cycl
   return "AWAITING_AVAILABILITY";
 }
 
-export async function syncCycleStatus(cycleId: string, now = new Date()): Promise<CycleStatus | null> {
+export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | null> {
   const cycle = await prisma.appraisalCycle.findUnique({
     where: { id: cycleId },
     include: {
@@ -125,7 +132,7 @@ export async function syncCycleStatus(cycleId: string, now = new Date()): Promis
 
   if (!cycle) return null;
 
-  const nextStatus = computeCycleStatus(cycle, now);
+  const nextStatus = computeCycleStatus(cycle);
   if (cycle.status !== nextStatus) {
     await prisma.appraisalCycle.update({
       where: { id: cycleId },

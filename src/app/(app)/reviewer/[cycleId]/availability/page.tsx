@@ -44,14 +44,14 @@ export default async function AvailabilityPage({
             </div>
 
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Are you available to review this employee's appraisal? This answer is{" "}
+              Are you available to review this employee&apos;s appraisal? This answer is{" "}
               <span className="font-medium text-slate-900 dark:text-white">final</span> — only admin
               can change it after submission.
             </p>
 
             <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3">
               <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
-              If you select "Not Available", admin will be notified to reassign.
+              If you select &quot;Not Available&quot;, admin will be notified to reassign.
             </div>
 
             <AvailabilityButtons assignmentId={assignment.id} />

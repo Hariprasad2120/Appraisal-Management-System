@@ -28,6 +28,7 @@ const STATUS_LABELS: Record<string, string> = {
   AWAITING_AVAILABILITY: "Reviewers confirming availability",
   RATING_IN_PROGRESS: "Rating in progress",
   RATINGS_COMPLETE: "Ratings complete",
+  MANAGEMENT_REVIEW: "Management review",
   DATE_VOTING: "Scheduling meeting",
   SCHEDULED: "Meeting scheduled",
   DECIDED: "Decision finalized",

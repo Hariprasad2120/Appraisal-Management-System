@@ -16,6 +16,7 @@ import { ManagementCharts } from "../management/management-charts";
 
 const STATUS_BADGE: Record<string, string> = {
   RATINGS_COMPLETE: "bg-green-100 text-green-700",
+  MANAGEMENT_REVIEW: "bg-green-100 text-green-700",
   DATE_VOTING: "bg-purple-100 text-purple-700",
   SCHEDULED: "bg-teal-100 text-teal-700",
   DECIDED: "bg-emerald-100 text-emerald-700",
@@ -52,7 +53,7 @@ export default async function PartnerDashboard() {
     ["PENDING_SELF", "SELF_SUBMITTED", "AWAITING_AVAILABILITY", "RATING_IN_PROGRESS"].includes(c.status),
   ).length;
   const totalReady = cycles.filter((c) =>
-    ["RATINGS_COMPLETE", "DATE_VOTING", "SCHEDULED"].includes(c.status),
+    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED"].includes(c.status),
   ).length;
 
   // Chart data
