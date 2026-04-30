@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { canAccessPath, ROLE_HOME } from "@/lib/rbac";
 
@@ -15,7 +16,16 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await auth();
+  let session: Session | null;
+  try {
+    session = await auth();
+  } catch {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(url);
+  }
+
   if (!session?.user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

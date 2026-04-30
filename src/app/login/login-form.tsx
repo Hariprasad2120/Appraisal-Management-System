@@ -22,7 +22,9 @@ export function LoginForm() {
     e.preventDefault();
     setErr(null);
     setLoading(true);
-    const res = await signIn("credentials", { email, password, redirect: false });
+    const userAgent = navigator.userAgent;
+    // IP resolution is done server-side; pass UA from client
+    const res = await signIn("credentials", { email, password, userAgent, redirect: false });
     setLoading(false);
     if (res?.error) {
       setErr("Invalid email or password. Please try again.");
@@ -36,8 +38,8 @@ export function LoginForm() {
     <div className="bg-card border border-border rounded-2xl shadow-md p-7 w-full">
       {/* Header */}
       <div className="mb-7">
-        <h2 className="text-xl font-bold text-foreground">Welcome back</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h2 className="ds-h2">Welcome back</h2>
+        <p className="ds-body mt-1">
           Sign in to your account to continue
         </p>
       </div>

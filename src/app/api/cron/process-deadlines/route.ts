@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { addBusinessDays } from "@/lib/business-days";
+import { syncCycleStatus } from "@/lib/workflow";
 
 /**
  * Called to process deadline events:
@@ -47,8 +48,8 @@ export async function POST() {
       day: "numeric", month: "short", year: "numeric",
     }) ?? "unknown";
 
-    // Set rating deadline (3 more business days from now)
-    const ratingDeadline = addBusinessDays(now, 3);
+    // Set rating deadline 3 business days after the self-assessment period closes.
+    const ratingDeadline = addBusinessDays(cycle.self.editableUntil, 3);
     await prisma.appraisalCycle.update({
       where: { id: cycle.id },
       data: { ratingDeadline },
@@ -63,6 +64,7 @@ export async function POST() {
           message: `${cycle.user.name} submitted their appraisal on ${submittedAt}${editCount > 0 ? ` (edited ${editCount} time${editCount !== 1 ? "s" : ""})` : ""}. You have 3 business days (until ${ratingDeadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}) to submit your rating.`,
           link: `/reviewer/${cycle.id}/rate`,
           persistent: true,
+          critical: true,
         },
       });
     }
@@ -84,6 +86,8 @@ export async function POST() {
   });
 
   for (const cycle of ratingExpiredCycles) {
+    await syncCycleStatus(cycle.id);
+
     const ratedIds = new Set(cycle.ratings.map((r) => r.reviewerId));
     const pendingReviewers = cycle.assignments.filter(
       (a) => a.availability === "AVAILABLE" && !ratedIds.has(a.reviewer.id),
@@ -108,6 +112,7 @@ export async function POST() {
           message: `Rating deadline for ${cycle.user.name}'s appraisal has passed. Please submit your rating immediately or request a time extension.`,
           link: `/reviewer/${cycle.id}`,
           persistent: true,
+          critical: true,
         },
       });
     }

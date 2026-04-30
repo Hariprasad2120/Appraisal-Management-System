@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { getSalaryTier } from "@/lib/criteria";
+import { getSystemDate } from "@/lib/system-date";
+import { isManagementReviewOpen } from "@/lib/workflow";
 
 function addBusinessDays(from: Date, days: number): Date {
   let count = 0;
@@ -60,23 +62,27 @@ export async function submitTentativeDatesAction(
       data: { tentativeDate1: d1, tentativeDate2: d2, status: "DATE_VOTING" },
     });
 
-    // Notify HR reviewers of this cycle to pick from tentative dates
+    // Notify HR reviewers + admins of tentative dates
     const hrAssignments = await tx.cycleAssignment.findMany({
       where: { cycleId, role: "HR" },
       select: { reviewerId: true },
     });
+    const adminUsers = await tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } });
     const mgmtUser = await tx.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
     const d1Str = d1.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
     const d2Str = d2.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    const hrIds = hrAssignments.map((a) => a.reviewerId);
+    const tentativeNotifyIds = [...new Set([...hrIds, ...adminUsers.map((u) => u.id)])];
     await Promise.all(
-      hrAssignments.map((a) =>
+      tentativeNotifyIds.map((uid) =>
         tx.notification.create({
           data: {
-            userId: a.reviewerId,
+            userId: uid,
             type: "TENTATIVE_DATES_SET",
             message: `${mgmtUser?.name ?? "Management"} has proposed 2 tentative appraisal dates for ${cycle.user.name}: ${d1Str} or ${d2Str}. Please select the confirmed date.`,
-            link: `/reviewer/${cycleId}/schedule`,
+            link: hrIds.includes(uid) ? `/reviewer/${cycleId}/schedule` : `/management/decide/${cycleId}`,
             persistent: true,
+            critical: true,
           },
         })
       )
@@ -137,14 +143,16 @@ export async function hrSelectScheduledDateAction(
       data: { scheduledDate: chosen, status: "SCHEDULED" },
     });
 
-    // Notify: admins + concerned management user (claimedById only) + appraisee
-    const adminUsers = await tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } });
+    // Notify: admins + all management users + appraisee (critical — meeting date confirmed)
+    const [adminUsers, managementUsers] = await Promise.all([
+      tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
+      tx.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
+    ]);
     const notifyIds = new Set<string>([
       ...adminUsers.map((u) => u.id),
+      ...managementUsers.map((u) => u.id),
       cycle.userId, // appraisee
     ]);
-    // Only notify the specific management user who claimed this cycle
-    if (cycle.claimedById) notifyIds.add(cycle.claimedById);
 
     await Promise.all(
       [...notifyIds].map((userId) =>
@@ -155,6 +163,7 @@ export async function hrSelectScheduledDateAction(
             message: notificationMessage,
             link: userId === cycle.userId ? "/employee" : `/management/decide/${cycleId}`,
             persistent: true,
+            critical: true,
           },
         })
       )
@@ -198,14 +207,19 @@ export async function claimAppraisalAction(cycleId: string): Promise<Result> {
   if (!cycleId) return { ok: false, error: "Invalid cycle" };
 
   try {
+    const now = await getSystemDate();
     const res = await prisma.$transaction(async (tx) => {
       const cycle = await tx.appraisalCycle.findUnique({
         where: { id: cycleId },
-        select: { id: true, claimedById: true, status: true, userId: true },
+        include: {
+          self: { select: { editableUntil: true, submittedAt: true, locked: true } },
+          assignments: { select: { availability: true } },
+          ratings: { select: { averageScore: true, reviewerId: true } },
+        },
       });
       if (!cycle) return { ok: false as const, error: "Cycle not found" };
-      if (cycle.status !== "MANAGEMENT_REVIEW" && cycle.status !== "RATINGS_COMPLETE") {
-        return { ok: false as const, error: "Appraisal is not ready for management review" };
+      if (!isManagementReviewOpen(cycle, now)) {
+        return { ok: false as const, error: "Management review opens after the reviewer rating deadline is completed" };
       }
 
       if (cycle.claimedById && cycle.claimedById !== session.user.id && session.user.role !== "ADMIN") {
@@ -226,23 +240,59 @@ export async function claimAppraisalAction(cycleId: string): Promise<Result> {
           },
         });
 
-        // Notify admins + management users
-        const [adminUsers, managementUsers] = await Promise.all([
+        // Fetch employee name for notifications
+        const cycleUser = await tx.user.findUnique({ where: { id: cycle.userId }, select: { name: true } });
+        const empName = cycleUser?.name ?? "an employee";
+        const claimerName = session.user.name ?? "A management user";
+
+        // Dismiss RATINGS_COMPLETE notifications for other management users
+        const otherMgmtUsers = await tx.user.findMany({
+          where: { role: "MANAGEMENT", active: true, id: { not: session.user.id } },
+          select: { id: true },
+        });
+        if (otherMgmtUsers.length > 0) {
+          await tx.notification.updateMany({
+            where: {
+              userId: { in: otherMgmtUsers.map((u) => u.id) },
+              type: "RATINGS_COMPLETE",
+              link: `/management/decide/${cycleId}`,
+              dismissed: false,
+            },
+            data: { dismissed: true },
+          });
+          // Notify other management users that appraisal is claimed
+          await Promise.all(
+            otherMgmtUsers.map((u) =>
+              tx.notification.create({
+                data: {
+                  userId: u.id,
+                  type: "MANAGEMENT_CLAIMED",
+                  message: `${claimerName} has claimed ${empName}'s appraisal for management review.`,
+                  link: `/management/decide/${cycleId}`,
+                  persistent: true,
+                  critical: false,
+                },
+              })
+            )
+          );
+        }
+
+        // Notify admins + HR — FYI only, no action needed
+        const [adminUsers, hrUsers] = await Promise.all([
           tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
-          tx.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
+          tx.user.findMany({ where: { role: "HR", active: true }, select: { id: true } }),
         ]);
-        const notifyIds = [
-          ...new Set([...adminUsers.map((u) => u.id), ...managementUsers.map((u) => u.id)]),
-        ];
+        const adminHrIds = [...new Set([...adminUsers.map((u) => u.id), ...hrUsers.map((u) => u.id)])];
         await Promise.all(
-          notifyIds.map((userId) =>
+          adminHrIds.map((u) =>
             tx.notification.create({
               data: {
-                userId,
+                userId: u,
                 type: "MANAGEMENT_CLAIMED",
-                message: `Appraisal claimed by ${session.user.name} for management review.`,
-                link: `/management/decide/${cycleId}`,
-                persistent: false,
+                message: `${claimerName} has claimed ${empName}'s appraisal for management review.`,
+                link: null,
+                persistent: true,
+                critical: false,
               },
             }),
           ),
@@ -270,9 +320,19 @@ export async function finalizeDecisionAction(input: z.infer<typeof schema>): Pro
 
   const cycle = await prisma.appraisalCycle.findUnique({
     where: { id: cycleId },
-    include: { ratings: true, user: { include: { salary: true } } },
+    include: {
+      self: { select: { editableUntil: true, submittedAt: true, locked: true } },
+      assignments: { select: { availability: true } },
+      ratings: true,
+      user: { include: { salary: true } },
+    },
   });
   if (!cycle) return { ok: false, error: "Cycle not found" };
+
+  const now = await getSystemDate();
+  if (!isManagementReviewOpen(cycle, now)) {
+    return { ok: false, error: "Management review opens after the reviewer rating deadline is completed" };
+  }
 
   if (
     session.user.role !== "ADMIN" &&
@@ -292,20 +352,23 @@ export async function finalizeDecisionAction(input: z.infer<typeof schema>): Pro
   const dbTier =
     tierKey === "upto15k" ? "UPTO_15K" : tierKey === "upto30k" ? "BTW_15K_30K" : "ABOVE_30K";
 
+  // Floor rating before slab lookup so decimals (e.g. 60.5 → 60) match correctly
+  const flooredRating = Math.floor(finalRating);
+
   // Prefer slab linkage (rating → tier → slab → hike%)
   const resolvedSlab = slabId
     ? await prisma.incrementSlab.findUnique({ where: { id: slabId } })
     : (await prisma.incrementSlab.findFirst({
         where: {
-          minRating: { lte: finalRating },
-          maxRating: { gte: finalRating },
+          minRating: { lte: flooredRating },
+          maxRating: { gte: flooredRating },
           salaryTier: dbTier,
         },
       })) ??
       (await prisma.incrementSlab.findFirst({
         where: {
-          minRating: { lte: finalRating },
-          maxRating: { gte: finalRating },
+          minRating: { lte: flooredRating },
+          maxRating: { gte: flooredRating },
           salaryTier: "ALL",
         },
       }));
@@ -350,59 +413,66 @@ export async function finalizeDecisionAction(input: z.infer<typeof schema>): Pro
       data: cycleUpdateData,
     });
 
-    // Notify HR if tentative dates were set
+    // Notify HR + admins if tentative dates were set
     if (cycleUpdateData.tentativeDate1) {
       const hrAssignments = await tx.cycleAssignment.findMany({
         where: { cycleId, role: "HR" },
         select: { reviewerId: true },
       });
+      const adminUsersForDates = await tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } });
       const decidedUser = await tx.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
       const d1Str = (cycleUpdateData.tentativeDate1 as Date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
       const d2Str = (cycleUpdateData.tentativeDate2 as Date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+      const hrIds = hrAssignments.map((a) => a.reviewerId);
+      const datesNotifyIds = [...new Set([...hrIds, ...adminUsersForDates.map((u) => u.id)])];
       await Promise.all(
-        hrAssignments.map((a) =>
+        datesNotifyIds.map((uid) =>
           tx.notification.create({
             data: {
-              userId: a.reviewerId,
+              userId: uid,
               type: "TENTATIVE_DATES_SET",
               message: `${decidedUser?.name ?? "Management"} has proposed 2 tentative dates for ${cycle.user.name}'s appraisal: ${d1Str} or ${d2Str}. Please select the confirmed date.`,
-              link: `/reviewer/${cycleId}/schedule`,
+              link: hrIds.includes(uid) ? `/reviewer/${cycleId}/schedule` : `/management/decide/${cycleId}`,
               persistent: true,
+              critical: true,
             },
           })
         )
       );
     }
 
-    // Notify employee
+    // Notify employee — actionable, meeting date upcoming
     await tx.notification.create({
       data: {
         userId: cycle.userId,
         type: "APPRAISAL_DECIDED",
-        message: `Your appraisal decision has been finalized. Final rating: ${finalRating.toFixed(2)}. Increment: ₹${finalAmount.toLocaleString()}/yr.`,
+        message: `Your appraisal has been reviewed by management. Your meeting date will be communicated soon. Increment details will be shared after the meeting.`,
         link: "/employee",
         persistent: true,
+        critical: true,
       },
     });
 
-    // Notify all assigned reviewers + admins + management with summary
     const slabLabel = resolvedSlab?.label ?? "—";
     const summaryMsg = `Appraisal for ${cycle.user.name} finalized. Rating: ${finalRating.toFixed(2)}, Slab: ${slabLabel}, Increment: ₹${finalAmount.toLocaleString()}/yr.`;
+
+    // Reviewers: FYI — their work is fully done
+    const reviewerNotifyIds = reviewerIds.filter((id) => id !== cycle.userId);
     await Promise.all(
-      reviewerIds.map((reviewerId) =>
+      reviewerNotifyIds.map((reviewerId) =>
         tx.notification.create({
           data: {
             userId: reviewerId,
             type: "APPRAISAL_DECIDED",
             message: summaryMsg,
-            link: `/reviewer/${cycleId}`,
+            link: null,
             persistent: false,
           },
         })
       )
     );
 
-    // Notify admins and management
+    // Admins + management: FYI summary — decision already made, no further action
     const [adminUsers, managementUsers] = await Promise.all([
       tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
       tx.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
@@ -415,7 +485,7 @@ export async function finalizeDecisionAction(input: z.infer<typeof schema>): Pro
             userId,
             type: "APPRAISAL_DECIDED",
             message: summaryMsg,
-            link: `/management/decide/${cycleId}`,
+            link: null,
             persistent: false,
           },
         })
@@ -470,10 +540,11 @@ export async function updateHikePercentAction(
   const tierKey = getSalaryTier(monthlyGross);
   const dbTier =
     tierKey === "upto15k" ? "UPTO_15K" : tierKey === "upto30k" ? "BTW_15K_30K" : "ABOVE_30K";
+  const flooredFinalRating = Math.floor(cycle.decision.finalRating);
   const resolvedSlab = await prisma.incrementSlab.findFirst({
     where: {
-      minRating: { lte: cycle.decision.finalRating },
-      maxRating: { gte: cycle.decision.finalRating },
+      minRating: { lte: flooredFinalRating },
+      maxRating: { gte: flooredFinalRating },
       salaryTier: dbTier,
     },
   });

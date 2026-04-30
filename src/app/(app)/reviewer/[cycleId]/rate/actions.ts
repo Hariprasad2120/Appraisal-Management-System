@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { sendEmail, rateCompletedEmail } from "@/lib/email";
 import { isRatingOpen, syncCycleStatus } from "@/lib/workflow";
 import { CRITERIA_CATEGORIES, getCriteriaForRole } from "@/lib/criteria";
+import { getSystemDate } from "@/lib/system-date";
 
 const schema = z.object({
   cycleId: z.string(),
@@ -43,8 +44,9 @@ export async function submitRatingAction(input: z.infer<typeof schema>): Promise
   });
   if (!assignment) return { ok: false, error: "Not assigned" };
   if (assignment.availability !== "AVAILABLE") return { ok: false, error: "Not available" };
-  if (!isRatingOpen(assignment.cycle)) {
-    return { ok: false, error: "Reviewing opens after self-assessment is submitted or the deadline passes" };
+  const now = await getSystemDate();
+  if (!isRatingOpen(assignment.cycle, now)) {
+    return { ok: false, error: "Reviewing opens after the self-assessment period is completed" };
   }
 
   const existing = await prisma.rating.findFirst({ where: { cycleId, reviewerId: session.user.id } });
@@ -113,31 +115,58 @@ export async function submitRatingAction(input: z.infer<typeof schema>): Promise
       await sendEmail({ to: r.email, ...mail }).catch(() => {});
     }
 
-    // Popup notifications: admin + management + employee
-    const [adminUsers, managementUsers] = await Promise.all([
-      prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
-      prisma.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
-    ]);
-    const notifyIds = [
-      ...new Set([
-        ...adminUsers.map((u) => u.id),
-        ...managementUsers.map((u) => u.id),
-        cycleWithUser.user.id,
-      ]),
-    ];
+    const adminUsers = await prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } });
+    const reviewerName = session.user.name ?? role;
+    const adminIds = new Set(adminUsers.map((u) => u.id));
+
+    // Appraisee: FYI — one of their reviewers submitted a rating
+    if (!adminIds.has(cycleWithUser.user.id)) {
+      await prisma.notification.create({
+        data: {
+          userId: cycleWithUser.user.id,
+          type: "RATING_SUBMITTED",
+          message: `${reviewerName} (${role}) has submitted their rating for your appraisal.`,
+          link: "/employee",
+          persistent: true,
+          critical: true,
+        },
+      });
+    }
+
+    // Admins: FYI only — no action needed, no link
+    const adminNotifyIds = adminUsers.map((u) => u.id).filter((id) => id !== cycleWithUser.user.id);
     await Promise.all(
-      notifyIds.map((userId) =>
+      adminNotifyIds.map((userId) =>
         prisma.notification.create({
           data: {
             userId,
             type: "RATING_SUBMITTED",
-            message: `${role} reviewer has submitted their rating for ${cycleWithUser.user.name}'s appraisal.`,
-            link: userId === cycleWithUser.user.id ? "/employee" : `/management/decide/${cycleId}`,
-            persistent: false,
+            message: `${reviewerName} (${role}) submitted a rating for ${cycleWithUser.user.name}'s appraisal.`,
+            link: null,
+            persistent: true,
+            critical: false,
           },
         })
       )
     );
+
+    // Check if ALL reviewers have now rated — notify appraisee that ratings are complete
+    const availableAssignmentCount = await prisma.cycleAssignment.count({
+      where: { cycleId, availability: "AVAILABLE" },
+    });
+    const ratingCount = await prisma.rating.count({ where: { cycleId } });
+    if (availableAssignmentCount > 0 && ratingCount >= availableAssignmentCount) {
+      await prisma.notification.create({
+        data: {
+          userId: cycleWithUser.user.id,
+          type: "ALL_RATINGS_COMPLETE",
+          message: "All your reviewers have completed their ratings. Management review will open after the reviewer rating deadline is completed.",
+          link: "/employee",
+          persistent: true,
+          critical: true,
+        },
+      });
+    }
   }
 
   await syncCycleStatus(cycleId);

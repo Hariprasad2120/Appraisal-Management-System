@@ -8,7 +8,7 @@ import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
 import { getAppraisalEligibility, autoCycleType } from "@/lib/appraisal-eligibility";
 import { canBeAppraised } from "@/lib/rbac";
-import { Calendar, User, IndianRupee, TrendingUp, ExternalLink, CheckCircle, Circle, Clock } from "lucide-react";
+import { Calendar, User, IndianRupee, TrendingUp, ExternalLink, CheckCircle, Circle, Clock, ClipboardList, Star, FileCheck, CalendarCheck } from "lucide-react";
 import Link from "next/link";
 
 export default async function AssignPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,13 +26,15 @@ export default async function AssignPage({ params }: { params: Promise<{ id: str
   ]);
 
   const existingCycle = await prisma.appraisalCycle.findFirst({
-    where: { userId: id, status: { notIn: ["CLOSED", "DECIDED"] } },
+    where: { userId: id, status: { notIn: ["CLOSED"] } },
     include: {
       assignments: {
         include: { reviewer: { select: { id: true, name: true, role: true } } },
       },
       self: true,
       ratings: { select: { role: true, reviewerId: true, submittedAt: true, averageScore: true } },
+      decision: { include: { slab: true } },
+      moms: { where: { role: "MANAGEMENT" } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -57,6 +59,23 @@ export default async function AssignPage({ params }: { params: Promise<{ id: str
   const selfDeadlinePassed = existingCycle?.self
     ? new Date() > existingCycle.self.editableUntil
     : false;
+
+  // Cycle is editable (reassign reviewers) only if no one has confirmed availability yet and no ratings exist
+  const anyAvailabilityConfirmed = existingCycle?.assignments.some(
+    (a) => a.availability !== "PENDING"
+  ) ?? false;
+  const hasRatings = (existingCycle?.ratings.length ?? 0) > 0;
+  const cycleIsEditable = !anyAvailabilityConfirmed && !hasRatings;
+
+  // Timeline stages for progress display
+  const allAvailable = existingCycle?.assignments.every((a) => a.availability === "AVAILABLE") ?? false;
+  const allRated = existingCycle
+    ? existingCycle.ratings.length >= existingCycle.assignments.filter((a) => a.availability === "AVAILABLE").length && existingCycle.assignments.length > 0
+    : false;
+  const hasDecision = !!existingCycle?.decision;
+  const hasScheduledDate = !!existingCycle?.scheduledDate;
+  const hasMom = (existingCycle?.moms.length ?? 0) > 0;
+  const meetingPassed = existingCycle?.scheduledDate ? new Date() >= new Date(existingCycle.scheduledDate) : false;
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -306,26 +325,163 @@ export default async function AssignPage({ params }: { params: Promise<{ id: str
         </Card>
       </FadeIn>
 
-      <FadeIn delay={0.1}>
-        <AssignForm
-          employeeId={employee.id}
-          employeeName={toTitleCase(employee.name)}
-          existingCycleId={existingCycle?.id ?? null}
-          existingCycleType={existingCycle?.type ?? null}
-          existingCycleIsManagerCycle={existingCycle?.isManagerCycle ?? false}
-          existingAssignments={
-            existingCycle?.assignments.map((a) => ({ role: a.role, reviewerId: a.reviewerId })) ?? []
-          }
-          autoType={autoType}
-          autoReason={eligibility.eligible ? eligibility.reason : `Tenure: ${monthsTenure} months`}
-          eligible={eligibility.eligible}
-          hrUsers={hrUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
-          tlUsers={tlUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
-          mgrUsers={mgrUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
-          appraiseeId={employee.id}
-          employeeRole={employee.role}
-        />
-      </FadeIn>
+      {/* Assign form — only shown when cycle hasn't started (no availability confirmed, no ratings) */}
+      {cycleIsEditable ? (
+        <FadeIn delay={0.1}>
+          <AssignForm
+            employeeId={employee.id}
+            employeeName={toTitleCase(employee.name)}
+            existingCycleId={existingCycle?.id ?? null}
+            existingCycleType={existingCycle?.type ?? null}
+            existingCycleIsManagerCycle={existingCycle?.isManagerCycle ?? false}
+            existingAssignments={
+              existingCycle?.assignments.map((a) => ({ role: a.role, reviewerId: a.reviewerId })) ?? []
+            }
+            autoType={autoType}
+            autoReason={eligibility.eligible ? eligibility.reason : `Tenure: ${monthsTenure} months`}
+            eligible={eligibility.eligible}
+            hrUsers={hrUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
+            tlUsers={tlUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
+            mgrUsers={mgrUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
+            appraiseeId={employee.id}
+            employeeRole={employee.role}
+          />
+        </FadeIn>
+      ) : existingCycle ? (
+        /* Dynamic progress timeline — replaces assign form once cycle is in progress */
+        <FadeIn delay={0.1}>
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Cycle Progress</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-0">
+              {[
+                {
+                  done: true,
+                  label: "Reviewers Assigned",
+                  detail: existingCycle.assignments.map((a) => `${a.role}: ${toTitleCase(a.reviewer.name)}`).join(", "),
+                  icon: CheckCircle,
+                  color: "text-green-500",
+                },
+                {
+                  done: allAvailable,
+                  label: "Reviewer Availability Confirmed",
+                  detail: allAvailable
+                    ? "All reviewers confirmed available"
+                    : existingCycle.assignments.some((a) => a.availability === "NOT_AVAILABLE")
+                    ? "Some reviewers unavailable — action required"
+                    : "Waiting for reviewers to respond",
+                  icon: allAvailable ? CheckCircle : Clock,
+                  color: allAvailable ? "text-green-500" : existingCycle.assignments.some((a) => a.availability === "NOT_AVAILABLE") ? "text-red-400" : "text-amber-400",
+                },
+                {
+                  done: selfSubmitted || selfDeadlinePassed,
+                  label: "Self-Assessment",
+                  detail: selfSubmitted
+                    ? `Submitted ${existingCycle.self?.submittedAt ? new Date(existingCycle.self.submittedAt).toLocaleDateString("en-IN") : ""}`
+                    : selfDeadlinePassed
+                    ? "Deadline passed without submission"
+                    : `Due ${existingCycle.self?.editableUntil.toLocaleDateString("en-IN")}`,
+                  icon: selfSubmitted || selfDeadlinePassed ? FileCheck : Clock,
+                  color: selfSubmitted ? "text-green-500" : selfDeadlinePassed ? "text-red-400" : "text-amber-400",
+                },
+                {
+                  done: allRated,
+                  label: "Reviewer Ratings",
+                  detail: allRated
+                    ? `All ${existingCycle.ratings.length} rating(s) submitted. Avg: ${(existingCycle.ratings.reduce((s, r) => s + r.averageScore, 0) / existingCycle.ratings.length).toFixed(2)}`
+                    : `${existingCycle.ratings.length} / ${existingCycle.assignments.filter((a) => a.availability === "AVAILABLE").length} submitted`,
+                  icon: allRated ? CheckCircle : Star,
+                  color: allRated ? "text-green-500" : existingCycle.ratings.length > 0 ? "text-blue-500" : "text-slate-400",
+                },
+                {
+                  done: hasDecision,
+                  label: "Management Decision",
+                  detail: hasDecision
+                    ? `Rating: ${existingCycle.decision!.finalRating.toFixed(2)} · Slab: ${existingCycle.decision!.slab?.label ?? "—"} · Increment: ₹${Number(existingCycle.decision!.finalAmount).toLocaleString("en-IN")}/yr`
+                    : "Pending management review",
+                  icon: hasDecision ? CheckCircle : Circle,
+                  color: hasDecision ? "text-green-500" : "text-slate-300",
+                },
+                {
+                  done: hasScheduledDate,
+                  label: "Meeting Scheduled",
+                  detail: hasScheduledDate
+                    ? new Date(existingCycle.scheduledDate!).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+                    : existingCycle.tentativeDate1 && existingCycle.tentativeDate2
+                    ? "HR selecting final date from proposed options"
+                    : "Tentative dates not yet proposed",
+                  icon: hasScheduledDate ? CalendarCheck : Calendar,
+                  color: hasScheduledDate ? "text-green-500" : "text-slate-300",
+                },
+                {
+                  done: hasMom,
+                  label: "MOM Recorded",
+                  detail: hasMom
+                    ? "Minutes of meeting recorded — cycle closed"
+                    : meetingPassed
+                    ? "Meeting passed — record MOM to finalize"
+                    : "Awaiting meeting",
+                  icon: hasMom ? CheckCircle : ClipboardList,
+                  color: hasMom ? "text-green-500" : meetingPassed ? "text-amber-500" : "text-slate-300",
+                  action: meetingPassed && !hasMom
+                    ? { label: "Record MOM", href: `/admin/mom/${existingCycle.id}` }
+                    : hasMom
+                    ? { label: "View MOM", href: `/admin/mom/${existingCycle.id}` }
+                    : undefined,
+                },
+              ].map((step, i, arr) => {
+                const Icon = step.icon;
+                const isLast = i === arr.length - 1;
+                return (
+                  <div key={step.label} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <Icon className={`size-5 shrink-0 mt-0.5 ${step.color}`} />
+                      {!isLast && <div className="w-px flex-1 bg-slate-100 dark:bg-slate-800 mt-1 mb-1" />}
+                    </div>
+                    <div className={`pb-4 flex-1 min-w-0 ${isLast ? "" : ""}`}>
+                      <p className={`text-sm font-semibold ${step.done ? "text-slate-900 dark:text-white" : "text-slate-400"}`}>
+                        {step.label}
+                      </p>
+                      <p className={`text-xs mt-0.5 ${step.done ? "text-slate-500" : "text-slate-400"}`}>
+                        {step.detail}
+                      </p>
+                      {"action" in step && step.action && (
+                        <Link
+                          href={step.action.href}
+                          className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-950/20 rounded px-2 py-0.5 border border-purple-200 dark:border-purple-800"
+                        >
+                          {step.action.label} →
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </FadeIn>
+      ) : (
+        /* No cycle — show assign form to start one */
+        <FadeIn delay={0.1}>
+          <AssignForm
+            employeeId={employee.id}
+            employeeName={toTitleCase(employee.name)}
+            existingCycleId={null}
+            existingCycleType={null}
+            existingCycleIsManagerCycle={false}
+            existingAssignments={[]}
+            autoType={autoType}
+            autoReason={eligibility.eligible ? eligibility.reason : `Tenure: ${monthsTenure} months`}
+            eligible={eligibility.eligible}
+            hrUsers={hrUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
+            tlUsers={tlUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
+            mgrUsers={mgrUsers.map((u) => ({ id: u.id, name: toTitleCase(u.name) }))}
+            appraiseeId={employee.id}
+            employeeRole={employee.role}
+          />
+        </FadeIn>
+      )}
 
       {existingCycle?.self && (
         <FadeIn delay={0.2}>

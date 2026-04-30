@@ -68,6 +68,7 @@ export async function adminAddCommentAction(input: z.infer<typeof commentSchema>
       message: `Admin replied to your ticket: "${ticket.title}"`,
       link: `/tickets`,
       persistent: true,
+      critical: false,
     },
   });
 

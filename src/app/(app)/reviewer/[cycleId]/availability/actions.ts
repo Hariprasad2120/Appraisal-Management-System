@@ -29,6 +29,7 @@ export async function forceMarkAvailableAction(assignmentId: string): Promise<{ 
       message: "Admin has marked you as AVAILABLE for an appraisal cycle. Please proceed to rate the employee.",
       link: `/reviewer/${assignment.cycleId}`,
       persistent: true,
+      critical: true,
     },
   });
 
@@ -69,30 +70,6 @@ export async function submitAvailabilityAction(input: z.infer<typeof schema>): P
     },
   });
 
-  // Notify the appraisee about reviewer availability update
-  {
-    const cycle = await prisma.appraisalCycle.findUnique({
-      where: { id: assignment.cycleId },
-      select: { userId: true },
-    });
-    const reviewer = await prisma.user.findUnique({
-      where: { id: assignment.reviewerId },
-      select: { name: true },
-    });
-    if (cycle && reviewer) {
-      const statusLabel = parsed.data.choice === "AVAILABLE" ? "available" : "not available";
-      await prisma.notification.create({
-        data: {
-          userId: cycle.userId,
-          type: "REVIEWER_AVAILABILITY",
-          message: `${reviewer.name} (${assignment.role}) has marked themselves as ${statusLabel} for your appraisal.`,
-          link: "/employee",
-          persistent: false,
-        },
-      });
-    }
-  }
-
   if (parsed.data.choice === "NOT_AVAILABLE") {
     // Fetch reviewer name and cycle employee for context
     const reviewer = await prisma.user.findUnique({
@@ -113,6 +90,7 @@ export async function submitAvailabilityAction(input: z.infer<typeof schema>): P
           message: `${reviewer?.name ?? "A reviewer"} marked NOT AVAILABLE for ${cycle?.user.name ?? "an employee"}'s appraisal. Action required: reassign or force-mark available.`,
           link: `/admin/employees/${cycle?.userId}/assign`,
           persistent: true,
+          critical: true,
         },
       });
     }

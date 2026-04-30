@@ -75,6 +75,7 @@ export function DecisionForm({
   mgmtCriteria,
   slabs,
   isAdmin = false,
+  maxTentativeDate,
 }: {
   cycleId: string;
   reviewerAvgRating: number;
@@ -86,6 +87,7 @@ export function DecisionForm({
   mgmtCriteria: MgmtCriterion[];
   slabs: SlabInfo[];
   isAdmin?: boolean;
+  maxTentativeDate?: string; // ISO date string: 30 business days from now
 }) {
   const [comments, setComments] = useState("");
   const [managementComment, setManagementComment] = useState("");
@@ -170,18 +172,21 @@ export function DecisionForm({
   const salaryTierKey =
     monthlyGross <= 15000 ? "UPTO_15K" : monthlyGross <= 30000 ? "BTW_15K_30K" : "ABOVE_30K";
 
+  // Floor before slab lookup so decimals (e.g. 60.5 → 60) match correctly
+  const flooredCompositeScore = Math.floor(compositeScore);
+
   // Find slab matching composite score AND salary tier (tier-specific first, then ALL fallback)
   const matchedSlab =
     slabs.find(
       (s) =>
-        compositeScore >= s.minRating &&
-        compositeScore <= s.maxRating &&
+        flooredCompositeScore >= s.minRating &&
+        flooredCompositeScore <= s.maxRating &&
         s.salaryTier === salaryTierKey,
     ) ??
     slabs.find(
       (s) =>
-        compositeScore >= s.minRating &&
-        compositeScore <= s.maxRating &&
+        flooredCompositeScore >= s.minRating &&
+        flooredCompositeScore <= s.maxRating &&
         s.salaryTier === "ALL",
     ) ??
     null;
@@ -578,7 +583,8 @@ export function DecisionForm({
                   Propose Tentative Meeting Dates
                 </Label>
                 <p className="text-[10px] text-slate-400">
-                  Both dates will be sent to HR to confirm one. Must be within 30 business days of today.
+                  Both dates will be sent to HR to confirm one. Must be within 30 business days of the decision date
+                  {maxTentativeDate ? ` (by ${new Date(maxTentativeDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })})` : ""}.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -588,6 +594,7 @@ export function DecisionForm({
                       value={tentDate1}
                       onChange={(e) => setTentDate1(e.target.value)}
                       min={new Date().toISOString().slice(0, 10)}
+                      max={maxTentativeDate ? maxTentativeDate.slice(0, 10) : undefined}
                       className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -598,6 +605,7 @@ export function DecisionForm({
                       value={tentDate2}
                       onChange={(e) => setTentDate2(e.target.value)}
                       min={new Date().toISOString().slice(0, 10)}
+                      max={maxTentativeDate ? maxTentativeDate.slice(0, 10) : undefined}
                       className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>

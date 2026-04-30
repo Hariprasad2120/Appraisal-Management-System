@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
@@ -11,8 +12,11 @@ import {
   IndianRupee,
   Activity,
   Building2,
+  Bell,
 } from "lucide-react";
 import { ManagementCharts } from "../management/management-charts";
+import { getSystemDate } from "@/lib/system-date";
+import { computeCycleStatus } from "@/lib/workflow";
 
 const STATUS_BADGE: Record<string, string> = {
   RATINGS_COMPLETE: "bg-green-100 text-green-700",
@@ -24,13 +28,16 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default async function PartnerDashboard() {
-  const [cycles, allEmployees] = await Promise.all([
+  const session = await auth();
+  const now = await getSystemDate();
+  const [cycles, allEmployees, recentNotifs] = await Promise.all([
     prisma.appraisalCycle.findMany({
       include: {
+        self: true,
         user: { include: { salary: true } },
         ratings: true,
         decision: { include: { slab: true } },
-        assignments: { select: { reviewer: { select: { name: true } }, role: true } },
+        assignments: { select: { reviewer: { select: { name: true } }, role: true, availability: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -46,14 +53,22 @@ export default async function PartnerDashboard() {
       },
       orderBy: { name: "asc" },
     }),
+    session?.user
+      ? prisma.notification.findMany({
+          where: { userId: session.user.id, read: false },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { id: true, message: true, link: true, createdAt: true },
+        })
+      : Promise.resolve([] as { id: string; message: string; link: string | null; createdAt: Date }[]),
   ]);
 
   const totalDecided = cycles.filter((c) => c.status === "DECIDED").length;
   const totalActive = cycles.filter((c) =>
-    ["PENDING_SELF", "SELF_SUBMITTED", "AWAITING_AVAILABILITY", "RATING_IN_PROGRESS"].includes(c.status),
+    ["PENDING_SELF", "SELF_SUBMITTED", "AWAITING_AVAILABILITY", "RATING_IN_PROGRESS"].includes(computeCycleStatus(c, now)),
   ).length;
   const totalReady = cycles.filter((c) =>
-    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED"].includes(c.status),
+    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED"].includes(computeCycleStatus(c, now)),
   ).length;
 
   // Chart data
@@ -115,8 +130,10 @@ export default async function PartnerDashboard() {
               <Building2 className="size-5 text-[#008993]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Partner Dashboard</h1>
-              <p className="text-slate-400 text-sm mt-0.5">Appraisal & workforce overview — Adarsh Shipping</p>
+              <h1 className="text-2xl font-bold text-white">
+                {session?.user ? `Good ${getGreeting(now)}, ${toTitleCase(session.user.name?.split(" ")[0] ?? "there")}` : "Partner Dashboard"}
+              </h1>
+              <p className="text-slate-400 text-sm mt-0.5">Appraisal &amp; workforce overview — Adarsh Shipping</p>
             </div>
           </div>
           <Link
@@ -150,6 +167,32 @@ export default async function PartnerDashboard() {
           </StaggerItem>
         ))}
       </StaggerList>
+
+      {/* Notifications */}
+      {recentNotifs.length > 0 && (
+        <FadeIn delay={0.12}>
+          <div className="border border-[#1a1a1a] rounded-xl bg-[#111] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-[#1a1a1a] flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                <Bell className="size-3.5" /> Notifications
+              </span>
+              <Link href="/notifications" className="text-[11px] text-[#00cec4] hover:underline">View all</Link>
+            </div>
+            <div className="divide-y divide-[#1a1a1a]">
+              {recentNotifs.map((n) => (
+                <div key={n.id} className="px-5 py-3 flex items-start gap-3">
+                  <span className="size-1.5 rounded-full bg-[#008993] shrink-0 mt-1.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-slate-300 line-clamp-2">{n.message}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{n.createdAt.toLocaleString("en-IN")}</p>
+                  </div>
+                  {n.link && <Link href={n.link} className="text-[11px] text-[#00cec4] shrink-0 hover:underline">View</Link>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </FadeIn>
+      )}
 
       {/* Charts */}
       <FadeIn delay={0.15}>
@@ -285,4 +328,11 @@ export default async function PartnerDashboard() {
       </FadeIn>
     </div>
   );
+}
+
+function getGreeting(now: Date): string {
+  const h = now.getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  return "evening";
 }

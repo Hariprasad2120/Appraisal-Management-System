@@ -10,6 +10,13 @@ export function addBusinessDays(date: Date, days: number): Date {
   return d;
 }
 
+/** Returns end-of-day (23:59:59.999) of N business days from date. */
+export function selfAssessmentDeadline(from: Date, businessDays = 3): Date {
+  const d = addBusinessDays(from, businessDays);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 export function isAnniversaryInMonth(joiningDate: Date, ref: Date): boolean {
   return joiningDate.getMonth() === ref.getMonth();
 }

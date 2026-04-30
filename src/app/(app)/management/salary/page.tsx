@@ -2,15 +2,19 @@ import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { SalaryCalculator } from "./salary-calculator";
 import { getSalaryTier } from "@/lib/criteria";
+import { getSystemDate } from "@/lib/system-date";
+import { computeCycleStatus } from "@/lib/workflow";
 
 export default async function SalaryPage() {
+  const now = await getSystemDate();
   const [slabs, readyCycles] = await Promise.all([
     prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } }),
     prisma.appraisalCycle.findMany({
-      where: { status: { in: ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"] } },
       include: {
+        self: true,
         user: { include: { salary: true } },
         ratings: true,
+        assignments: { select: { availability: true } },
         decision: { include: { slab: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -18,7 +22,11 @@ export default async function SalaryPage() {
     }),
   ]);
 
-  const employees = readyCycles.map((c) => {
+  const employees = readyCycles.filter((c) =>
+    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"].includes(
+      computeCycleStatus(c, now),
+    )
+  ).map((c) => {
     const avg = c.ratings.length > 0
       ? c.ratings.reduce((s, r) => s + r.averageScore, 0) / c.ratings.length
       : 0;
@@ -26,8 +34,9 @@ export default async function SalaryPage() {
     const monthlyGross = grossAnnum / 12;
     const tierKey = getSalaryTier(monthlyGross);
     const dbTier = tierKey === "upto15k" ? "UPTO_15K" : tierKey === "upto30k" ? "BTW_15K_30K" : "ABOVE_30K";
+    const flooredAvg = Math.floor(avg);
     const slab = slabs.find((s) =>
-      avg >= s.minRating && avg <= s.maxRating &&
+      flooredAvg >= s.minRating && flooredAvg <= s.maxRating &&
       (s.salaryTier === dbTier || s.salaryTier === "ALL")
     );
     return {

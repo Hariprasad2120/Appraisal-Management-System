@@ -54,6 +54,13 @@ enum ExtensionStatus {
   REJECTED
 }
 
+enum SelfAssessmentStatus {
+  DRAFT
+  SUBMITTED
+  REOPENED
+  LOCKED
+}
+
 enum RatingEvaluation {
   ACCURATE
   OVERRATED
@@ -72,6 +79,19 @@ enum TicketPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+enum ArrearStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum RescheduleStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
 }
 
 model User {
@@ -132,6 +152,7 @@ model User {
   decisionsMade     AppraisalDecision[] @relation("DecidedBy")
   notifications     Notification[]
   auditLogs         AuditLog[]
+  securityEvents    SecurityEvent[]
   momsCreated        MOM[]               @relation("MomAuthor")
   extensionsRaised   ExtensionRequest[]  @relation("ExtRequester")
   extensionsDecided  ExtensionRequest[]  @relation("ExtDecider")
@@ -141,6 +162,11 @@ model User {
   ticketsRaised        Ticket[]           @relation("TicketRaiser")
   ticketsAssigned    Ticket[]           @relation("TicketAssignee")
   ticketComments     TicketComment[]
+  userSessions       UserSession[]
+  arrears            Arrear[]           @relation("ArrearEmployee")
+  arrearApprovals    Arrear[]           @relation("ArrearApprover")
+  reschedulesCreated MeetingReschedule[] @relation("RescheduledBy")
+  reschedulesConfirmed MeetingReschedule[] @relation("RescheduleConfirmer")
 
   @@index([role, active])
 }
@@ -210,9 +236,11 @@ model AppraisalCycle {
   extensions    ExtensionRequest[]
   auditLogs     AuditLog[]
   votes         DateVote[]
-  mom                 MOM?
+  moms                MOM[]
   ratingReviews       RatingReview[]
   ratingDisagreements RatingDisagreement[]
+  arrear              Arrear?
+  reschedules         MeetingReschedule[]
 
   @@index([userId, status])
   @@index([startDate])
@@ -220,14 +248,16 @@ model AppraisalCycle {
 }
 
 model SelfAssessment {
-  id            String         @id @default(cuid())
-  cycleId       String         @unique
-  cycle         AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  answers       Json
-  submittedAt   DateTime?
-  editableUntil DateTime
-  locked        Boolean        @default(false)
-  editCount     Int            @default(0)
+  id             String                 @id @default(cuid())
+  cycleId        String                 @unique
+  cycle          AppraisalCycle         @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  answers        Json
+  submittedAt    DateTime?
+  lastModifiedAt DateTime?
+  editableUntil  DateTime
+  locked         Boolean                @default(false)
+  editCount      Int                    @default(0)
+  status         SelfAssessmentStatus   @default(DRAFT)
 }
 
 model CycleAssignment {
@@ -283,13 +313,18 @@ model DateVote {
 
 model MOM {
   id        String         @id @default(cuid())
-  cycleId   String         @unique
+  cycleId   String
   cycle     AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  /// Role perspective that owns this record: "ADMIN" | "MANAGEMENT" | "HR"
+  role      String         @default("MANAGEMENT")
   content   String
   authorId  String
   author    User           @relation("MomAuthor", fields: [authorId], references: [id])
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+
+  @@unique([cycleId, role])
+  @@index([cycleId])
 }
 
 model AppraisalDecision {
@@ -340,19 +375,30 @@ model ExtensionRequest {
 }
 
 model Notification {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  type        String
-  message     String
-  link        String?
-  read        Boolean  @default(false)
-  persistent  Boolean  @default(false)
-  dismissed   Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  type           String
+  message        String
+  link           String?
+  read           Boolean   @default(false)
+  persistent     Boolean   @default(false)
+  critical       Boolean   @default(false)
+  dismissed      Boolean   @default(false)
+  /// User clicked "Acknowledge" (distinct from dismiss/close)
+  acknowledged   Boolean   @default(false)
+  acknowledgedAt DateTime?
+  /// Admin marked this as important — ignored ones can be re-triggered
+  important      Boolean   @default(false)
+  /// Marks a re-triggered urgent copy; persists until acknowledged
+  urgent         Boolean   @default(false)
+  /// Id of the original notification this was re-triggered from
+  retriggeredFromId String?
+  createdAt      DateTime  @default(now())
 
   @@index([userId, read])
   @@index([userId, dismissed])
+  @@index([userId, critical, dismissed])
 }
 
 model AuditLog {
@@ -367,6 +413,56 @@ model AuditLog {
   createdAt DateTime        @default(now())
 
   @@index([cycleId, createdAt])
+}
+
+/// Security and access trail for login attempts plus session lifecycle events.
+/// userId is nullable so failed login attempts for unknown/inactive users remain traceable.
+model SecurityEvent {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email        String?
+  event        String
+  outcome      String
+  ipAddress    String?
+  userAgent    String?
+  sessionToken String?
+  details      Json?
+  createdAt    DateTime @default(now())
+
+  @@index([event, outcome, createdAt])
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@index([sessionToken, createdAt])
+}
+
+/// Tracks each authenticated user session for admin monitoring.
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// JWT session token identifier (sub claim or random token)
+  token       String    @unique
+  loginAt     DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  logoutAt    DateTime?
+  /// "ACTIVE" | "TIMED_OUT" | "LOGGED_OUT"
+  status      String    @default("ACTIVE")
+  ipAddress   String?
+  userAgent   String?
+  /// Rough location from IP
+  location    String?
+
+  @@index([userId, status])
+  @@index([status, lastSeenAt])
+}
+
+/// Admin-configurable key/value settings store.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedById String?
 }
 
 /// Admin-editable override for criteria category questions.
@@ -413,6 +509,65 @@ model TicketComment {
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+/// Arrear record for a cycle — computed when meeting is late (>7 days after self-assessment submitted).
+/// Locked once approved by management.
+model Arrear {
+  id            String        @id @default(cuid())
+  cycleId       String        @unique
+  cycle         AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User          @relation("ArrearEmployee", fields: [userId], references: [id])
+
+  /// Days from (selfSubmittedAt + 7) to scheduledDate
+  arrearDays    Int
+  /// Daily rate = finalAmount / 365
+  dailyRate     Decimal       @db.Decimal(12, 2)
+  /// arrearDays * dailyRate
+  arrearAmount  Decimal       @db.Decimal(12, 2)
+  /// Date from which arrear is counted (selfSubmittedAt + 7 days)
+  periodFrom    DateTime
+  /// Date until which arrear is counted (scheduledDate)
+  periodTo      DateTime
+  /// Month in which arrears will be credited (set on approval)
+  payoutMonth   DateTime?
+
+  status        ArrearStatus  @default(PENDING_APPROVAL)
+  approvedById  String?
+  approvedBy    User?         @relation("ArrearApprover", fields: [approvedById], references: [id])
+  approvedAt    DateTime?
+  rejectedReason String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([cycleId])
+}
+
+/// Reschedule record when a meeting does not occur on the scheduled date.
+model MeetingReschedule {
+  id             String           @id @default(cuid())
+  cycleId        String
+  cycle          AppraisalCycle   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  /// Original date that was missed
+  originalDate   DateTime
+  /// New proposed date
+  newDate        DateTime
+  reason         String
+  rescheduledById String
+  rescheduledBy  User             @relation("RescheduledBy", fields: [rescheduledById], references: [id])
+  status         RescheduleStatus @default(PENDING)
+
+  confirmedById  String?
+  confirmedBy    User?            @relation("RescheduleConfirmer", fields: [confirmedById], references: [id])
+  confirmedAt    DateTime?
+
+  createdAt      DateTime         @default(now())
+
+  @@index([cycleId, createdAt])
 }
 
 /// Reviewer evaluation of their own submitted rating (Accurate/Overrated/Underrated).

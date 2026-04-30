@@ -163,8 +163,17 @@ async function main() {
 
   console.log("Wiping existing data...");
   await prisma.auditLog.deleteMany({});
+  await prisma.securityEvent.deleteMany({});
+  await prisma.userSession.deleteMany({});
   await prisma.notification.deleteMany({});
+  await prisma.ticketComment.deleteMany({});
+  await prisma.ticket.deleteMany({});
+  await prisma.criteriaOverride.deleteMany({});
+  await prisma.ratingReview.deleteMany({});
+  await prisma.ratingDisagreement.deleteMany({});
   await prisma.extensionRequest.deleteMany({});
+  await prisma.meetingReschedule.deleteMany({});
+  await prisma.arrear.deleteMany({});
   await prisma.appraisalDecision.deleteMany({});
   await prisma.mOM.deleteMany({});
   await prisma.dateVote.deleteMany({});
@@ -172,7 +181,9 @@ async function main() {
   await prisma.cycleAssignment.deleteMany({});
   await prisma.selfAssessment.deleteMany({});
   await prisma.appraisalCycle.deleteMany({});
+  await prisma.salaryRevision.deleteMany({});
   await prisma.employeeSalary.deleteMany({});
+  await prisma.incrementSlab.deleteMany({});
   await prisma.user.deleteMany({});
 
   const empNoToId = new Map<number, string>();

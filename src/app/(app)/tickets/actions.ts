@@ -46,6 +46,7 @@ export async function createTicketAction(input: z.infer<typeof createSchema>): P
         message: `New ${parsed.data.priority} priority ticket: "${parsed.data.title}" from ${session.user.name ?? "a user"}`,
         link: `/admin/tickets`,
         persistent: true,
+        critical: false,
       },
     });
   }
@@ -89,6 +90,7 @@ export async function addTicketCommentAction(input: z.infer<typeof commentSchema
         message: `Admin replied to your ticket: "${ticket.title}"`,
         link: `/tickets`,
         persistent: true,
+        critical: false,
       },
     });
   }

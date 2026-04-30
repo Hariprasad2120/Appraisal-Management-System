@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { sendEmail, assignmentEmail } from "@/lib/email";
-import { addBusinessDays } from "@/lib/business-days";
+import { selfAssessmentDeadline } from "@/lib/business-days";
 import { syncCycleStatus } from "@/lib/workflow";
 import { autoCycleType } from "@/lib/appraisal-eligibility";
 import { canBeAppraised } from "@/lib/rbac";
@@ -120,9 +120,23 @@ async function createOrReuseAssignments(
         message: `You have been assigned as ${role} reviewer for ${employee.name}'s appraisal. Please confirm your availability.`,
         link: `/reviewer/${cycleId}`,
         persistent: true,
+        critical: true,
       },
     });
   }
+}
+
+async function notifyEmployee(cycleId: string, employeeId: string) {
+  await prisma.notification.create({
+    data: {
+      userId: employeeId,
+      type: "CYCLE_STARTED",
+      message: "Your appraisal cycle has been started. Please wait for your reviewers to confirm their availability — self-assessment will open once all reviewers are confirmed.",
+      link: `/employee`,
+      persistent: true,
+      critical: true,
+    },
+  });
 }
 
 /** Standard assign — cycle type auto-determined from joining date. */
@@ -175,6 +189,7 @@ export async function assignReviewersAction(input: z.infer<typeof schema>): Prom
     orderBy: { createdAt: "desc" },
   });
 
+  let isNewCycle = false;
   if (!cycle) {
     cycle = await prisma.appraisalCycle.create({
       data: {
@@ -185,10 +200,11 @@ export async function assignReviewersAction(input: z.infer<typeof schema>): Prom
         // Legacy field: treated as "no TL reviewer included"
         isManagerCycle: !effectiveIncludeTL,
         self: {
-          create: { answers: {}, editableUntil: addBusinessDays(new Date(), 3) },
+          create: { answers: {}, editableUntil: selfAssessmentDeadline(new Date()) },
         },
       },
     });
+    isNewCycle = true;
   } else if (isManagerCycle !== undefined || includeTlReviewer !== undefined) {
     await prisma.appraisalCycle.update({
       where: { id: cycle.id },
@@ -206,6 +222,7 @@ export async function assignReviewersAction(input: z.infer<typeof schema>): Prom
 
   const loginUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/login`;
   await createOrReuseAssignments(cycle.id, assignments, session.user.id, employee, loginUrl);
+  if (isNewCycle) await notifyEmployee(cycle.id, employeeId);
   await syncCycleStatus(cycle.id);
 
   revalidatePath(`/admin/employees/${employeeId}/assign`);
@@ -264,7 +281,7 @@ export async function startSpecialAppraisalAction(input: z.infer<typeof specialS
       // Legacy field: treated as "no TL reviewer included"
       isManagerCycle: !effectiveIncludeTL,
       self: {
-        create: { answers: {}, editableUntil: addBusinessDays(new Date(), 3) },
+        create: { answers: {}, editableUntil: selfAssessmentDeadline(new Date()) },
       },
     },
   });
@@ -288,6 +305,7 @@ export async function startSpecialAppraisalAction(input: z.infer<typeof specialS
 
   const loginUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/login`;
   await createOrReuseAssignments(cycle.id, assignments, session.user.id, employee, loginUrl);
+  await notifyEmployee(cycle.id, employeeId);
   await syncCycleStatus(cycle.id);
 
   revalidatePath(`/admin/employees/${employeeId}/assign`);
@@ -325,6 +343,7 @@ export async function forceMarkAvailableAction(assignmentId: string): Promise<Re
         message: `You have been force-marked as AVAILABLE for ${assignment.cycle.user.name}'s appraisal by admin. Please proceed to rate.`,
         link: `/reviewer/${assignment.cycleId}`,
         persistent: true,
+        critical: true,
       },
     });
   });

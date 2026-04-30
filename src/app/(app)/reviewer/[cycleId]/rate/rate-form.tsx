@@ -172,7 +172,6 @@ export function RateForm({
       });
       if (!res.ok) { toast.error(res.error); return; }
       toast.success("Rating submitted — thank you!");
-      router.push(`/reviewer/${cycleId}`);
       router.refresh();
     });
   }

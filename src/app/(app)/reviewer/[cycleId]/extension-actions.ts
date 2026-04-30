@@ -50,6 +50,7 @@ export async function requestExtensionAction(input: z.infer<typeof schema>): Pro
         message: `${session.user.name ?? "A reviewer"} has requested a time extension (up to 2 business days) to rate ${cycle?.user.name ?? "an employee"}'s appraisal. Reason: "${reason.substring(0, 100)}${reason.length > 100 ? "…" : ""}". Please approve or reject.`,
         link: "/admin/extensions",
         persistent: true,
+        critical: true,
       },
     });
   }

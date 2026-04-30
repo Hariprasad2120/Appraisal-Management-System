@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { getSystemDate } from "@/lib/system-date";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -64,6 +65,56 @@ export async function shiftDeadlinesAction(days: number): Promise<Result> {
     });
   });
 
+  // After shifting, check for SCHEDULED cycles whose meeting date has now arrived
+  const now = await getSystemDate();
+  const meetingArrivedCycles = await prisma.appraisalCycle.findMany({
+    where: {
+      status: "SCHEDULED",
+      scheduledDate: { lte: now },
+    },
+    include: {
+      user: { select: { id: true, name: true } },
+      assignments: { select: { reviewerId: true } },
+    },
+  });
+
+  for (const cycle of meetingArrivedCycles) {
+    // Avoid duplicate meeting-day notifications
+    const alreadyNotified = await prisma.notification.findFirst({
+      where: {
+        type: "MEETING_DAY",
+        link: `/admin/mom/${cycle.id}`,
+      },
+    });
+    if (alreadyNotified) continue;
+
+    const [adminUsers, managementUsers, hrUsers] = await Promise.all([
+      prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
+      prisma.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
+      prisma.user.findMany({ where: { role: "HR", active: true }, select: { id: true } }),
+    ]);
+    const meetingNotifyIds = [...new Set([
+      ...adminUsers.map((u) => u.id),
+      ...managementUsers.map((u) => u.id),
+      ...hrUsers.map((u) => u.id),
+    ])];
+    const dateStr = cycle.scheduledDate!.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    await Promise.all(
+      meetingNotifyIds.map((userId) =>
+        prisma.notification.create({
+          data: {
+            userId,
+            type: "MEETING_DAY",
+            message: `Today is the scheduled appraisal meeting date for ${cycle.user.name} (${dateStr}). MOM window is now open.`,
+            link: `/admin/mom/${cycle.id}`,
+            persistent: true,
+            critical: true,
+          },
+        })
+      )
+    );
+  }
+
   revalidatePath("/admin/simulation");
   revalidatePath("/admin");
   revalidatePath("/management");
@@ -107,6 +158,7 @@ export async function extendCycleDeadlineAction(cycleId: string, days: number): 
             message: `Rating deadline extended by ${days} day${days !== 1 ? "s" : ""}. New deadline: ${newDeadline.toLocaleDateString("en-IN")}`,
             link: `/reviewer/${cycleId}`,
             persistent: true,
+            critical: false,
           },
         })
       )
@@ -149,6 +201,45 @@ export async function setSystemDateAction(isoDate: string): Promise<Result> {
       after: { date: d.toISOString(), active: true },
     },
   });
+
+  // Check if any SCHEDULED cycle's meeting date has arrived at the new system date
+  const meetingArrivedOnSet = await prisma.appraisalCycle.findMany({
+    where: { status: "SCHEDULED", scheduledDate: { lte: d } },
+    include: { user: { select: { id: true, name: true } } },
+  });
+
+  for (const cycle of meetingArrivedOnSet) {
+    const alreadyNotified = await prisma.notification.findFirst({
+      where: { type: "MEETING_DAY", link: `/admin/mom/${cycle.id}` },
+    });
+    if (alreadyNotified) continue;
+
+    const [adminUsers, managementUsers, hrUsers] = await Promise.all([
+      prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
+      prisma.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
+      prisma.user.findMany({ where: { role: "HR", active: true }, select: { id: true } }),
+    ]);
+    const meetingNotifyIds = [...new Set([
+      ...adminUsers.map((u) => u.id),
+      ...managementUsers.map((u) => u.id),
+      ...hrUsers.map((u) => u.id),
+    ])];
+    const dateStr = cycle.scheduledDate!.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    await Promise.all(
+      meetingNotifyIds.map((userId) =>
+        prisma.notification.create({
+          data: {
+            userId,
+            type: "MEETING_DAY",
+            message: `Today is the scheduled appraisal meeting date for ${cycle.user.name} (${dateStr}). MOM window is now open.`,
+            link: `/admin/mom/${cycle.id}`,
+            persistent: true,
+            critical: true,
+          },
+        })
+      )
+    );
+  }
 
   revalidatePath("/admin/simulation");
   revalidatePath("/");

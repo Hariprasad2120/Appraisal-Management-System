@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { addBusinessDays } from "@/lib/business-days";
 import type { CycleStatus, ReviewerAvailability } from "@/generated/prisma/enums";
 
 type WorkflowAssignment = {
@@ -19,6 +20,7 @@ type WorkflowSelf = {
 type WorkflowCycle = {
   id: string;
   status: CycleStatus;
+  ratingDeadline?: Date | null;
   self: WorkflowSelf;
   assignments: WorkflowAssignment[];
   ratings: WorkflowRating[];
@@ -49,10 +51,11 @@ export function isSelfAssessmentOpen(
   return allReviewersAvailable(cycle.assignments);
 }
 
-/** Rating window opens after employee submits self-assessment (or deadline passed) */
+/** Rating window opens once the self-assessment deadline has passed */
 export function isReviewWindowOpen(cycle: Pick<WorkflowCycle, "self" | "assignments">, now = new Date()): boolean {
   if (!allReviewersAvailable(cycle.assignments)) return false;
-  return isSelfAssessmentSubmitted(cycle.self) || isSelfAssessmentWindowExpired(cycle.self, now);
+  if (!cycle.self) return false;
+  return now >= cycle.self.editableUntil;
 }
 
 export function isRatingOpen(
@@ -60,6 +63,27 @@ export function isRatingOpen(
   now = new Date(),
 ): boolean {
   return isReviewWindowOpen(cycle, now);
+}
+
+export function getRatingDeadline(cycle: Pick<WorkflowCycle, "self" | "ratingDeadline">): Date | null {
+  if (cycle.ratingDeadline) return cycle.ratingDeadline;
+  if (!cycle.self) return null;
+  return addBusinessDays(cycle.self.editableUntil, 3);
+}
+
+export function isManagementReviewOpen(
+  cycle: Pick<WorkflowCycle, "self" | "ratingDeadline" | "assignments" | "ratings">,
+  now = new Date(),
+): boolean {
+  const availableAssignments = cycle.assignments.filter(
+    (assignment) => assignment.availability === "AVAILABLE",
+  );
+  if (availableAssignments.length === 0 || cycle.ratings.length < availableAssignments.length) {
+    return false;
+  }
+
+  const ratingDeadline = getRatingDeadline(cycle);
+  return Boolean(ratingDeadline && now >= ratingDeadline);
 }
 
 export function getVisibleAverageForReviewer(
@@ -71,23 +95,18 @@ export function getVisibleAverageForReviewer(
   return ratings.reduce((sum, rating) => sum + rating.averageScore, 0) / ratings.length;
 }
 
-export function computeCycleStatus(cycle: WorkflowCycle): CycleStatus {
+export function computeCycleStatus(cycle: WorkflowCycle, now = new Date()): CycleStatus {
   if (
     cycle.status === "DECIDED" ||
     cycle.status === "CLOSED" ||
     cycle.status === "SCHEDULED" ||
-    cycle.status === "MANAGEMENT_REVIEW"
+    cycle.status === "DATE_VOTING"
   ) {
     return cycle.status;
   }
 
-  const availableAssignments = cycle.assignments.filter(
-    (assignment) => assignment.availability === "AVAILABLE",
-  );
-
-  if (availableAssignments.length > 0 && cycle.ratings.length >= availableAssignments.length) {
-    // New explicit final stage: management reviews once all assigned reviewers submitted.
-    // Backward-compat: older cycles may already be RATINGS_COMPLETE; callers should treat both as equivalent.
+  if (isManagementReviewOpen(cycle, now)) {
+    // Management review opens only after all assigned reviewers submit and the reviewer rating window closes.
     return "MANAGEMENT_REVIEW";
   }
 
@@ -142,23 +161,111 @@ export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | nu
       data: { status: nextStatus },
     });
 
-    // When all reviewers done → notify management + admin that it's ready for review
+    // All reviewers confirmed available → notify admin (FYI) + appraisee (actionable)
+    if (nextStatus === "PENDING_SELF") {
+      const adminUsers = await prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } });
+      const empName = cycle.user?.name ?? "an employee";
+      const adminIds = new Set(adminUsers.map((u) => u.id));
+
+      // Appraisee: actionable — self-assessment is now open
+      await prisma.notification.create({
+        data: {
+          userId: cycle.userId,
+          type: "ALL_REVIEWERS_AVAILABLE",
+          message: "All your reviewers have confirmed availability. You can now start your self-assessment.",
+          link: "/employee",
+          persistent: true,
+          critical: true,
+        },
+      });
+
+      // Admins: FYI only — no action needed, no link
+      const adminNotifyIds = adminUsers.map((u) => u.id).filter((id) => id !== cycle.userId);
+      await Promise.all(
+        adminNotifyIds.map((userId) =>
+          prisma.notification.create({
+            data: {
+              userId,
+              type: "ALL_REVIEWERS_AVAILABLE",
+              message: `All reviewers for ${empName}'s appraisal confirmed availability. Self-assessment window is now open.`,
+              link: null,
+              persistent: true,
+              critical: false,
+            },
+          })
+        )
+      );
+    }
+
+    // When all reviewers done → notify management (actionable), appraisee (FYI), reviewers (FYI), admin (FYI)
     if (nextStatus === "MANAGEMENT_REVIEW") {
       const [adminUsers, managementUsers] = await Promise.all([
         prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
         prisma.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
       ]);
-      const notifyIds = [...new Set([...adminUsers.map((u) => u.id), ...managementUsers.map((u) => u.id)])];
+      const adminIds = new Set(adminUsers.map((u) => u.id));
+      const reviewerIds = cycle.assignments.map((a) => a.reviewerId);
       const empName = cycle.user?.name ?? "an employee";
+
+      // Management: actionable — they need to claim and decide
       await Promise.all(
-        notifyIds.map((userId) =>
+        managementUsers.map((u) =>
+          prisma.notification.create({
+            data: {
+              userId: u.id,
+              type: "RATINGS_COMPLETE",
+              message: `All reviewers have rated ${empName}'s appraisal. Management review is now open — please claim and finalise the decision.`,
+              link: `/management/decide/${cycleId}`,
+              persistent: true,
+              critical: true,
+            },
+          })
+        )
+      );
+
+      // Appraisee: FYI — appraisal moved to management review
+      if (!adminIds.has(cycle.userId)) {
+        await prisma.notification.create({
+          data: {
+            userId: cycle.userId,
+            type: "RATINGS_COMPLETE",
+            message: "All your reviewer ratings are complete. Your appraisal has moved to management review.",
+            link: "/employee",
+            persistent: true,
+            critical: true,
+          },
+        });
+      }
+
+      // Reviewers: FYI — their job is done
+      const reviewerNotifyIds = reviewerIds.filter((id) => id !== cycle.userId && !adminIds.has(id));
+      await Promise.all(
+        reviewerNotifyIds.map((userId) =>
           prisma.notification.create({
             data: {
               userId,
               type: "RATINGS_COMPLETE",
-              message: `All reviewers have submitted ratings for ${empName}. Appraisal is ready for management review.`,
-              link: `/management/decide/${cycleId}`,
+              message: `All ratings for ${empName}'s appraisal are complete. The appraisal has moved to management review.`,
+              link: null,
+              persistent: false,
+              critical: false,
+            },
+          })
+        )
+      );
+
+      // Admins: FYI only — no action needed
+      const adminNotifyIds = adminUsers.map((u) => u.id).filter((id) => id !== cycle.userId);
+      await Promise.all(
+        adminNotifyIds.map((userId) =>
+          prisma.notification.create({
+            data: {
+              userId,
+              type: "RATINGS_COMPLETE",
+              message: `All reviewer ratings for ${empName}'s appraisal are complete. Appraisal is now in management review.`,
+              link: null,
               persistent: true,
+              critical: false,
             },
           })
         )

@@ -4,26 +4,59 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { getSystemDate } from "@/lib/system-date";
+import { isAdmin } from "@/lib/rbac";
 
-const schema = z.object({ cycleId: z.string(), content: z.string().min(1) });
+const schema = z.object({
+  cycleId: z.string(),
+  content: z.string().min(1),
+});
 type Result = { ok: true } | { ok: false; error: string };
 
-export async function saveMomAction(input: z.infer<typeof schema>): Promise<Result> {
+function isMeetingDay(now: Date, scheduledDate: Date): boolean {
+  return (
+    now.getFullYear() === scheduledDate.getFullYear() &&
+    now.getMonth() === scheduledDate.getMonth() &&
+    now.getDate() === scheduledDate.getDate()
+  );
+}
+
+export async function saveAdminMomAction(input: z.infer<typeof schema>): Promise<Result> {
   const session = await auth();
-  const allowed = ["ADMIN", "MANAGEMENT", "HR"];
-  if (!session?.user || (!allowed.includes(session.user.role) && !(session.user.secondaryRole && allowed.includes(session.user.secondaryRole)))) return { ok: false, error: "Forbidden" };
+  if (!session?.user || !isAdmin(session.user.role, session.user.secondaryRole)) {
+    return { ok: false, error: "Forbidden: Admin only" };
+  }
+
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid" };
 
   const { cycleId, content } = parsed.data;
+
+  const cycle = await prisma.appraisalCycle.findUnique({ where: { id: cycleId } });
+  if (!cycle) return { ok: false, error: "Cycle not found" };
+  if (!cycle.scheduledDate) return { ok: false, error: "Meeting date not set" };
+
+  const now = await getSystemDate();
+  if (now < cycle.scheduledDate && !isMeetingDay(now, cycle.scheduledDate)) {
+    return { ok: false, error: "Cannot record MOM before the scheduled meeting date" };
+  }
+
   await prisma.mOM.upsert({
-    where: { cycleId },
-    create: { cycleId, content, authorId: session.user.id },
+    where: { cycleId_role: { cycleId, role: "ADMIN" } },
+    create: { cycleId, role: "ADMIN", content, authorId: session.user.id },
     update: { content },
   });
 
-  await prisma.appraisalCycle.update({ where: { id: cycleId }, data: { status: "SCHEDULED" } });
+  await prisma.auditLog.create({
+    data: {
+      cycleId,
+      actorId: session.user.id,
+      action: "MOM_SAVED",
+      after: { role: "ADMIN" },
+    },
+  });
+
   revalidatePath(`/admin/mom/${cycleId}`);
-  revalidatePath(`/admin/cycles`);
+  revalidatePath(`/admin/mom`);
   return { ok: true };
 }

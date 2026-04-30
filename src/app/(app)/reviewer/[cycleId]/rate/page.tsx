@@ -1,27 +1,37 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isRatingOpen } from "@/lib/workflow";
+import { getSystemDate } from "@/lib/system-date";
 import { RateForm } from "./rate-form";
 import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
 import {
   SUPPLEMENTARY_SECTIONS,
   getCriteriaForRole,
+  GRADE_BANDS,
 } from "@/lib/criteria";
 import { getMergedCriteria } from "@/lib/criteria-overrides";
+import { isManagement, isAdmin } from "@/lib/rbac";
 import {
   TrendingUp,
   User,
   IndianRupee,
   FileText,
+  EyeOff,
+  ArrowLeft,
+  CheckCircle,
 } from "lucide-react";
 
 type SelfAnswers = Record<
   string,
   { score: number; comment: string; questionAnswers?: Record<string, string> }
 > & { __supplementary?: Record<string, string> };
+
+/** Roles whose salary is confidential from reviewers */
+const SALARY_CONFIDENTIAL_ROLES = ["HR", "MANAGER"] as const;
 
 export default async function RatePage({
   params,
@@ -46,12 +56,12 @@ export default async function RatePage({
   });
   if (!assignment) notFound();
   if (assignment.availability !== "AVAILABLE") redirect(`/reviewer/${cycleId}`);
-  if (!isRatingOpen(assignment.cycle)) redirect(`/reviewer/${cycleId}`);
+  const now = await getSystemDate();
+  if (!isRatingOpen(assignment.cycle, now)) redirect(`/reviewer/${cycleId}`);
 
   const existing = await prisma.rating.findFirst({
     where: { cycleId, reviewerId: session.user.id },
   });
-  if (existing) redirect(`/reviewer/${cycleId}`);
 
   const [peerRatingExistsCount, allMergedCategories] = await Promise.all([
     prisma.rating.count({ where: { cycleId } }),
@@ -61,35 +71,76 @@ export default async function RatePage({
   const mergedCategories = getCriteriaForRole(allMergedCategories, assignment.role);
   const roleMaxPoints = mergedCategories.reduce((s, c) => s + c.maxPoints, 0);
 
-  // Salary revisions (last 5)
-  const revisions = await prisma.salaryRevision.findMany({
-    where: { userId: assignment.cycle.userId },
-    orderBy: { effectiveFrom: "desc" },
-    take: 5,
-  });
+  const emp = assignment.cycle.user;
+  const reviewerRole = session.user.role;
+  const reviewerSecondaryRole = session.user.secondaryRole ?? null;
+
+  // Salary confidentiality: hidden from reviewers when appraisee is HR or MANAGER.
+  // Management and Admin always see salary.
+  const appraiseeRoleIsConfidential = (SALARY_CONFIDENTIAL_ROLES as readonly string[]).includes(emp.role);
+  const viewerCanSeeSalary =
+    isManagement(reviewerRole, reviewerSecondaryRole) ||
+    isAdmin(reviewerRole, reviewerSecondaryRole);
+  const salaryHidden = appraiseeRoleIsConfidential && !viewerCanSeeSalary;
+
+  // Salary revisions (last 5) — only fetch if allowed
+  const revisions = salaryHidden
+    ? []
+    : await prisma.salaryRevision.findMany({
+        where: { userId: assignment.cycle.userId },
+        orderBy: { effectiveFrom: "desc" },
+        take: 5,
+      });
 
   const selfAnswers = assignment.cycle.self?.answers as SelfAnswers | null;
   const suppAnswers = selfAnswers?.__supplementary ?? {};
 
-  const emp = assignment.cycle.user;
-  const sal = emp.salary;
-  const grossAnnum = sal ? Number(sal.grossAnnum) : null;
+  const sal = salaryHidden ? null : emp.salary;
 
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
   const fmtMonth = (d: Date) =>
     d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 
+  const submittedScores = existing
+    ? (existing.scores as Record<string, number>)
+    : null;
+  const submittedAvg = existing ? existing.averageScore : null;
+  const currentGrade = submittedAvg !== null
+    ? GRADE_BANDS.find((b) => submittedAvg >= b.minNormalized && submittedAvg <= b.maxNormalized) ?? null
+    : null;
+
   return (
-    // Wide layout: side-by-side panels
     <div className="max-w-[1400px] mx-auto">
       <FadeIn>
         <div className="mb-5">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Rate {toTitleCase(emp.name)}
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {assignment.role} Reviewer · {assignment.cycle.type} cycle
-          </p>
+          <Link
+            href={`/reviewer/${cycleId}`}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
+          >
+            <ArrowLeft className="size-3.5" /> Back
+          </Link>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                {existing ? "Submitted Rating — " : "Rate "}{toTitleCase(emp.name)}
+              </h1>
+              <p className="text-slate-500 text-sm mt-1">
+                {assignment.role} Reviewer · {assignment.cycle.type} cycle
+              </p>
+            </div>
+            {existing && (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-full px-3 py-1.5">
+                  <CheckCircle className="size-3.5" /> Rating Submitted
+                </span>
+                {currentGrade && (
+                  <span className="text-sm font-black px-3 py-1.5 rounded-full border bg-[#0e8a95]/10 text-[#0e8a95] border-[#0e8a95]/20">
+                    {currentGrade.grade} · {submittedAvg?.toFixed(1)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </FadeIn>
 
@@ -128,7 +179,21 @@ export default async function RatePage({
                   ))}
                 </div>
 
-                {sal && (
+                {/* Salary structure */}
+                {salaryHidden ? (
+                  <>
+                    <div className="h-px bg-slate-100 dark:bg-slate-800" />
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5">
+                      <EyeOff className="size-4 text-slate-400 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500">Salary — Confidential</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Compensation details are not visible for {emp.role} appraisees.
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : sal && (
                   <>
                     <div className="h-px bg-slate-100 dark:bg-slate-800" />
                     <div>
@@ -169,8 +234,8 @@ export default async function RatePage({
             </Card>
           </FadeIn>
 
-          {/* Salary revision history */}
-          {revisions.length > 0 && (
+          {/* Salary revision history — hidden if salary confidential */}
+          {!salaryHidden && revisions.length > 0 && (
             <FadeIn delay={0.07}>
               <Card className="border-0 shadow-sm">
                 <CardHeader className="pb-2">
@@ -227,6 +292,23 @@ export default async function RatePage({
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </FadeIn>
+          )}
+
+          {/* Confidential revision history notice */}
+          {salaryHidden && (
+            <FadeIn delay={0.07}>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <EyeOff className="size-4 text-slate-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">Salary Revision History — Confidential</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Revision history is not visible for {emp.role} appraisees.
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -330,17 +412,67 @@ export default async function RatePage({
           )}
         </div>
 
-        {/* ── RIGHT: Rating form ── */}
+        {/* ── RIGHT: Rating form or submitted read-only view ── */}
         <div className="xl:sticky xl:top-6">
           <FadeIn delay={0.06}>
-            <RateForm
-              cycleId={cycleId}
-              role={assignment.role}
-              categories={mergedCategories}
-              totalMaxPoints={roleMaxPoints}
-              peerRatingExists={peerRatingExists}
-              isAdmin={true}
-            />
+            {existing && submittedScores ? (
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">Your Submitted Scores</span>
+                    {currentGrade && (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full border bg-[#0e8a95]/10 text-[#0e8a95] border-[#0e8a95]/20">
+                        {currentGrade.grade} — {submittedAvg?.toFixed(2)} / 100
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {mergedCategories.map((cat) => {
+                      const raw = submittedScores[cat.name];
+                      const isAO = raw === -1;
+                      const pct = isAO ? null : Math.round((raw / cat.maxPoints) * 100);
+                      return (
+                        <div key={cat.name} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{cat.name}</span>
+                            {isAO ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Averaged Out</span>
+                            ) : (
+                              <span className="text-xs font-bold text-[#0e8a95]">{raw} / {cat.maxPoints}</span>
+                            )}
+                          </div>
+                          {!isAO && pct !== null && (
+                            <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-[#0e8a95]"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {existing.comments && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Overall Comment</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">
+                        {existing.comments}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <RateForm
+                cycleId={cycleId}
+                role={assignment.role}
+                categories={mergedCategories}
+                totalMaxPoints={roleMaxPoints}
+                peerRatingExists={peerRatingExists}
+                isAdmin={true}
+              />
+            )}
           </FadeIn>
         </div>
       </div>

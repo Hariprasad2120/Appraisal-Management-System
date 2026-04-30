@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
@@ -7,10 +8,35 @@ import { Users, Clock, AlertCircle, Calendar, ChevronRight, Bell } from "lucide-
 import { getAppraisalEligibility, getMilestoneAlert, autoCycleType } from "@/lib/appraisal-eligibility";
 import { ManagementCharts } from "../management/management-charts";
 
+function getGreeting(now: Date): string {
+  const h = now.getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  return "evening";
+}
+
+function ArrowUpRight() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      viewBox="0 0 24 24"
+    >
+      <path d="M7 17L17 7" />
+      <path d="M7 7h10v10" />
+    </svg>
+  );
+}
+
 export default async function AdminDashboard() {
+  const session = await auth();
   const now = new Date();
 
-  const [allEmployees, activeCycles, pendingAssignments, pendingExtensions, decidedCyclesRaw] =
+  const [allEmployees, activeCycles, pendingAssignments, pendingExtensions, decidedCyclesRaw, recentNotifs] =
     await Promise.all([
       prisma.user.findMany({
         where: { role: { notIn: ["MANAGEMENT", "PARTNER"] }, active: true },
@@ -36,6 +62,14 @@ export default async function AdminDashboard() {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
+      session?.user
+        ? prisma.notification.findMany({
+            where: { userId: session.user.id, read: false },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+            select: { id: true, message: true, link: true, createdAt: true },
+          })
+        : Promise.resolve([] as { id: string; message: string; link: string | null; createdAt: Date }[]),
     ]);
 
   const chartData = [...decidedCyclesRaw]
@@ -83,6 +117,7 @@ export default async function AdminDashboard() {
       accent: "stat-cyan",
       iconColor: "text-cyan-600 dark:text-cyan-400",
       iconBg: "bg-cyan-50 dark:bg-cyan-900/20",
+      accentColor: "#00cec4",
     },
     {
       label: "Active Cycles",
@@ -91,6 +126,7 @@ export default async function AdminDashboard() {
       accent: "stat-amber",
       iconColor: "text-amber-600 dark:text-amber-400",
       iconBg: "bg-amber-50 dark:bg-amber-900/20",
+      accentColor: "#ffaa2d",
     },
     {
       label: "Pending Availability",
@@ -99,6 +135,7 @@ export default async function AdminDashboard() {
       accent: "stat-teal",
       iconColor: "text-teal-600 dark:text-teal-400",
       iconBg: "bg-teal-50 dark:bg-teal-900/20",
+      accentColor: "#0e8a95",
     },
     {
       label: "Pending Extensions",
@@ -107,33 +144,53 @@ export default async function AdminDashboard() {
       accent: "stat-orange",
       iconColor: "text-orange-600 dark:text-orange-400",
       iconBg: "bg-orange-50 dark:bg-orange-900/20",
+      accentColor: "#ff8333",
     },
   ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <FadeIn>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {now.toLocaleString("default", { month: "long", year: "numeric" })}
-          </p>
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="ds-h1">
+              {session?.user
+                ? `Good ${getGreeting(now)}, ${toTitleCase(session.user.name?.split(" ")[0] ?? "there")}`
+                : "Admin Dashboard"}
+            </h1>
+            <p className="ds-body mt-1">
+              {now.toLocaleString("default", { month: "long", year: "numeric" })}
+            </p>
+          </div>
+          {recentNotifs.length > 0 && (
+            <Link
+              href="/notifications"
+              className="inline-flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-3 py-2 rounded-xl hover:bg-amber-100 transition-colors"
+            >
+              <Bell className="size-3.5" />
+              {recentNotifs.length} unread
+            </Link>
+          )}
         </div>
       </FadeIn>
 
-      {/* Stats */}
+      {/* Stat cards */}
       <StaggerList className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
           <StaggerItem key={s.label}>
-            <Card className={`border border-border shadow-sm ${s.accent} bg-card`}>
-              <CardContent className="p-5">
-                <div className={`inline-flex rounded-xl p-2.5 ${s.iconBg} mb-3`}>
-                  <s.icon className={`size-5 ${s.iconColor}`} />
+            <div className={`bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 ${s.accent}`}>
+              {/* Icon row + arrow */}
+              <div className="flex items-start justify-between mb-3">
+                <div className={`size-9 rounded-[10px] ${s.iconBg} flex items-center justify-center shrink-0`}>
+                  <s.icon className={`size-[18px] ${s.iconColor}`} />
                 </div>
-                <div className="text-3xl font-bold text-foreground">{s.value}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
-              </CardContent>
-            </Card>
+                <span className="text-muted-foreground/50 mt-0.5">
+                  <ArrowUpRight />
+                </span>
+              </div>
+              <div className="ds-stat">{s.value}</div>
+              <div className="ds-small mt-1">{s.label}</div>
+            </div>
           </StaggerItem>
         ))}
       </StaggerList>
@@ -141,73 +198,71 @@ export default async function AdminDashboard() {
       {/* Milestone alerts */}
       {milestoneAlerts.length > 0 && (
         <FadeIn delay={0.15}>
-          <Card className="border border-orange-200 dark:border-orange-900/50 shadow-sm bg-orange-50/50 dark:bg-orange-950/10">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-orange-700 dark:text-orange-400">
+          <div className="border border-orange-200 dark:border-orange-900/50 shadow-sm bg-orange-50/50 dark:bg-orange-950/10 rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-orange-200/60 dark:border-orange-900/40">
+              <div className="flex items-center gap-2 text-sm font-semibold text-orange-700 dark:text-orange-400">
                 <Bell className="size-4" /> Milestone Alerts ({milestoneAlerts.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {milestoneAlerts.map(({ employee, alert }) => (
-                  <div key={employee.id} className="flex items-center justify-between text-sm flex-wrap gap-2">
-                    <div>
-                      <span className="font-medium text-foreground">{toTitleCase(employee.name)}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">{alert.label}</span>
-                    </div>
-                    <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full px-2.5 py-0.5 font-medium">
-                      {alert.type === "EPF_ESI" ? "EPF/ESI Alert" : "Training"}
-                    </span>
-                  </div>
-                ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              {milestoneAlerts.map(({ employee, alert }) => (
+                <div key={employee.id} className="flex items-center justify-between text-sm flex-wrap gap-2">
+                  <div>
+                    <span className="font-medium text-foreground">{toTitleCase(employee.name)}</span>
+                    <span className="text-muted-foreground ml-2 text-xs">{alert.label}</span>
+                  </div>
+                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full px-2.5 py-0.5 font-medium">
+                    {alert.type === "EPF_ESI" ? "EPF/ESI Alert" : "Training"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </FadeIn>
       )}
 
       {/* Appraisals due */}
       <FadeIn delay={0.2}>
-        <Card className="border border-border shadow-sm bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base text-foreground">Appraisals Due This Month</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <span className="text-sm font-semibold text-foreground">Appraisals Due This Month</span>
+            {dueForAppraisal.length > 0 && (
+              <span className="text-xs text-primary font-medium">{dueForAppraisal.length} pending</span>
+            )}
+          </div>
+          <div className="px-5 py-4">
             {dueForAppraisal.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
                 No appraisals due this month.
               </p>
             ) : (
-              <div className="overflow-x-auto -mx-2">
+              <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-sm min-w-[520px]">
                   <thead>
-                    <tr className="text-left text-xs text-muted-foreground border-b border-border">
-                      <th className="py-2.5 px-2 font-medium">Emp #</th>
-                      <th className="px-2 font-medium">Name</th>
-                      <th className="px-2 font-medium hidden sm:table-cell">Department</th>
-                      <th className="px-2 font-medium hidden sm:table-cell">Joining</th>
-                      <th className="px-2 font-medium">Type</th>
-                      <th className="px-2 font-medium">Action</th>
+                    <tr className="text-left border-b border-border">
+                      <th className="py-2.5 px-2 ds-label">Emp #</th>
+                      <th className="px-2 ds-label">Name</th>
+                      <th className="px-2 ds-label hidden sm:table-cell">Department</th>
+                      <th className="px-2 ds-label hidden sm:table-cell">Joining</th>
+                      <th className="px-2 ds-label">Type</th>
+                      <th className="px-2 ds-label">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {dueForAppraisal.map((u) => {
                       const cycleType = autoCycleType(u.joiningDate, now);
                       return (
-                        <tr
-                          key={u.id}
-                          className="hover:bg-muted/40 transition-colors"
-                        >
-                          <td className="py-3 px-2 text-muted-foreground text-xs">
+                        <tr key={u.id} className="hover:bg-muted/40 transition-colors">
+                          <td className="py-3 px-2 text-muted-foreground font-mono text-xs">
                             {u.employeeNumber ?? "—"}
                           </td>
-                          <td className="px-2 font-medium text-foreground">
+                          <td className="px-2 font-semibold text-foreground">
                             {toTitleCase(u.name)}
                           </td>
                           <td className="px-2 text-muted-foreground text-xs hidden sm:table-cell">
                             {u.department ?? "—"}
                           </td>
-                          <td className="px-2 text-muted-foreground text-xs hidden sm:table-cell">
+                          <td className="px-2 text-muted-foreground font-mono text-xs hidden sm:table-cell">
                             {u.joiningDate.toLocaleDateString()}
                           </td>
                           <td className="px-2">
@@ -236,8 +291,8 @@ export default async function AdminDashboard() {
                 </table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </FadeIn>
 
       {/* Charts */}
@@ -261,14 +316,12 @@ export default async function AdminDashboard() {
             },
           ].map((item) => (
             <Link key={item.href} href={item.href} className="block group">
-              <Card className="border border-border hover:border-primary/40 hover:shadow-md transition-all duration-200 cursor-pointer h-full bg-card">
-                <CardContent className="p-4">
-                  <div className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                    {item.label}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
-                </CardContent>
-              </Card>
+              <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:border-primary/40 hover:shadow-md transition-all duration-200 cursor-pointer h-full">
+                <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                  {item.label}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
+              </div>
             </Link>
           ))}
         </div>

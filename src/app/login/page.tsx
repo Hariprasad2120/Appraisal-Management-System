@@ -36,10 +36,10 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              <p className="ds-label text-primary">
                 Appraisal Management Portal
               </p>
-              <h1 className="text-4xl font-bold tracking-tight text-foreground leading-tight">
+              <h1 className="ds-h1" style={{ fontSize: "32px", letterSpacing: "-0.02em" }}>
                 Performance.{" "}
                 <span className="text-gradient-teal">Rewarded fairly.</span>
               </h1>

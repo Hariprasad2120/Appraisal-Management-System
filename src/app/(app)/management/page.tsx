@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
@@ -13,9 +14,12 @@ import {
   Clock,
   IndianRupee,
   Activity,
+  Bell,
 } from "lucide-react";
 import type { CycleStatus } from "@/generated/prisma/enums";
 import { ManagementCharts } from "./management-charts";
+import { getSystemDate } from "@/lib/system-date";
+import { computeCycleStatus } from "@/lib/workflow";
 
 const STATUS_BADGE: Record<string, string> = {
   RATINGS_COMPLETE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -40,9 +44,13 @@ const ALL_STATUSES: CycleStatus[] = [
 ];
 
 export default async function ManagementDashboard() {
-  const [cycles, slabs, allEmployees] = await Promise.all([
+  const session = await auth();
+  const now = await getSystemDate();
+
+  const [cycles, slabs, allEmployees, recentNotifs] = await Promise.all([
     prisma.appraisalCycle.findMany({
       include: {
+        self: true,
         user: {
           include: {
             salary: true,
@@ -52,7 +60,7 @@ export default async function ManagementDashboard() {
         claimedBy: { select: { name: true } },
         ratings: true,
         decision: { include: { slab: true } },
-        assignments: { select: { reviewer: { select: { name: true } }, role: true } },
+        assignments: { select: { reviewer: { select: { name: true } }, role: true, availability: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -66,13 +74,26 @@ export default async function ManagementDashboard() {
       },
       orderBy: { name: "asc" },
     }),
+    session?.user
+      ? prisma.notification.findMany({
+          where: { userId: session.user.id, read: false },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { id: true, message: true, link: true, createdAt: true },
+        })
+      : Promise.resolve([] as { id: string; message: string; link: string | null; createdAt: Date }[]),
   ]);
 
+  const getDisplayStatus = (cycle: (typeof cycles)[number]) => computeCycleStatus(cycle, now);
+
   const actionableCycles = cycles.filter((c) =>
-    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"].includes(c.status)
+    ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"].includes(getDisplayStatus(c))
   );
   const totalDecided = cycles.filter((c) => c.status === "DECIDED").length;
-  const totalPending = cycles.filter((c) => c.status === "MANAGEMENT_REVIEW" || c.status === "RATINGS_COMPLETE").length;
+  const totalPending = cycles.filter((c) => {
+    const status = getDisplayStatus(c);
+    return status === "MANAGEMENT_REVIEW" || status === "RATINGS_COMPLETE";
+  }).length;
   const totalClosed = cycles.filter((c) => c.status === "CLOSED").length;
 
   const decidedCycles = cycles
@@ -91,7 +112,7 @@ export default async function ManagementDashboard() {
 
   const statusCounts = ALL_STATUSES.map((s) => ({
     status: s,
-    count: cycles.filter((c) => c.status === s).length,
+    count: cycles.filter((c) => getDisplayStatus(c) === s).length,
     label: s.replace(/_/g, " "),
   })).filter((x) => x.count > 0);
 
@@ -158,9 +179,11 @@ export default async function ManagementDashboard() {
       <FadeIn>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Management Dashboard</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {session?.user ? `Good ${getGreeting(now)}, ${toTitleCase(session.user.name?.split(" ")[0] ?? "there")}` : "Management Dashboard"}
+            </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Appraisal overview, employee performance & salary impact
+              Appraisal overview, employee performance &amp; salary impact
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -196,6 +219,32 @@ export default async function ManagementDashboard() {
           </StaggerItem>
         ))}
       </StaggerList>
+
+      {/* Notifications */}
+      {recentNotifs.length > 0 && (
+        <FadeIn delay={0.12}>
+          <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                <Bell className="size-3.5" /> Notifications
+              </span>
+              <Link href="/notifications" className="text-[11px] text-primary hover:underline">View all</Link>
+            </div>
+            <div className="divide-y divide-border">
+              {recentNotifs.map((n) => (
+                <div key={n.id} className="px-5 py-3 flex items-start gap-3">
+                  <span className="size-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground line-clamp-2">{n.message}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{n.createdAt.toLocaleString("en-IN")}</p>
+                  </div>
+                  {n.link && <Link href={n.link} className="text-[11px] text-primary shrink-0 hover:underline">View</Link>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </FadeIn>
+      )}
 
       {/* Charts */}
       <FadeIn delay={0.15}>
@@ -311,6 +360,7 @@ export default async function ManagementDashboard() {
                     </tr>
                   )}
                   {actionableCycles.map((c) => {
+                    const displayStatus = getDisplayStatus(c);
                     const avg =
                       c.ratings.length > 0
                         ? c.ratings.reduce((s, r) => s + r.averageScore, 0) / c.ratings.length
@@ -320,9 +370,10 @@ export default async function ManagementDashboard() {
                     const monthlyGross = grossAnnum ? grossAnnum / 12 : null;
                     const tierKey = monthlyGross ? getSalaryTier(monthlyGross) : null;
                     const dbTier = tierKey === "upto15k" ? "UPTO_15K" : tierKey === "upto30k" ? "BTW_15K_30K" : "ABOVE_30K";
-                    const tieredSlab = avg !== null && grossAnnum
+                    const flooredAvg = avg !== null ? Math.floor(avg) : null;
+                    const tieredSlab = flooredAvg !== null && grossAnnum
                       ? slabs.find((s) =>
-                          avg >= s.minRating && avg <= s.maxRating &&
+                          flooredAvg >= s.minRating && flooredAvg <= s.maxRating &&
                           (s.salaryTier === dbTier || s.salaryTier === "ALL")
                         )
                       : slab;
@@ -348,11 +399,11 @@ export default async function ManagementDashboard() {
                         <td className="px-4">
                           <span
                             className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              STATUS_BADGE[c.status] ??
+                              STATUS_BADGE[displayStatus] ??
                               "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {c.status.replace(/_/g, " ")}
+                            {displayStatus.replace(/_/g, " ")}
                           </span>
                         </td>
                         <td className="px-4 font-semibold text-primary">
@@ -509,4 +560,11 @@ export default async function ManagementDashboard() {
       </FadeIn>
     </div>
   );
+}
+
+function getGreeting(now: Date): string {
+  const h = now.getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  return "evening";
 }

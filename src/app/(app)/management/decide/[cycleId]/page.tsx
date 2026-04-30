@@ -1,20 +1,35 @@
 import { notFound } from "next/navigation";
+import { getSystemDate } from "@/lib/system-date";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { DecisionForm } from "./decision-form";
 import { HikeEditForm } from "./hike-edit-form";
-import { CheckCircle, FileText, Calendar, Pencil } from "lucide-react";
+import { CheckCircle, FileText, Calendar, Pencil, ClipboardList } from "lucide-react";
+import Link from "next/link";
 import { CRITERIA_CATEGORIES, getCriteriaForRole, getSalaryTier } from "@/lib/criteria";
 import { auth } from "@/lib/auth";
 import { ClaimPanel } from "./claim-panel";
+import { getRatingDeadline, isManagementReviewOpen } from "@/lib/workflow";
+
+function addBusinessDays(from: Date, days: number): Date {
+  let count = 0;
+  const d = new Date(from);
+  while (count < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return d;
+}
 
 export default async function DecidePage({ params }: { params: Promise<{ cycleId: string }> }) {
   const { cycleId } = await params;
   const session = await auth();
   const actorId = session?.user?.id ?? null;
   const actorRole = session?.user?.role ?? null;
+  const now = await getSystemDate();
 
   const cycle = await prisma.appraisalCycle.findUnique({
     where: { id: cycleId },
@@ -31,6 +46,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
       decision: { include: { slab: true } },
       assignments: { include: { reviewer: { select: { name: true } } } },
       claimedBy: { select: { id: true, name: true } },
+      moms: { where: { role: "MANAGEMENT" } },
       ratingReviews: {
         include: { reviewer: { select: { name: true, role: true } } },
         orderBy: { updatedAt: "desc" },
@@ -40,6 +56,8 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
   if (!cycle) notFound();
 
   const slabs = await prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } });
+  const managementReviewOpen = isManagementReviewOpen(cycle, now);
+  const ratingDeadline = getRatingDeadline(cycle);
 
   const avg = cycle.ratings.length > 0
     ? cycle.ratings.reduce((s, r) => s + r.averageScore, 0) / cycle.ratings.length
@@ -50,7 +68,8 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
   const tierKey = monthlyGross ? getSalaryTier(monthlyGross) : null;
   const dbTier =
     tierKey === "upto15k" ? "UPTO_15K" : tierKey === "upto30k" ? "BTW_15K_30K" : "ABOVE_30K";
-  const suggestedSlab = slabs.find((s) => avg >= s.minRating && avg <= s.maxRating && (s.salaryTier === dbTier || s.salaryTier === "ALL"));
+  const flooredAvg = Math.floor(avg);
+  const suggestedSlab = slabs.find((s) => flooredAvg >= s.minRating && flooredAvg <= s.maxRating && (s.salaryTier === dbTier || s.salaryTier === "ALL"));
 
   // Build per-reviewer rating data with criteria breakdown
   const reviewerRatings = cycle.ratings.map((r) => {
@@ -194,12 +213,67 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
                 )}
               </CardContent>
             </Card>
+
+            {/* MOM — available once meeting date has passed */}
+            {cycle.scheduledDate && (() => {
+              const meetingPassed = now >= cycle.scheduledDate;
+              return meetingPassed ? (
+                <Card className="border-0 shadow-sm border-l-4 border-l-purple-400">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2 text-purple-600">
+                      <ClipboardList className="size-4" /> Minutes of Meeting
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    {cycle.moms.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-green-600 text-xs font-medium">MOM recorded</p>
+                        <Link
+                          href={`/management/mom/${cycleId}`}
+                          className="text-xs text-purple-600 hover:text-purple-700 font-medium underline"
+                        >
+                          View / Edit MOM →
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-amber-600 text-xs">Meeting date has passed. Record MOM to finalize salary.</p>
+                        <Link
+                          href={`/management/mom/${cycleId}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium bg-purple-600 text-white rounded-lg px-3 py-1.5 hover:bg-purple-700 transition-colors"
+                        >
+                          <ClipboardList className="size-3" /> Record MOM
+                        </Link>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-0 shadow-sm border-l-4 border-l-slate-300">
+                  <CardContent className="p-3 text-xs text-slate-400">
+                    MOM will be available once the meeting date has passed.
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
         </FadeIn>
       ) : (
         <FadeIn delay={0.1}>
           <div className="space-y-3">
-            {!cycle.claimedById && <ClaimPanel cycleId={cycleId} />}
+            {!managementReviewOpen ? (
+              <Card className="border border-border shadow-sm bg-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-foreground">Management Review Locked</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-muted-foreground">
+                  Management review opens after the reviewer rating deadline is completed
+                  {ratingDeadline
+                    ? ` (${ratingDeadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}).`
+                    : "."}
+                </CardContent>
+              </Card>
+            ) : !cycle.claimedById && <ClaimPanel cycleId={cycleId} />}
 
             {cycle.claimedById && (
               <Card className="border border-border shadow-sm bg-card">
@@ -217,7 +291,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
               </Card>
             )}
 
-            {claimedByOther ? (
+            {!managementReviewOpen ? null : claimedByOther ? (
               <Card className="border border-border shadow-sm bg-card">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-foreground">Locked</CardTitle>
@@ -239,6 +313,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
                 mgmtCriteria={mgmtCriteria.map((c) => ({ name: c.name, maxPoints: c.maxPoints, items: c.items }))}
                 slabs={slabs.map((s) => ({ id: s.id, label: s.label, minRating: s.minRating, maxRating: s.maxRating, hikePercent: s.hikePercent, salaryTier: s.salaryTier }))}
                 isAdmin={true}
+                maxTentativeDate={addBusinessDays(new Date(), 30).toISOString()}
               />
             )}
           </div>

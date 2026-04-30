@@ -325,7 +325,8 @@ export const GRADE_BANDS: GradeInfo[] = [
 ];
 
 export function getGrade(normalizedScore: number): GradeInfo {
-  return GRADE_BANDS.find((b) => normalizedScore >= b.minNormalized && normalizedScore <= b.maxNormalized)
+  const floored = Math.floor(normalizedScore);
+  return GRADE_BANDS.find((b) => floored >= b.minNormalized && floored <= b.maxNormalized)
     ?? GRADE_BANDS[GRADE_BANDS.length - 1];
 }
 

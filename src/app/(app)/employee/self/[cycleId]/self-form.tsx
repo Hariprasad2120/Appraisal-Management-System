@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { submitSelfAction } from "./actions";
 import { motion } from "motion/react";
-import { Wand2 } from "lucide-react";
+import { Wand2, Lock } from "lucide-react";
 import type { CriteriaCategory, SupplementarySection } from "@/lib/criteria";
 
 type CategoryAnswer = {
@@ -23,7 +23,10 @@ export function SelfForm({
   existing,
   editableUntil,
   submittedAt,
+  lastModifiedAt,
   editCount,
+  selfStatus,
+  editable,
 }: {
   cycleId: string;
   categories: CriteriaCategory[];
@@ -31,7 +34,10 @@ export function SelfForm({
   existing: Record<string, CategoryAnswer>;
   editableUntil: string;
   submittedAt: string | null;
+  lastModifiedAt: string | null;
   editCount: number;
+  selfStatus: string;
+  editable: boolean;
 }) {
   const employeeCategories = categories.filter((c) => !c.reviewerOnly);
 
@@ -61,10 +67,18 @@ export function SelfForm({
 
   const [pending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(!!submittedAt);
+  // formOpen: controls whether form body is visible. Default open only for first-time submission (not yet submitted).
+  const [formOpen, setFormOpen] = useState(!submittedAt);
+  // reviewing: true = edit mode, false = view-only mode (used after submission)
   const [reviewing, setReviewing] = useState(false);
   const [highlightedCriteria, setHighlightedCriteria] = useState<string | null>(null);
   const criteriaRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const router = useRouter();
+
+  const isLocked = !editable;
+  const deadline = new Date(editableUntil);
+  const now = new Date();
+  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
   function scrollToMissed(catName: string) {
     const el = criteriaRefs.current[catName];
@@ -75,19 +89,18 @@ export function SelfForm({
     }
   }
 
-  const deadline = new Date(editableUntil);
-  const now = new Date();
-  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-
   function setScore(name: string, score: number) {
+    if (isLocked) return;
     setAnswers((prev) => ({ ...prev, [name]: { ...prev[name], score } }));
   }
 
   function setComment(name: string, comment: string) {
+    if (isLocked) return;
     setAnswers((prev) => ({ ...prev, [name]: { ...prev[name], comment } }));
   }
 
   function setQuestionAnswer(catName: string, question: string, value: string) {
+    if (isLocked) return;
     setAnswers((prev) => ({
       ...prev,
       [catName]: {
@@ -98,6 +111,7 @@ export function SelfForm({
   }
 
   function setSuppAnswer(id: string, value: string) {
+    if (isLocked) return;
     setSuppAnswers((prev) => ({ ...prev, [id]: value }));
   }
 
@@ -105,6 +119,7 @@ export function SelfForm({
   const [performerPreset, setPerformerPreset] = useState<PerformerPreset>("high");
 
   function demoFill() {
+    if (isLocked) return;
     const multipliers: Record<PerformerPreset, number> = { high: 0.9, average: 0.65, low: 0.4 };
     const base = multipliers[performerPreset];
     const COMMENTS: Record<PerformerPreset, (cat: string) => string> = {
@@ -144,6 +159,10 @@ export function SelfForm({
   }
 
   function submit() {
+    if (isLocked) {
+      toast.error("Edit window has closed — form is read-only.");
+      return;
+    }
     for (const cat of employeeCategories) {
       const ans = answers[cat.name];
       for (const q of cat.questions) {
@@ -195,9 +214,7 @@ export function SelfForm({
   const totalScore = employeeCategories.reduce((s, c) => s + (answers[c.name]?.score ?? 0), 0);
   const totalMax = employeeCategories.reduce((s, c) => s + c.maxPoints, 0);
 
-  // Progress calculation
   const totalFields = employeeCategories.reduce((s, c) => {
-    // comment + each question
     return s + 1 + c.questions.length;
   }, 0) + supplementary.reduce((s, sec) => s + sec.questions.length, 0);
 
@@ -217,6 +234,73 @@ export function SelfForm({
 
   return (
     <div className="space-y-6">
+      {/* Submitted: View / Edit action card */}
+      {submitted && (
+        <div className={`rounded-xl border px-4 py-4 space-y-3 ${
+          isLocked
+            ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700"
+            : "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${isLocked ? "bg-slate-400" : "bg-green-500"}`}>
+              {isLocked
+                ? <Lock className="size-4 text-white" />
+                : <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-sm ${isLocked ? "text-slate-700 dark:text-slate-300" : "text-green-800 dark:text-green-300"}`}>
+                {isLocked ? "Self-assessment submitted — deadline passed" : "Self-assessment submitted"}
+              </p>
+              <p className={`text-xs mt-0.5 ${isLocked ? "text-slate-500" : "text-green-700 dark:text-green-400"}`}>
+                {isLocked
+                  ? `Locked on ${deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} — view only`
+                  : `Edit deadline: ${deadline.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`
+                }
+              </p>
+              {lastModifiedAt && (
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Last saved: {new Date(lastModifiedAt).toLocaleString("en-IN")}
+                  {editCount > 0 ? ` · ${editCount} edit${editCount !== 1 ? "s" : ""} made` : ""}
+                </p>
+              )}
+              {!isLocked && (
+                <p className={`text-xs mt-0.5 ${isLocked ? "text-slate-400" : "text-green-600 dark:text-green-500"}`}>
+                  {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining to edit` : "Edit window closes today"}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setFormOpen((v) => !v); setReviewing(false); }}
+              className={`flex-1 h-9 text-sm ${
+                isLocked
+                  ? "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400"
+                  : "border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-400"
+              }`}
+            >
+              {formOpen ? "Hide Form" : "View Form"}
+            </Button>
+            {!isLocked && (
+              <Button
+                type="button"
+                onClick={() => { setFormOpen(true); setReviewing(true); }}
+                className="flex-1 h-9 text-sm"
+              >
+                Edit Form
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Form body — hidden until opened via View/Edit button (or on first submission) */}
+      {formOpen && <div className="space-y-6">
+
       {/* Progress bar */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 space-y-2">
         <div className="flex items-center justify-between text-sm">
@@ -259,7 +343,7 @@ export function SelfForm({
                   isHighlighted
                     ? "border-amber-400 shadow-lg shadow-amber-100 dark:shadow-amber-900/20 ring-2 ring-amber-300 dark:ring-amber-600"
                     : "border-slate-200 dark:border-slate-700"
-                }`}
+                } ${isLocked ? "opacity-80" : ""}`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -283,6 +367,8 @@ export function SelfForm({
                         rows={2}
                         placeholder="Your answer..."
                         className="resize-none text-sm"
+                        disabled={isLocked}
+                        readOnly={isLocked}
                       />
                     </div>
                   ))}
@@ -300,7 +386,8 @@ export function SelfForm({
                     step={1}
                     value={ans.score}
                     onChange={(e) => setScore(cat.name, Number(e.target.value))}
-                    className="w-full accent-blue-600 h-2"
+                    className={`w-full h-2 ${isLocked ? "accent-slate-400 cursor-not-allowed" : "accent-blue-600"}`}
+                    disabled={isLocked}
                   />
                   <div className="flex justify-between text-[10px] text-slate-400">
                     <span>0</span>
@@ -319,6 +406,8 @@ export function SelfForm({
                     rows={2}
                     placeholder={`Summarize your performance in ${cat.name.toLowerCase()}...`}
                     className="resize-none text-sm"
+                    disabled={isLocked}
+                    readOnly={isLocked}
                   />
                 </div>
               </motion.div>
@@ -339,7 +428,7 @@ export function SelfForm({
           <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1">
             Part {sec.part} — {sec.title}
           </h2>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4">
+          <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4 ${isLocked ? "opacity-80" : ""}`}>
             {sec.questions.map((q, qIdx) => (
               <div key={q.id} className="space-y-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-pre-line">
@@ -350,7 +439,7 @@ export function SelfForm({
                     {q.choices.map((choice) => (
                       <label
                         key={choice}
-                        className="flex items-start gap-2 cursor-pointer group"
+                        className={`flex items-start gap-2 ${isLocked ? "cursor-not-allowed" : "cursor-pointer"} group`}
                       >
                         <input
                           type="radio"
@@ -359,6 +448,7 @@ export function SelfForm({
                           checked={suppAnswers[q.id] === choice}
                           onChange={() => setSuppAnswer(q.id, choice)}
                           className="mt-0.5 accent-blue-600 shrink-0"
+                          disabled={isLocked}
                         />
                         <span className={`text-xs ${suppAnswers[q.id] === choice ? "text-blue-600 font-medium" : "text-slate-600 dark:text-slate-400"}`}>
                           {choice}
@@ -375,7 +465,9 @@ export function SelfForm({
                       value={suppAnswers[q.id] ?? ""}
                       onChange={(e) => setSuppAnswer(q.id, e.target.value.replace(/[^0-9]/g, ""))}
                       placeholder="Enter amount in ₹..."
-                      className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isLocked}
+                      readOnly={isLocked}
                     />
                     <p className="text-[10px] text-slate-400">Numbers only — enter annual amount in rupees</p>
                   </div>
@@ -386,6 +478,8 @@ export function SelfForm({
                     rows={2}
                     placeholder="Your answer..."
                     className="resize-none text-sm"
+                    disabled={isLocked}
+                    readOnly={isLocked}
                   />
                 )}
               </div>
@@ -394,41 +488,10 @@ export function SelfForm({
         </motion.div>
       ))}
 
-      {/* Submission status banner */}
-      {submitted && !reviewing && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl px-4 py-4 space-y-3"
-        >
-          <div className="flex items-start gap-3">
-            <div className="size-8 rounded-full bg-green-500 flex items-center justify-center shrink-0">
-              <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            </div>
-            <div>
-              <p className="font-semibold text-green-800 dark:text-green-300 text-sm">Successfully submitted your appraisal form</p>
-              <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
-                Review & edit deadline: <strong>{deadline.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</strong>
-              </p>
-              <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
-                {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining` : "Edit window closes today"}
-                {editCount > 0 ? ` · Edited ${editCount} time${editCount !== 1 ? "s" : ""}` : ""}
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={() => setReviewing(true)}
-            variant="outline"
-            className="w-full h-9 border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-400"
-          >
-            Review / Edit Form
-          </Button>
-        </motion.div>
-      )}
-
-      {(!submitted || reviewing) && (
+      {/* Submit / save actions — only when not locked */}
+      {!isLocked && (
         <div className="space-y-3">
-          {submitted && reviewing && (
+          {submitted && (
             <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
               <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Edit window closes: <strong>{deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>
@@ -477,6 +540,15 @@ export function SelfForm({
           </Button>
         </div>
       )}
+
+      {/* Read-only footer when locked */}
+      {isLocked && (
+        <div className="text-center text-xs text-slate-400 py-2">
+          Form is read-only. Editing closed on {deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.
+        </div>
+      )}
+
+      </div>} {/* end formOpen wrapper */}
     </div>
   );
 }

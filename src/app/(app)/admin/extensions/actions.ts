@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { addBusinessDays } from "@/lib/business-days";
@@ -24,14 +23,42 @@ export async function decideExtensionAction(
 
   const extendedUntil = decision === "APPROVED" ? addBusinessDays(new Date(), 2) : null;
 
-  await prisma.extensionRequest.update({
-    where: { id: extensionId },
-    data: {
-      status: decision,
-      extendedUntil,
-      decidedById: session.user.id,
-      updatedAt: new Date(),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.extensionRequest.update({
+      where: { id: extensionId },
+      data: {
+        status: decision,
+        extendedUntil,
+        decidedById: session.user.id,
+        updatedAt: new Date(),
+      },
+    });
+
+    if (extendedUntil) {
+      await tx.appraisalCycle.update({
+        where: { id: ext.cycleId },
+        data: { ratingDeadline: extendedUntil },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        cycleId: ext.cycleId,
+        actorId: session.user.id,
+        action: `EXTENSION_${decision}`,
+        before: {
+          extensionId,
+          status: ext.status,
+          extendedUntil: ext.extendedUntil?.toISOString() ?? null,
+        },
+        after: {
+          extensionId,
+          status: decision,
+          extendedUntil: extendedUntil?.toISOString() ?? null,
+          requesterId: ext.requesterId,
+        },
+      },
+    });
   });
 
   await prisma.notification.create({
@@ -43,9 +70,11 @@ export async function decideExtensionAction(
         : `Your extension request has been REJECTED. Please submit your rating immediately.`,
       link: `/reviewer/${ext.cycleId}/rate`,
       persistent: true,
+      critical: true,
     },
   });
 
   revalidatePath("/admin/extensions");
+  revalidatePath("/management");
   return { ok: true };
 }
