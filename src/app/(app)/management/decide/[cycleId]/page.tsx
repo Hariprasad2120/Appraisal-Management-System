@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSystemDate } from "@/lib/system-date";
 import { prisma } from "@/lib/db";
+import { getSlabs } from "@/lib/slabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
@@ -55,7 +56,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
   });
   if (!cycle) notFound();
 
-  const slabs = await prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } });
+  const slabs = await getSlabs();
   const managementReviewOpen = isManagementReviewOpen(cycle, now);
   const ratingDeadline = getRatingDeadline(cycle);
 

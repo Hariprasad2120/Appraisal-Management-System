@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -32,6 +32,7 @@ export async function createSlabAction(fd: FormData): Promise<Result> {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
   await prisma.incrementSlab.create({ data: parsed.data });
+  revalidateTag("slabs", "max");
   revalidatePath("/admin/slabs");
   return { ok: true };
 }
@@ -42,6 +43,7 @@ export async function deleteSlabAction(fd: FormData): Promise<void> {
   const id = fd.get("id") as string;
   if (!id) return;
   await prisma.incrementSlab.delete({ where: { id } }).catch(() => {});
+  revalidateTag("slabs", "max");
   revalidatePath("/admin/slabs");
 }
 
@@ -76,6 +78,7 @@ export async function seedSlabsAction(): Promise<Result> {
     prisma.incrementSlab.createMany({ data: slabs }),
   ]);
 
+  revalidateTag("slabs", "max");
   revalidatePath("/admin/slabs");
   return { ok: true };
 }

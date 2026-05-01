@@ -4,11 +4,12 @@ import { SalaryCalculator } from "./salary-calculator";
 import { getSalaryTier } from "@/lib/criteria";
 import { getSystemDate } from "@/lib/system-date";
 import { computeCycleStatus } from "@/lib/workflow";
+import { getSlabs } from "@/lib/slabs";
 
 export default async function SalaryPage() {
   const now = await getSystemDate();
   const [slabs, readyCycles] = await Promise.all([
-    prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } }),
+    getSlabs(),
     prisma.appraisalCycle.findMany({
       include: {
         self: true,

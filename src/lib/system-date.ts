@@ -1,15 +1,14 @@
 import { prisma } from "@/lib/db";
+import { cacheLife } from "next/cache";
 
-/**
- * Returns the system date for "now" checks.
- * If admin has set a date override via simulation panel, returns that date.
- * Otherwise returns the real current date.
- */
 export async function getSystemDate(): Promise<Date> {
+  "use cache";
+  cacheLife("seconds");
   try {
     const last = await prisma.auditLog.findFirst({
       where: { action: "SYSTEM_DATE_OVERRIDE" },
       orderBy: { createdAt: "desc" },
+      select: { after: true },
     });
     if (!last) return new Date();
     const after = last.after as { active?: boolean; date?: string } | null;

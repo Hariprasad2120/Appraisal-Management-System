@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
@@ -41,6 +41,7 @@ export async function saveCriteriaOverrideAction(input: z.infer<typeof schema>):
     },
   });
 
+  revalidateTag("criteria", "max");
   revalidatePath("/admin/criteria");
   revalidatePath("/employee");
   return { ok: true };
@@ -53,6 +54,7 @@ export async function resetCriteriaOverrideAction(categoryName: string): Promise
   }
 
   await prisma.criteriaOverride.deleteMany({ where: { categoryName } });
+  revalidateTag("criteria", "max");
   revalidatePath("/admin/criteria");
   revalidatePath("/employee");
   return { ok: true };

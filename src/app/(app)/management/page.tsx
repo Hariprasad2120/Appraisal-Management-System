@@ -17,8 +17,16 @@ import {
   Bell,
 } from "lucide-react";
 import type { CycleStatus } from "@/generated/prisma/enums";
-import { ManagementCharts } from "./management-charts";
+import dynamic from "next/dynamic";
 import { getSystemDate } from "@/lib/system-date";
+import { getSlabs } from "@/lib/slabs";
+
+const ManagementCharts = dynamic(
+  () => import("./management-charts").then((m) => m.ManagementCharts),
+  {
+    loading: () => <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />,
+  }
+);
 import { computeCycleStatus } from "@/lib/workflow";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -49,28 +57,61 @@ export default async function ManagementDashboard() {
 
   const [cycles, slabs, allEmployees, recentNotifs] = await Promise.all([
     prisma.appraisalCycle.findMany({
-      include: {
-        self: true,
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        userId: true,
+        ratingDeadline: true,
+        self: {
+          select: { editableUntil: true, submittedAt: true, locked: true },
+        },
         user: {
-          include: {
-            salary: true,
-            salaryRevisions: { orderBy: { effectiveFrom: "desc" }, take: 3 },
+          select: {
+            name: true,
+            salary: { select: { grossAnnum: true } },
           },
         },
         claimedBy: { select: { name: true } },
-        ratings: true,
-        decision: { include: { slab: true } },
-        assignments: { select: { reviewer: { select: { name: true } }, role: true, availability: true } },
+        ratings: { select: { averageScore: true, reviewerId: true } },
+        decision: {
+          select: {
+            finalAmount: true,
+            slab: { select: { label: true, hikePercent: true } },
+          },
+        },
+        assignments: {
+          select: {
+            reviewer: { select: { name: true } },
+            role: true,
+            availability: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: 200,
     }),
-    prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } }),
+    getSlabs(),
     prisma.user.findMany({
       where: { active: true, role: { notIn: ["MANAGEMENT", "PARTNER", "ADMIN"] } },
-      include: {
-        salary: true,
-        cyclesAsEmployee: { include: { ratings: true, decision: { include: { slab: true } } } },
+      select: {
+        id: true,
+        name: true,
+        salary: { select: { grossAnnum: true, ctcAnnum: true, basic: true } },
+        _count: { select: { cyclesAsEmployee: true } },
+        cyclesAsEmployee: {
+          where: { status: "DECIDED" },
+          select: {
+            ratings: { select: { averageScore: true } },
+            decision: {
+              select: {
+                finalAmount: true,
+                slab: { select: { label: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { name: "asc" },
     }),
@@ -119,7 +160,7 @@ export default async function ManagementDashboard() {
   const employeePerf = allEmployees
     .map((emp) => {
       const decidedEmpCycles = emp.cyclesAsEmployee.filter(
-        (c) => c.status === "DECIDED" && c.ratings.length > 0
+        (c) => c.ratings.length > 0
       );
       const avgRating =
         decidedEmpCycles.length > 0
@@ -136,7 +177,7 @@ export default async function ManagementDashboard() {
         name: emp.name,
         grossAnnum: emp.salary ? Number(emp.salary.grossAnnum) : null,
         avgRating,
-        cycleCount: emp.cyclesAsEmployee.length,
+        cycleCount: emp._count.cyclesAsEmployee,
         lastHike: lastHike ? Number(lastHike) : null,
         lastSlab,
       };
@@ -494,7 +535,7 @@ export default async function ManagementDashboard() {
                 <tbody className="divide-y divide-border">
                   {allEmployees.slice(0, 30).map((emp) => {
                     const decidedEmpCycles = emp.cyclesAsEmployee.filter(
-                      (c) => c.status === "DECIDED" && c.ratings.length > 0
+                      (c) => c.ratings.length > 0
                     );
                     const lastAvg =
                       decidedEmpCycles[0]
