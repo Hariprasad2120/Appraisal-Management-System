@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/db";
 import { CRITERIA_CATEGORIES, type CriteriaCategory } from "@/lib/criteria";
-import { cacheLife, cacheTag } from "next/cache";
+import { unstable_cache } from "next/cache";
+
+const getCachedCriteriaOverrides = unstable_cache(
+  async () => prisma.criteriaOverride.findMany(),
+  ["criteria-overrides"],
+  { tags: ["criteria"], revalidate: 3600 }
+);
 
 export async function getMergedCriteria(): Promise<CriteriaCategory[]> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag("criteria");
-  const overrides = await prisma.criteriaOverride.findMany();
+  const overrides = await getCachedCriteriaOverrides();
   const overrideMap = new Map(
     overrides.map((o) => [o.categoryName, { questions: o.questions as string[], maxPoints: o.maxPoints }])
   );

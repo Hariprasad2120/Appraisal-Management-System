@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/db";
-import { cacheLife, cacheTag } from "next/cache";
+import { unstable_cache } from "next/cache";
 
-export async function getSlabs() {
-  "use cache";
-  cacheLife("hours");
-  cacheTag("slabs");
-  return prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } });
-}
+export const getSlabs = unstable_cache(
+  async () => prisma.incrementSlab.findMany({ orderBy: { minRating: "desc" } }),
+  ["increment-slabs"],
+  { tags: ["slabs"], revalidate: 3600 }
+);

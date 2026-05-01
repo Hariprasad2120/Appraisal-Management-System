@@ -7,10 +7,8 @@ import { getAppraisalEligibility, autoCycleType } from "@/lib/appraisal-eligibil
 import { ChevronRight, Calendar, Users, Clock, CalendarDays } from "lucide-react";
 import { AppraisalCalendar } from "@/components/appraisal-calendar";
 import { AppraisalsMonthFilter } from "./appraisals-month-filter";
-import { connection } from "next/server";
 
 export default async function AppraisalsPage() {
-  await connection();
   const now = new Date();
 
   const [allUsers, activeCycles] = await Promise.all([
