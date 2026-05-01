@@ -141,7 +141,7 @@ export function CycleCardSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div key={i} className="rounded-xl border border-border bg-card p-4 ">
           <div className="flex items-center justify-between">
             <div className="space-y-1.5">
               <Skeleton className="h-4 w-32 rounded" />
