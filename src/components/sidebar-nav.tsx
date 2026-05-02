@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   Users,
   History,
-  Star,
   UserCheck,
   BarChart3,
   ClipboardList,
@@ -23,82 +22,115 @@ import {
   FlaskConical,
   Bell,
   MonitorCheck,
+  Star,
 } from "lucide-react";
 
-type NavItem = { href: string; label: string; icon: React.ReactNode };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  iconColor: string;
+  activeBg: string;
+  activeBar: string;
+  activeLabel: string;
+};
+
+function item(
+  href: string,
+  label: string,
+  icon: React.ReactNode,
+  iconColor: string,
+  activeBg: string,
+  activeBar: string,
+  activeLabel: string
+): NavItem {
+  return { href, label, icon, iconColor, activeBg, activeBar, activeLabel };
+}
+
+// DS per-item color palette
+const C = {
+  teal:   { color: "#2dd4bf", activeBg: "rgba(14,137,149,0.12)",  bar: "#0e8a95", label: "#2dd4bf" },
+  blue:   { color: "#60a5fa", activeBg: "rgba(59,130,246,0.10)",  bar: "#3b82f6", label: "#60a5fa" },
+  purple: { color: "#a78bfa", activeBg: "rgba(124,58,237,0.10)", bar: "#7c3aed", label: "#a78bfa" },
+  cyan:   { color: "#22d3ee", activeBg: "rgba(0,206,196,0.09)",  bar: "#00cec4", label: "#22d3ee" },
+  green:  { color: "#4ade80", activeBg: "rgba(34,197,94,0.09)",  bar: "#22c55e", label: "#4ade80" },
+  amber:  { color: "#fbbf24", activeBg: "rgba(255,170,45,0.09)", bar: "#ffaa2d", label: "#fbbf24" },
+  orange: { color: "#fb923c", activeBg: "rgba(255,131,51,0.09)", bar: "#ff8333", label: "#fb923c" },
+  rose:   { color: "#fb7185", activeBg: "rgba(244,63,94,0.09)",  bar: "#f43f5e", label: "#fb7185" },
+  slate:  { color: "#94a3b8", activeBg: "rgba(100,116,139,0.09)", bar: "#64748b", label: "#94a3b8" },
+};
+
+function mkItem(href: string, label: string, icon: React.ReactNode, c: typeof C[keyof typeof C]): NavItem {
+  return item(href, label, icon, c.color, c.activeBg, c.bar, c.label);
+}
 
 function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
-  const dashboard: NavItem = {
-    href: ROLE_HOME[role],
-    label: "Dashboard",
-    icon: <LayoutDashboard className="size-[18px]" />,
-  };
+  const sz = "size-[15px]";
+  const dashboard = mkItem(ROLE_HOME[role], "Dashboard", <LayoutDashboard className={sz} />, C.teal);
 
   if (role === "ADMIN") {
     return [
       dashboard,
-      { href: "/admin/employees", label: "Employees", icon: <Users className="size-[18px]" /> },
-      { href: "/admin/appraisals", label: "Appraisals", icon: <UserCheck className="size-[18px]" /> },
-      { href: "/admin/cycles", label: "All Cycles", icon: <ClipboardList className="size-[18px]" /> },
-      { href: "/admin/mom", label: "Minutes of Meeting", icon: <Building2 className="size-[18px]" /> },
-      { href: "/admin/slabs", label: "Increment Slabs", icon: <Layers className="size-[18px]" /> },
-      { href: "/admin/extensions", label: "Extensions", icon: <Settings className="size-[18px]" /> },
-      { href: "/admin/criteria", label: "Criteria Questions", icon: <ListChecks className="size-[18px]" /> },
-      { href: "/admin/tickets", label: "Support Tickets", icon: <Ticket className="size-[18px]" /> },
-      { href: "/admin/salary-sheet", label: "Salary Sheet", icon: <BarChart3 className="size-[18px]" /> },
-      { href: "/admin/salary-revisions", label: "Salary Revisions", icon: <TrendingUp className="size-[18px]" /> },
-      { href: "/admin/notifications", label: "Notification Center", icon: <Bell className="size-[18px]" /> },
-      { href: "/admin/sessions", label: "Session Monitor", icon: <MonitorCheck className="size-[18px]" /> },
-      { href: "/admin/simulation", label: "Simulation / Time Travel", icon: <FlaskConical className="size-[18px]" /> },
-      { href: "/employee", label: "My Appraisal", icon: <Star className="size-[18px]" /> },
-      { href: "/history", label: "History", icon: <History className="size-[18px]" /> },
-      { href: "/tickets", label: "My Tickets", icon: <Ticket className="size-[18px]" /> },
+      mkItem("/admin/employees",       "Employees",             <Users className={sz} />,         C.blue),
+      mkItem("/admin/appraisals",      "Appraisals",            <UserCheck className={sz} />,      C.purple),
+      mkItem("/admin/cycles",          "All Cycles",            <ClipboardList className={sz} />,  C.cyan),
+      mkItem("/admin/mom",             "Minutes of Meeting",    <Building2 className={sz} />,      C.slate),
+      mkItem("/admin/slabs",           "Increment Slabs",       <Layers className={sz} />,         C.amber),
+      mkItem("/admin/extensions",      "Extensions",            <Settings className={sz} />,       C.orange),
+      mkItem("/admin/criteria",        "Criteria Questions",    <ListChecks className={sz} />,     C.orange),
+      mkItem("/admin/tickets",         "Support Tickets",       <Ticket className={sz} />,         C.rose),
+      mkItem("/admin/salary-sheet",    "Salary Sheet",          <BarChart3 className={sz} />,      C.green),
+      mkItem("/admin/salary-revisions","Salary Revisions",      <TrendingUp className={sz} />,     C.green),
+      mkItem("/admin/notifications",   "Notification Center",   <Bell className={sz} />,           C.amber),
+      mkItem("/admin/sessions",        "Session Monitor",       <MonitorCheck className={sz} />,   C.slate),
+      mkItem("/admin/simulation",      "Simulation",            <FlaskConical className={sz} />,   C.slate),
+      mkItem("/history",               "History",               <History className={sz} />,        C.slate),
     ];
   }
   if (role === "MANAGEMENT") {
     return [
       dashboard,
-      { href: "/management/mom", label: "Minutes of Meeting", icon: <Building2 className="size-[18px]" /> },
-      { href: "/management/salary", label: "Salary Calculator", icon: <BarChart3 className="size-[18px]" /> },
-      { href: "/management/slabs", label: "Increment Slabs", icon: <Layers className="size-[18px]" /> },
-      { href: "/admin/employees", label: "Employees", icon: <Users className="size-[18px]" /> },
-      { href: "/history", label: "History", icon: <History className="size-[18px]" /> },
-      { href: "/notifications", label: "Notifications", icon: <Bell className="size-[18px]" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-[18px]" /> },
+      mkItem("/management/mom",    "Minutes of Meeting", <Building2 className={sz} />,  C.slate),
+      mkItem("/management/salary", "Salary Calculator",  <BarChart3 className={sz} />,  C.green),
+      mkItem("/management/slabs",  "Increment Slabs",    <Layers className={sz} />,     C.amber),
+      mkItem("/admin/employees",   "Employees",          <Users className={sz} />,      C.blue),
+      mkItem("/history",           "History",            <History className={sz} />,    C.slate),
+      mkItem("/notifications",     "Notifications",      <Bell className={sz} />,       C.amber),
+      mkItem("/tickets",           "Support Tickets",    <Ticket className={sz} />,     C.rose),
     ];
   }
   if (role === "HR" || role === "TL" || role === "MANAGER") {
     return [
-      { href: "/reviewer", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
-      ...(role === "HR" ? [{ href: "/reviewer/mom", label: "Minutes of Meeting", icon: <Building2 className="size-[18px]" /> }] : []),
-      { href: "/employee", label: "My Appraisal", icon: <UserCheck className="size-[18px]" /> },
-      { href: "/history", label: "History", icon: <History className="size-[18px]" /> },
-      { href: "/notifications", label: "Notifications", icon: <Bell className="size-[18px]" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-[18px]" /> },
+      mkItem("/reviewer",     "Dashboard",           <LayoutDashboard className={sz} />, C.teal),
+      ...(role === "HR" ? [mkItem("/reviewer/mom", "Minutes of Meeting", <Building2 className={sz} />, C.slate)] : []),
+      mkItem("/employee",     "My Appraisal",        <Star className={sz} />,            C.purple),
+      mkItem("/history",      "History",             <History className={sz} />,         C.slate),
+      mkItem("/notifications","Notifications",       <Bell className={sz} />,            C.amber),
+      mkItem("/tickets",      "Support Tickets",     <Ticket className={sz} />,          C.rose),
     ];
   }
   if (role === "EMPLOYEE") {
     return [
       dashboard,
-      { href: "/history", label: "History", icon: <History className="size-[18px]" /> },
-      { href: "/notifications", label: "Notifications", icon: <Bell className="size-[18px]" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-[18px]" /> },
+      mkItem("/history",       "History",         <History className={sz} />, C.slate),
+      mkItem("/notifications", "Notifications",   <Bell className={sz} />,    C.amber),
+      mkItem("/tickets",       "Support Tickets", <Ticket className={sz} />,  C.rose),
     ];
   }
   if (role === "PARTNER") {
     return [
-      { href: "/partner", label: "Dashboard", icon: <LayoutDashboard className="size-[18px]" /> },
-      { href: "/admin/employees", label: "Employees", icon: <Users className="size-[18px]" /> },
-      { href: "/history", label: "History", icon: <History className="size-[18px]" /> },
-      { href: "/notifications", label: "Notifications", icon: <Bell className="size-[18px]" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-[18px]" /> },
+      mkItem("/partner",       "Dashboard",       <LayoutDashboard className={sz} />, C.teal),
+      mkItem("/admin/employees","Employees",      <Users className={sz} />,           C.blue),
+      mkItem("/history",       "History",         <History className={sz} />,         C.slate),
+      mkItem("/notifications", "Notifications",   <Bell className={sz} />,            C.amber),
+      mkItem("/tickets",       "Support Tickets", <Ticket className={sz} />,          C.rose),
     ];
   }
   return [
     dashboard,
-    { href: "/history", label: "History", icon: <History className="size-[18px]" /> },
-    { href: "/notifications", label: "Notifications", icon: <Bell className="size-[18px]" /> },
-    { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-[18px]" /> },
+    mkItem("/history",       "History",         <History className={sz} />, C.slate),
+    mkItem("/notifications", "Notifications",   <Bell className={sz} />,    C.amber),
+    mkItem("/tickets",       "Support Tickets", <Ticket className={sz} />,  C.rose),
   ];
 }
 
@@ -113,7 +145,7 @@ export function SidebarNav({
   const items = navFor(role, secondaryRole);
 
   return (
-    <nav className="flex-1 px-2 py-2.5 flex flex-col gap-0.5 overflow-y-auto">
+    <nav className="flex-1 px-1.5 py-2 flex flex-col gap-px overflow-y-auto overflow-x-hidden">
       {items.map((item, i) => {
         const exactMatch = pathname === item.href;
         const prefixMatch =
@@ -143,32 +175,38 @@ export function SidebarNav({
               href={item.href}
               title={item.label}
               className={cn(
-                "relative flex items-center gap-2.5 px-2 py-2 rounded-lg transition-all duration-150 group/nav overflow-hidden",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                "relative grid h-[34px] grid-cols-[52px_1fr] items-center rounded-[4px] transition-colors duration-200 group/nav overflow-hidden",
+                "hover:bg-white/5"
               )}
+              style={isActive ? { background: item.activeBg } : undefined}
             >
+              {/* Left accent bar */}
               {isActive && (
                 <motion.div
                   layoutId="nav-active-bar"
-                  className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-full bg-primary"
+                  className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-r-sm"
+                  style={{ background: item.activeBar }}
                   transition={{ type: "spring", stiffness: 380, damping: 32 }}
                 />
               )}
-              {/* Icon — always visible */}
+
+              {/* Colored icon */}
               <span
-                className={cn(
-                  "shrink-0 transition-colors duration-150",
-                  isActive
-                    ? "text-primary"
-                    : "text-muted-foreground group-hover/nav:text-foreground"
-                )}
+                className="z-10 flex h-full w-[52px] shrink-0 items-center justify-center"
+                style={{ color: item.iconColor }}
               >
                 {item.icon}
               </span>
-              {/* Label — hidden at rest (sidebar 60px), visible when expanded */}
-              <span className="truncate text-[13px] font-medium whitespace-nowrap overflow-hidden opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-150 delay-75">
+
+              {/* Label */}
+              <span
+                className="z-10 w-[150px] min-w-0 -translate-x-1 truncate whitespace-nowrap text-[12px] font-medium opacity-0 transition-[opacity,transform] duration-200 ease-out group-hover/sidebar:translate-x-0 group-hover/sidebar:opacity-100"
+                style={
+                  isActive
+                    ? { color: item.activeLabel }
+                    : { color: "var(--muted-foreground)" }
+                }
+              >
                 {item.label}
               </span>
             </Link>

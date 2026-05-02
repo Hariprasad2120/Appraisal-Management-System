@@ -1,19 +1,11 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { Users, Clock, AlertCircle, Calendar, ChevronRight, Bell } from "lucide-react";
 import { getAppraisalEligibility, getMilestoneAlert, autoCycleType } from "@/lib/appraisal-eligibility";
 import { ManagementCharts } from "../management/management-charts";
-
-function getGreeting(now: Date): string {
-  const h = now.getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
-  return "evening";
-}
 
 function ArrowUpRight() {
   return (
@@ -153,14 +145,7 @@ export default async function AdminDashboard() {
       <FadeIn>
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="ds-h1">
-              {session?.user
-                ? `Good ${getGreeting(now)}, ${toTitleCase(session.user.name?.split(" ")[0] ?? "there")}`
-                : "Admin Dashboard"}
-            </h1>
-            <p className="ds-body mt-1">
-              {now.toLocaleString("default", { month: "long", year: "numeric" })}
-            </p>
+            <h1 className="ds-h1">Admin Dashboard</h1>
           </div>
           {recentNotifs.length > 0 && (
             <Link
@@ -208,7 +193,12 @@ export default async function AdminDashboard() {
               {milestoneAlerts.map(({ employee, alert }) => (
                 <div key={employee.id} className="flex items-center justify-between text-sm flex-wrap gap-2">
                   <div>
-                    <span className="font-medium text-foreground">{toTitleCase(employee.name)}</span>
+                    <Link
+                      href={`/admin/employees/${employee.id}/assign`}
+                      className="font-medium text-foreground transition-colors hover:text-primary hover:underline"
+                    >
+                      {toTitleCase(employee.name)}
+                    </Link>
                     <span className="text-muted-foreground ml-2 text-xs">{alert.label}</span>
                   </div>
                   <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full px-2.5 py-0.5 font-medium">
@@ -257,7 +247,12 @@ export default async function AdminDashboard() {
                             {u.employeeNumber ?? "—"}
                           </td>
                           <td className="px-2 font-semibold text-foreground">
-                            {toTitleCase(u.name)}
+                            <Link
+                              href={`/admin/employees/${u.id}/assign`}
+                              className="transition-colors hover:text-primary hover:underline"
+                            >
+                              {toTitleCase(u.name)}
+                            </Link>
                           </td>
                           <td className="px-2 text-muted-foreground text-xs hidden sm:table-cell">
                             {u.department ?? "—"}

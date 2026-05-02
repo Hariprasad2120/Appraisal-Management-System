@@ -46,7 +46,9 @@ export function TicketForm() {
     startTransition(async () => {
       const res = await createTicketAction({ title: title.trim(), description: description.trim(), category, priority });
       if (!res.ok) { toast.error(res.error); return; }
-      toast.success("Ticket submitted — admin will be notified");
+      toast.success("Ticket submitted", {
+        description: "The admin team has been notified.",
+      });
       setTitle(""); setDescription(""); setCategory(""); setPriority("MEDIUM");
       setOpen(false);
     });

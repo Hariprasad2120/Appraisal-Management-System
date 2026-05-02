@@ -31,10 +31,10 @@ export default async function VotePage({ params }: { params: Promise<{ cycleId: 
     <div className="space-y-5 max-w-xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h1 className="ds-h1">
             Schedule Appraisal Meeting
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="ds-body mt-1">
             {toTitleCase(cycle.user.name)} — propose and finalize the meeting date
           </p>
         </div>

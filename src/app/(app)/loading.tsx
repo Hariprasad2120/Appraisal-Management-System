@@ -4,7 +4,7 @@ export default function AppLoading() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Sidebar skeleton */}
-      <aside className="hidden md:flex w-64 shrink-0 border-r border-border bg-sidebar flex-col sticky top-0 h-screen overflow-hidden">
+      <aside className="hidden md:flex w-16 shrink-0 border-r border-border bg-sidebar flex-col sticky top-0 h-screen overflow-hidden">
         {/* Logo area */}
         <div className="px-5 py-5 border-b border-border space-y-1.5">
           <Skeleton className="h-4 w-32 rounded" />

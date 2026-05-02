@@ -305,13 +305,13 @@ export function SalaryCalculator() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-slate-500 border-b bg-slate-50 dark:bg-slate-800/50">
-                    <th className="py-2 px-4 font-medium">Component</th>
-                    <th className="py-2 px-4 text-right font-medium">Monthly</th>
-                    <th className="py-2 px-4 text-right font-medium">Annual</th>
+                  <tr className="text-left border-b border-border bg-muted/40">
+                    <th className="py-2.5 px-4 ds-label">Component</th>
+                    <th className="py-2 px-4 text-right ds-label">Monthly</th>
+                    <th className="py-2 px-4 text-right ds-label">Annual</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-border">
                   {rows.map((r) => (
                     <Row key={r.label} {...r} />
                   ))}
@@ -333,13 +333,13 @@ export function SalaryCalculator() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs text-slate-500 border-b bg-slate-50 dark:bg-slate-800/50">
-                      <th className="py-2 px-4 font-medium">Component</th>
-                      <th className="py-2 px-4 text-right font-medium">Monthly</th>
-                      <th className="py-2 px-4 text-right font-medium">Annual</th>
+                    <tr className="text-left border-b border-border bg-muted/40">
+                      <th className="py-2.5 px-4 ds-label">Component</th>
+                      <th className="py-2 px-4 text-right ds-label">Monthly</th>
+                      <th className="py-2 px-4 text-right ds-label">Annual</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-border">
                     {offerRows.map((r) => (
                       <Row key={r.label} {...r} />
                     ))}

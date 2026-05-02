@@ -7,25 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { approveArrearAction, rejectArrearAction } from "./actions";
-import { CalendarDays, IndianRupee, User, CheckCircle2, XCircle } from "lucide-react";
+import { CalendarDays, User, CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
 
 type ArrearCardProps = {
   arrear: {
     id: string;
     cycleId: string;
     arrearDays: number;
-    // Prisma Decimal serializes as object; toString() or Number() both work
-    arrearAmount: { toString(): string };
-    dailyRate: { toString(): string };
-    periodFrom: Date;
-    periodTo: Date;
-    user: { name: string; department: string | null; designation: string | null };
+    arrearAmount: number;
+    dailyRate: number;
+    periodFrom: string;
+    periodTo: string;
+    user: { id: string; name: string; department: string | null; designation: string | null };
     cycle: {
       id: string;
       type: string;
-      scheduledDate: Date | null;
-      self: { submittedAt: Date | null } | null;
-      decision: { finalAmount: { toString(): string }; finalRating: number } | null;
+      scheduledDate: string | null;
+      self: { submittedAt: string | null } | null;
+      decision: { finalAmount: number; finalRating: number } | null;
     };
   };
 };
@@ -65,9 +65,9 @@ export function ArrearApprovalCard({ arrear }: ArrearCardProps) {
     });
   }
 
-  const arrearAmt = Number(arrear.arrearAmount);
-  const dailyRateNum = Number(arrear.dailyRate);
-  const finalAmt = arrear.cycle.decision ? Number(arrear.cycle.decision.finalAmount) : 0;
+  const arrearAmt = arrear.arrearAmount;
+  const dailyRateNum = arrear.dailyRate;
+  const finalAmt = arrear.cycle.decision?.finalAmount ?? 0;
 
   return (
     <Card className="border-0 shadow-sm border-l-4 border-l-amber-400">
@@ -77,7 +77,12 @@ export function ArrearApprovalCard({ arrear }: ArrearCardProps) {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <User className="size-4 text-slate-400" />
-              <span className="font-semibold text-slate-900 dark:text-white">{arrear.user.name}</span>
+              <Link
+                href={`/admin/employees/${arrear.user.id}/assign`}
+                className="font-semibold text-slate-900 transition-colors hover:text-primary hover:underline dark:text-white"
+              >
+                {arrear.user.name}
+              </Link>
               {arrear.user.department && (
                 <span className="text-xs text-slate-500">· {arrear.user.department}</span>
               )}

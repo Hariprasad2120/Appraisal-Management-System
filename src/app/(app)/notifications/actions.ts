@@ -23,3 +23,12 @@ export async function markOneReadAction(id: string): Promise<void> {
   });
   revalidatePath("/notifications");
 }
+
+export async function deleteAllNotificationsAction(): Promise<void> {
+  const session = await auth();
+  if (!session?.user) return;
+  await prisma.notification.deleteMany({
+    where: { userId: session.user.id },
+  });
+  revalidatePath("/notifications");
+}

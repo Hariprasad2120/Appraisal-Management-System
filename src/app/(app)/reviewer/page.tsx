@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Users,
   ClipboardList,
+  CalendarDays,
   Bell,
   IndianRupee,
   TrendingUp,
@@ -35,7 +36,7 @@ export default async function ReviewerDashboard() {
       include: {
         cycle: {
           include: {
-            user: { select: { name: true, department: true, designation: true } },
+            user: { select: { id: true, name: true, department: true, designation: true } },
             self: { select: { editableUntil: true, submittedAt: true, locked: true, status: true } },
             assignments: { select: { availability: true } },
             ratings: { select: { reviewerId: true, averageScore: true } },
@@ -71,7 +72,7 @@ export default async function ReviewerDashboard() {
     prisma.notification.findMany({
       where: { userId: session.user.id, read: false },
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 3,
       select: { id: true, message: true, link: true, createdAt: true, type: true },
     }),
     prisma.appraisalCycle.findMany({
@@ -103,27 +104,31 @@ export default async function ReviewerDashboard() {
       isRatingOpen(a.cycle, now) &&
       !a.cycle.ratings.some((r) => r.reviewerId === session.user.id)
   );
+  const isHrReviewer = session.user.role === "HR" || session.user.secondaryRole === "HR";
+  const hrMeetings = assignments
+    .filter((a) => a.role === "HR" && (a.cycle.scheduledDate || a.cycle.tentativeDate1 || a.cycle.tentativeDate2))
+    .sort((a, b) => {
+      const aDate = a.cycle.scheduledDate ?? a.cycle.tentativeDate1 ?? a.cycle.tentativeDate2;
+      const bDate = b.cycle.scheduledDate ?? b.cycle.tentativeDate1 ?? b.cycle.tentativeDate2;
+      return (aDate?.getTime() ?? 0) - (bDate?.getTime() ?? 0);
+    });
 
   const myOwnCycle = myOwnCycles[0] ?? null;
   const ownStatus = myOwnCycle ? computeCycleStatus(myOwnCycle, now) : null;
 
   const salaryRevisions = reviewer?.salaryRevisions ?? [];
-  const currentCTC = reviewer?.salary?.ctcAnnum
-    ? Number(reviewer.salary.ctcAnnum)
-    : reviewer?.currentSalary
-    ? Number(reviewer.currentSalary)
-    : null;
-
-  const firstName = reviewer?.name?.split(" ")[0] ?? "there";
-
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div
+      className="mx-auto flex h-full max-h-full w-full max-w-[1440px] min-w-0 flex-col overflow-hidden"
+      style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+    >
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden">
       {/* Greeting header */}
       <FadeIn>
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Good {getGreeting(now)}, {toTitleCase(firstName)}
+            <h1 className="text-2xl font-normal text-foreground">
+              Reviewer Dashboard
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
               {reviewer?.designation && `${reviewer.designation} · `}
@@ -177,34 +182,9 @@ export default async function ReviewerDashboard() {
       </FadeIn>
 
       {/* Main 2-col grid */}
-      <div className="grid xl:grid-cols-[1fr_340px] gap-5 items-start">
+      <div className="grid grid-cols-1 gap-5 items-start">
         {/* Left column */}
-        <div className="space-y-5">
-          {/* Notifications */}
-          {recentNotifs.length > 0 && (
-            <FadeIn delay={0.08}>
-              <SectionCard
-                title="Notifications"
-                icon={<Bell className="size-3.5" />}
-                action={<Link href="/notifications" className="text-[11px] text-[#0e8a95] hover:underline">View all</Link>}
-              >
-                <div className="divide-y divide-border">
-                  {recentNotifs.map((n) => (
-                    <div key={n.id} className="px-5 py-3 flex items-start gap-3">
-                      <span className="size-1.5 rounded-full bg-[#0e8a95] shrink-0 mt-1.5" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{n.message}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {n.createdAt.toLocaleString("en-IN")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-            </FadeIn>
-          )}
-
+        <div className="min-w-0 space-y-5">
           {/* Active tickets */}
           {activeTickets.length > 0 && (
             <FadeIn delay={0.1}>
@@ -256,19 +236,18 @@ export default async function ReviewerDashboard() {
                   <Legend dot="bg-slate-300 dark:bg-slate-600" label="Waiting / N/A" />
                 </div>
               }
-              noPad
             >
               {assignments.length === 0 ? (
                 <div className="py-10 text-center text-muted-foreground text-sm">
                   No assignments yet. Admin will assign you when a cycle opens.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[900px] text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/40">
-                        {["#", "Employee", "Cycle", "My Role", "Status", "Reviewer Progress", "Score", "Deadline", "Action"].map((h) => (
-                          <th key={h} className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                        {["#", "Employee", "Cycle", "Role", "Status", "Progress", "Score", "Deadline", "Meeting", "Action"].map((h) => (
+                          <th key={h} className="text-left px-3 py-3 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
                             {h}
                           </th>
                         ))}
@@ -348,8 +327,101 @@ export default async function ReviewerDashboard() {
           )}
         </div>
 
-        {/* Right column: salary */}
-        <div className="space-y-5">
+        {/* Right column */}
+        <div className="grid min-w-0 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {isHrReviewer && (
+            <FadeIn delay={0.06}>
+              <SectionCard
+                title="Upcoming Meetings"
+                icon={<CalendarDays className="size-3.5" />}
+                action={<span className="text-[11px] text-muted-foreground">{hrMeetings.length} active</span>}
+              >
+                {hrMeetings.length === 0 ? (
+                  <div className="px-5 py-6 text-center text-xs text-muted-foreground">
+                    No meeting dates have been selected yet.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {hrMeetings.slice(0, 5).map((assignment) => {
+                      const meetingDate = assignment.cycle.scheduledDate;
+                      const firstOption = assignment.cycle.tentativeDate1;
+                      const secondOption = assignment.cycle.tentativeDate2;
+                      return (
+                        <div key={assignment.id} className="px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <Link
+                                href={`/admin/employees/${assignment.cycle.user.id}/assign`}
+                                className="block truncate text-sm font-semibold text-foreground transition-colors hover:text-primary hover:underline"
+                              >
+                                {toTitleCase(assignment.cycle.user.name)}
+                              </Link>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                {meetingDate
+                                  ? meetingDate.toLocaleDateString("en-IN", {
+                                      weekday: "short",
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    })
+                                  : "Management proposed meeting dates"}
+                              </p>
+                              {!meetingDate && (firstOption || secondOption) && (
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                  {[firstOption, secondOption]
+                                    .filter(Boolean)
+                                    .map((date) => date!.toLocaleDateString("en-IN", { day: "numeric", month: "short" }))
+                                    .join(" / ")}
+                                </p>
+                              )}
+                            </div>
+                            <Link
+                              href={`/reviewer/${assignment.cycle.id}/schedule`}
+                              className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                                meetingDate
+                                  ? "border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
+                                  : "bg-[#0e8a95] text-white hover:bg-[#0ea5b0]"
+                              }`}
+                            >
+                              {meetingDate ? "View" : "Confirm"}
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </SectionCard>
+            </FadeIn>
+          )}
+
+          {/* Compact notifications */}
+          {recentNotifs.length > 0 && (
+            <FadeIn delay={0.08}>
+              <SectionCard
+                title="Unread Notifications"
+                icon={<Bell className="size-3.5" />}
+                action={<Link href="/notifications" className="text-[11px] text-[#0e8a95] hover:underline">View all</Link>}
+              >
+                <div className="divide-y divide-border">
+                  {recentNotifs.map((n) => (
+                    <div key={n.id} className="px-4 py-2.5 flex items-start gap-2.5">
+                      <span className="size-1.5 rounded-full bg-[#0e8a95] shrink-0 mt-1.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-foreground line-clamp-2 leading-snug">{n.message}</p>
+                        {n.link && (
+                          <Link href={n.link} className="text-[10px] text-[#0e8a95] hover:underline mt-0.5 block">
+                            View →
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            </FadeIn>
+          )}
+
           {/* Salary details */}
           {reviewer?.salary && (
             <FadeIn delay={0.1}>
@@ -383,7 +455,7 @@ export default async function ReviewerDashboard() {
                 accent="#22c55e"
               >
                 <div className="px-5 pb-4 pt-1 space-y-2.5">
-                  {salaryRevisions.map((rev, i) => (
+                  {salaryRevisions.map((rev) => (
                     <div
                       key={rev.id}
                       className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/40 border border-border"
@@ -454,15 +526,9 @@ export default async function ReviewerDashboard() {
           </FadeIn>
         </div>
       </div>
+      </div>
     </div>
   );
-}
-
-function getGreeting(now: Date): string {
-  const h = now.getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
-  return "evening";
 }
 
 function formatCurrency(val: number): string {
@@ -485,7 +551,6 @@ function SectionCard({
   accent,
   action,
   headerExtra,
-  noPad,
   children,
 }: {
   title: string;
@@ -493,7 +558,6 @@ function SectionCard({
   accent?: string;
   action?: React.ReactNode;
   headerExtra?: React.ReactNode;
-  noPad?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -501,8 +565,8 @@ function SectionCard({
       className="border border-border rounded-xl bg-card shadow-sm overflow-hidden"
       style={accent ? { borderTop: `3px solid ${accent}` } : undefined}
     >
-      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between flex-wrap gap-2">
-        <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+      <div className="px-3 py-3.5 border-b border-border flex items-center justify-between flex-wrap gap-2">
+        <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           {icon}
           {title}
         </span>
@@ -560,10 +624,13 @@ type AssignmentWithCycle = {
   role: string;
   availability: string;
   assignedAt: Date;
-  cycle: {
+    cycle: {
     id: string;
     type: string;
-    user: { name: string; department: string | null; designation?: string | null };
+    user: { id: string; name: string; department: string | null; designation?: string | null };
+    scheduledDate: Date | null;
+    tentativeDate1: Date | null;
+    tentativeDate2: Date | null;
     self: { editableUntil: Date; submittedAt: Date | null; locked: boolean } | null;
     assignments: { availability: "PENDING" | "AVAILABLE" | "NOT_AVAILABLE" }[];
     ratings: { reviewerId: string; averageScore: number }[];
@@ -623,12 +690,15 @@ function ReviewRow({
 
   return (
     <tr className="hover:bg-muted/30 transition-colors">
-      <td className="px-5 py-3.5 text-xs text-muted-foreground font-mono">{idx}</td>
+      <td className="px-3 py-3.5 text-xs text-muted-foreground font-mono">{idx}</td>
 
-      <td className="px-5 py-3.5">
-        <div className="font-semibold text-foreground text-sm leading-tight">
+      <td className="px-3 py-3.5">
+        <Link
+          href={`/admin/employees/${assignment.cycle.user.id}/assign`}
+          className="text-sm font-semibold leading-tight text-foreground transition-colors hover:text-primary hover:underline"
+        >
           {toTitleCase(assignment.cycle.user.name)}
-        </div>
+        </Link>
         <div className="text-[11px] text-muted-foreground mt-0.5">
           {[
             assignment.cycle.user.department,
@@ -637,26 +707,26 @@ function ReviewRow({
         </div>
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
         <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#0e8a95]/10 text-[#0e8a95] font-medium border border-[#0e8a95]/20">
           {assignment.cycle.type}
         </span>
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
         <span className="text-xs font-mono font-semibold text-muted-foreground">
           {assignment.role}
         </span>
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
         <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${statusConfig.badge}`}>
           <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
           {statusConfig.label}
         </span>
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
         <div className="flex items-center gap-2">
           <div className="flex gap-1">
             {Array.from({ length: totalReviewers }).map((_, i) => (
@@ -670,7 +740,7 @@ function ReviewRow({
         </div>
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
         {visibleAverage !== null ? (
           <span className="text-xs font-bold text-green-600 dark:text-green-400">
             {visibleAverage.toFixed(1)}
@@ -682,7 +752,7 @@ function ReviewRow({
         )}
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
         {assignment.cycle.self ? (
           <div>
             <div className="text-[11px] text-foreground whitespace-nowrap">
@@ -701,7 +771,37 @@ function ReviewRow({
         )}
       </td>
 
-      <td className="px-5 py-3.5">
+      <td className="px-3 py-3.5">
+        {assignment.cycle.scheduledDate ? (
+          <Link
+            href={`/reviewer/${assignment.cycle.id}/schedule`}
+            className="inline-flex flex-col text-[11px] leading-tight text-foreground transition-colors hover:text-primary hover:underline"
+          >
+            <span>
+              {assignment.cycle.scheduledDate.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
+            <span className="mt-0.5 text-[10px] text-green-600 dark:text-green-400">
+              Scheduled
+            </span>
+          </Link>
+        ) : assignment.role === "HR" && (assignment.cycle.tentativeDate1 || assignment.cycle.tentativeDate2) ? (
+          <Link
+            href={`/reviewer/${assignment.cycle.id}/schedule`}
+            className="inline-flex items-center gap-1 rounded-lg bg-[#0e8a95]/10 px-2 py-1 text-[11px] font-semibold text-[#0e8a95] transition-colors hover:bg-[#0e8a95]/15"
+          >
+            Confirm date
+            <ChevronRight className="size-3" />
+          </Link>
+        ) : (
+          <span className="text-muted-foreground text-xs">-</span>
+        )}
+      </td>
+
+      <td className="px-3 py-3.5">
         <Link
           href={actionHref}
           className={`inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${actionStyle}`}

@@ -16,7 +16,11 @@ export default async function HrSchedulePage({
   const session = await auth();
   if (!session?.user) return null;
 
-  if (!["HR", "ADMIN"].includes(session.user.role)) {
+  const canSchedule =
+    ["HR", "ADMIN"].includes(session.user.role) ||
+    ["HR", "ADMIN"].includes(session.user.secondaryRole ?? "");
+
+  if (!canSchedule) {
     redirect(`/reviewer/${cycleId}`);
   }
 
@@ -39,8 +43,8 @@ export default async function HrSchedulePage({
     <div className="max-w-lg space-y-5">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Schedule Meeting</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Schedule Meeting</h1>
+          <p className="ds-body mt-1">
             {toTitleCase(cycle.user.name)} · {cycle.type} Appraisal
           </p>
         </div>

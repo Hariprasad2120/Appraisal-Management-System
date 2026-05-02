@@ -90,7 +90,7 @@ export function AssignForm(props: Props) {
         includeTlReviewer: includeTL,
         includeManagerReviewer: isTlAppraisee ? true : includeManager,
       });
-      if (res.ok) toast.success("Reviewers assigned — notifications sent");
+      if (res.ok) toast.success("Reviewers assigned", { description: "Notifications have been sent." });
       else toast.error(res.error ?? "Failed");
     });
   }
@@ -109,7 +109,7 @@ export function AssignForm(props: Props) {
         includeTlReviewer: specialIncludeTL,
         includeManagerReviewer: isTlAppraisee ? true : specialIncludeManager,
       });
-      if (res.ok) toast.success("Special appraisal started — notifications sent");
+      if (res.ok) toast.success("Special appraisal started", { description: "Notifications have been sent." });
       else toast.error(res.error ?? "Failed");
     });
   }

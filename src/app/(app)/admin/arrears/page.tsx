@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn } from "@/components/motion-div";
 import { CalendarDays, IndianRupee, User } from "lucide-react";
+import Link from "next/link";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING_APPROVAL: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
@@ -27,7 +28,7 @@ export default async function AdminArrearsPage() {
 
   const arrears = await prisma.arrear.findMany({
     include: {
-      user: { select: { name: true, department: true, designation: true } },
+      user: { select: { id: true, name: true, department: true, designation: true } },
       cycle: { select: { id: true, type: true, scheduledDate: true } },
       approvedBy: { select: { name: true } },
     },
@@ -48,8 +49,8 @@ export default async function AdminArrearsPage() {
     <div className="space-y-6">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Arrear Management</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Arrear Management</h1>
+          <p className="ds-body mt-1">
             Full audit trail of all arrear records across appraisal cycles.
           </p>
         </div>
@@ -61,7 +62,7 @@ export default async function AdminArrearsPage() {
           <Card className="border-0 shadow-sm">
             <CardContent className="p-4">
               <p className="text-xs text-slate-500">Total Arrears</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.total}</p>
+              <p className="ds-h1">{summary.total}</p>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-sm">
@@ -97,16 +98,19 @@ export default async function AdminArrearsPage() {
             {arrears.length === 0 ? (
               <p className="text-sm text-slate-500 p-6">No arrear records found.</p>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-border">
                 {arrears.map((arrear) => (
-                  <div key={arrear.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                  <div key={arrear.id} className="p-4 hover:bg-muted/30 transition-colors">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <User className="size-3.5 text-slate-400 shrink-0" />
-                          <span className="font-medium text-sm text-slate-900 dark:text-white">
+                          <Link
+                            href={`/admin/employees/${arrear.user.id}/assign`}
+                            className="text-sm font-medium text-slate-900 transition-colors hover:text-primary hover:underline dark:text-white"
+                          >
                             {arrear.user.name}
-                          </span>
+                          </Link>
                           {arrear.user.department && (
                             <span className="text-xs text-slate-500">· {arrear.user.department}</span>
                           )}

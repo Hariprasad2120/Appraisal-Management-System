@@ -41,7 +41,7 @@ export default async function AdminCyclesPage({
     where,
     include: {
       user: true,
-      assignments: { include: { reviewer: { select: { name: true, role: true } } } },
+      assignments: { include: { reviewer: { select: { id: true, name: true, role: true } } } },
       ratings: { select: { averageScore: true, role: true } },
       decision: { include: { slab: true } },
     },
@@ -67,8 +67,8 @@ export default async function AdminCyclesPage({
       <FadeIn>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">All Appraisal Cycles</h1>
-            <p className="text-slate-500 text-sm mt-1">{cycles.length} cycles</p>
+            <h1 className="ds-h1">All Appraisal Cycles</h1>
+            <p className="ds-body mt-1">{cycles.length} cycles</p>
           </div>
         </div>
       </FadeIn>
@@ -111,20 +111,20 @@ export default async function AdminCyclesPage({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-slate-500 border-b bg-slate-50 dark:bg-slate-800/50">
-                    <th className="py-3 px-4 font-medium">Employee</th>
-                    <th className="font-medium px-4">Emp #</th>
-                    <th className="font-medium px-4">Type</th>
-                    <th className="font-medium px-4">Status</th>
-                    <th className="font-medium px-4">Reviewers</th>
-                    <th className="font-medium px-4">Avg Score</th>
-                    <th className="font-medium px-4">Started</th>
+                  <tr className="text-left border-b border-border bg-muted/40">
+                    <th className="py-2.5 px-4 ds-label">Employee</th>
+                    <th className="px-4 ds-label">Emp #</th>
+                    <th className="px-4 ds-label">Type</th>
+                    <th className="px-4 ds-label">Status</th>
+                    <th className="px-4 ds-label">Reviewers</th>
+                    <th className="px-4 ds-label">Avg Score</th>
+                    <th className="px-4 ds-label">Started</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-border">
                   {cycles.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-10 text-center text-slate-400">No cycles found</td>
+                      <td colSpan={7} className="py-10 text-center text-muted-foreground/50">No cycles found</td>
                     </tr>
                   )}
                   {cycles.map((c) => {
@@ -133,7 +133,7 @@ export default async function AdminCyclesPage({
                         ? (c.ratings.reduce((s, r) => s + r.averageScore, 0) / c.ratings.length).toFixed(2)
                         : "—";
                     return (
-                      <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                         <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
                           <Link href={`/admin/employees/${c.userId}/assign`} className="hover:text-[#008993] transition-colors">
                             {toTitleCase(c.user.name)}
@@ -151,9 +151,23 @@ export default async function AdminCyclesPage({
                           </span>
                         </td>
                         <td className="px-4 text-slate-500 text-xs">
-                          {c.assignments.length === 0
-                            ? "Not assigned"
-                            : c.assignments.map((a) => a.reviewer.name.split(" ")[0]).join(", ")}
+                          {c.assignments.length === 0 ? (
+                            "Not assigned"
+                          ) : (
+                            <div className="flex flex-wrap gap-x-1.5 gap-y-1">
+                              {c.assignments.map((a, index) => (
+                                <span key={a.reviewer.id}>
+                                  <Link
+                                    href={`/admin/employees/${a.reviewer.id}/assign`}
+                                    className="transition-colors hover:text-primary hover:underline"
+                                  >
+                                    {a.reviewer.name.split(" ")[0]}
+                                  </Link>
+                                  {index < c.assignments.length - 1 ? "," : ""}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 font-medium text-slate-700 dark:text-slate-300">{avg}</td>
                         <td className="px-4 text-slate-500">{c.startDate?.toLocaleDateString() ?? "—"}</td>

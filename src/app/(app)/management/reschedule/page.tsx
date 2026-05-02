@@ -6,6 +6,7 @@ import { FadeIn } from "@/components/motion-div";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RescheduleForm } from "./reschedule-form";
 import { CalendarX, History } from "lucide-react";
+import Link from "next/link";
 
 export default async function ManagementReschedulePage({
   searchParams,
@@ -26,7 +27,7 @@ export default async function ManagementReschedulePage({
       moms: { none: { role: "MANAGEMENT" } },
     },
     include: {
-      user: { select: { name: true, department: true } },
+      user: { select: { id: true, name: true, department: true } },
     },
     orderBy: { scheduledDate: "asc" },
   });
@@ -35,14 +36,14 @@ export default async function ManagementReschedulePage({
   const selectedCycle = cycleId
     ? await prisma.appraisalCycle.findUnique({
         where: { id: cycleId },
-        include: { user: { select: { name: true } } },
+        include: { user: { select: { id: true, name: true } } },
       })
     : null;
 
   // Recent reschedules
   const recentReschedules = await prisma.meetingReschedule.findMany({
     include: {
-      cycle: { include: { user: { select: { name: true } } } },
+      cycle: { include: { user: { select: { id: true, name: true } } } },
       rescheduledBy: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -53,8 +54,8 @@ export default async function ManagementReschedulePage({
     <div className="space-y-6 max-w-3xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Meeting Reschedule</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Meeting Reschedule</h1>
+          <p className="ds-body mt-1">
             Reschedule missed or upcoming appraisal meetings.
           </p>
         </div>
@@ -71,11 +72,16 @@ export default async function ManagementReschedulePage({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-border">
                 {missedCycles.map((c) => (
                   <div key={c.id} className="px-4 py-3 flex items-center justify-between text-sm">
                     <div>
-                      <span className="font-medium">{c.user.name}</span>
+                      <Link
+                        href={`/admin/employees/${c.user.id}/assign`}
+                        className="font-medium transition-colors hover:text-primary hover:underline"
+                      >
+                        {c.user.name}
+                      </Link>
                       {c.user.department && (
                         <span className="text-slate-500 ml-2 text-xs">· {c.user.department}</span>
                       )}
@@ -108,7 +114,13 @@ export default async function ManagementReschedulePage({
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                Reschedule: {selectedCycle.user.name}
+                Reschedule:{" "}
+                <Link
+                  href={`/admin/employees/${selectedCycle.user.id}/assign`}
+                  className="transition-colors hover:text-primary hover:underline"
+                >
+                  {selectedCycle.user.name}
+                </Link>
               </CardTitle>
               {selectedCycle.scheduledDate && (
                 <p className="text-xs text-slate-500">
@@ -139,12 +151,17 @@ export default async function ManagementReschedulePage({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-border">
                 {recentReschedules.map((r) => (
                   <div key={r.id} className="px-4 py-3 text-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-0.5 min-w-0">
-                        <p className="font-medium">{r.cycle.user.name}</p>
+                        <Link
+                          href={`/admin/employees/${r.cycle.user.id}/assign`}
+                          className="font-medium transition-colors hover:text-primary hover:underline"
+                        >
+                          {r.cycle.user.name}
+                        </Link>
                         <p className="text-xs text-slate-500">
                           {new Date(r.originalDate).toLocaleDateString("en-IN")} →{" "}
                           <strong className="text-slate-700 dark:text-slate-300">

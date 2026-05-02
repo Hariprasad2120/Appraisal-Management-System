@@ -36,8 +36,8 @@ export default async function CriteriaPage({
     <div className="space-y-5 max-w-3xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Criteria Questions</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Criteria Questions</h1>
+          <p className="ds-body mt-1">
             Edit questions and point weights per category.
           </p>
         </div>

@@ -171,7 +171,9 @@ export function RateForm({
         hasAverageOut: hasAO,
       });
       if (!res.ok) { toast.error(res.error); return; }
-      toast.success("Rating submitted — thank you!");
+      toast.success("Thank you for your submission", {
+        description: "Your rating has been recorded successfully.",
+      });
       router.refresh();
     });
   }

@@ -226,7 +226,12 @@ export function AdminNotificationsPanel({ notifications: initial }: Props) {
 
                   {/* User */}
                   <div className="min-w-0">
-                    <p className="text-sm text-foreground truncate">{n.user.name}</p>
+                    <Link
+                      href={`/admin/employees/${n.user.id}/assign`}
+                      className="block truncate text-sm text-foreground transition-colors hover:text-primary hover:underline"
+                    >
+                      {n.user.name}
+                    </Link>
                     <p className="text-[11px] text-muted-foreground capitalize">{n.user.role.toLowerCase()}</p>
                   </div>
 

@@ -104,10 +104,11 @@ export default async function EmployeeDashboard() {
   const allRated = totalReviewers > 0 && ratedCount === totalReviewers;
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="mx-auto flex h-full max-h-full w-full max-w-3xl min-w-0 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden pr-1">
       <FadeIn>
         <div>
-          <h1 className="ds-h1">Welcome, {toTitleCase(user.name)}</h1>
+          <h1 className="ds-h1">My Appraisal</h1>
           <p className="ds-body mt-1">
             Joined {user.joiningDate.toLocaleDateString("en-IN")} ·{" "}
             {days === 0
@@ -271,7 +272,12 @@ export default async function EmployeeDashboard() {
                           <Clock className="size-4 text-amber-400 shrink-0" />
                         )}
                         <span className="text-sm text-foreground flex-1">
-                          {toTitleCase(a.reviewer.name)}
+                          <Link
+                            href={`/admin/employees/${a.reviewer.id}/assign`}
+                            className="transition-colors hover:text-primary hover:underline"
+                          >
+                            {toTitleCase(a.reviewer.name)}
+                          </Link>
                         </span>
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
@@ -393,7 +399,12 @@ export default async function EmployeeDashboard() {
                             <Circle className="size-4 text-border shrink-0" />
                           )}
                           <span className="text-sm text-foreground flex-1">
-                            {toTitleCase(a.reviewer.name)}
+                            <Link
+                              href={`/admin/employees/${a.reviewer.id}/assign`}
+                              className="transition-colors hover:text-primary hover:underline"
+                            >
+                              {toTitleCase(a.reviewer.name)}
+                            </Link>
                           </span>
                           <span
                             className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
@@ -575,6 +586,7 @@ export default async function EmployeeDashboard() {
           </div>
         </FadeIn>
       )}
+      </div>
     </div>
   );
 }

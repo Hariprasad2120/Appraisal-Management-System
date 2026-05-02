@@ -44,9 +44,7 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
       { href: "/admin/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
       { href: "/admin/salary-sheet", label: "Salary Sheet", icon: <BarChart3 className="size-4" /> },
       { href: "/admin/salary-revisions", label: "Salary Revisions", icon: <TrendingUp className="size-4" /> },
-      { href: "/employee", label: "My Appraisal", icon: <Star className="size-4" /> },
       { href: "/history", label: "History", icon: <History className="size-4" /> },
-      { href: "/tickets", label: "My Tickets", icon: <Ticket className="size-4" /> },
     ];
   }
   if (role === "MANAGEMENT") {
@@ -206,7 +204,16 @@ export function MobileNav({
               {/* Sign out */}
               <div className="p-4 border-t border-border">
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={async () => {
+                    try {
+                      await fetch("/api/session/end", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ reason: "LOGGED_OUT" }),
+                      });
+                    } catch { /* silent */ }
+                    await signOut({ callbackUrl: "/login" });
+                  }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <LogOut className="size-3.5" />

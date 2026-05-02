@@ -22,7 +22,9 @@ export function MomContentEditor({ cycleId, existingContent, isNew, saveAction, 
     startTransition(async () => {
       const res = await saveAction({ cycleId, content });
       if (!res.ok) { toast.error(res.error); return; }
-      toast.success(successMessage ?? (isNew ? "MOM recorded" : "MOM updated"));
+      toast.success(successMessage ?? (isNew ? "Meeting record saved" : "Minutes updated"), {
+        description: isNew ? "The minutes of meeting have been recorded." : "Your updates have been saved.",
+      });
     });
   }
 

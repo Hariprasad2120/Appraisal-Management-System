@@ -27,10 +27,10 @@ export default async function AdminTicketsPage() {
       <FadeIn>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h1 className="ds-h1 flex items-center gap-2">
               <Ticket className="size-6" /> Support Tickets
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="ds-body mt-1">
               {openCount} open · {urgentCount} urgent
             </p>
           </div>

@@ -220,8 +220,8 @@ export default async function ManagementDashboard() {
       <FadeIn>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              {session?.user ? `Good ${getGreeting(now)}, ${toTitleCase(session.user.name?.split(" ")[0] ?? "there")}` : "Management Dashboard"}
+            <h1 className="text-2xl font-normal text-foreground">
+              Management Dashboard
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
               Appraisal overview, employee performance &amp; salary impact
@@ -322,7 +322,7 @@ export default async function ManagementDashboard() {
                         <td className="py-2.5 px-4 text-muted-foreground text-xs">{i + 1}</td>
                         <td className="px-4 font-medium text-foreground">
                           <Link
-                            href={`/admin/employees/${e.id}`}
+                            href={`/admin/employees/${e.id}/assign`}
                             className="hover:text-primary transition-colors"
                           >
                             {toTitleCase(e.name)}
@@ -430,7 +430,7 @@ export default async function ManagementDashboard() {
                       <tr key={c.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-3 px-4 font-medium text-foreground">
                           <Link
-                            href={`/admin/employees/${c.userId}`}
+                            href={`/admin/employees/${c.userId}/assign`}
                             className="hover:text-primary transition-colors"
                           >
                             {toTitleCase(c.user.name)}
@@ -548,7 +548,7 @@ export default async function ManagementDashboard() {
                       <tr key={emp.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-2.5 px-4 font-medium text-foreground">
                           <Link
-                            href={`/admin/employees/${emp.id}`}
+                            href={`/admin/employees/${emp.id}/assign`}
                             className="hover:text-primary transition-colors"
                           >
                             {toTitleCase(emp.name)}
@@ -603,9 +603,3 @@ export default async function ManagementDashboard() {
   );
 }
 
-function getGreeting(now: Date): string {
-  const h = now.getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
-  return "evening";
-}

@@ -86,10 +86,10 @@ export default async function AssignPage({ params }: { params: Promise<{ id: str
           </Link>
         </div>
         <div className="mt-2">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h1 className="ds-h1">
             {toTitleCase(employee.name)}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">{employee.department ?? "—"} · {employee.designation ?? "—"}</p>
+          <p className="ds-body mt-1">{employee.department ?? "—"} · {employee.designation ?? "—"}</p>
         </div>
       </FadeIn>
 
@@ -287,9 +287,9 @@ export default async function AssignPage({ params }: { params: Promise<{ id: str
                         <th className="py-1.5 font-medium">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody className="divide-y divide-border">
                       {revisions.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <tr key={r.id} className="hover:bg-muted/30">
                           <td className="py-1.5 pr-3 text-slate-600 dark:text-slate-400">
                             {r.effectiveFrom.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                           </td>

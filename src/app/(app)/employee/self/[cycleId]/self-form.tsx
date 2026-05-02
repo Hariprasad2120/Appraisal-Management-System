@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { motion } from "motion/react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Lock, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { submitSelfAction } from "./actions";
-import { motion } from "motion/react";
-import { Wand2, Lock } from "lucide-react";
 import type { CriteriaCategory, SupplementarySection } from "@/lib/criteria";
 
 type CategoryAnswer = {
@@ -15,6 +15,12 @@ type CategoryAnswer = {
   comment: string;
   questionAnswers?: Record<string, string>;
 };
+
+type WizardStep =
+  | { id: string; kind: "category"; title: string; subtitle: string; category: CriteriaCategory }
+  | { id: string; kind: "supplementary"; title: string; subtitle: string; section: SupplementarySection };
+
+type PerformerPreset = "high" | "average" | "low";
 
 export function SelfForm({
   cycleId,
@@ -39,7 +45,30 @@ export function SelfForm({
   selfStatus: string;
   editable: boolean;
 }) {
-  const employeeCategories = categories.filter((c) => !c.reviewerOnly);
+  const employeeCategories = useMemo(
+    () => categories.filter((c) => !c.reviewerOnly),
+    [categories],
+  );
+
+  const steps = useMemo<WizardStep[]>(
+    () => [
+      ...employeeCategories.map((category, index) => ({
+        id: `category:${category.name}`,
+        kind: "category" as const,
+        title: category.name,
+        subtitle: `Step ${index + 1}: ${category.items.join(", ")}`,
+        category,
+      })),
+      ...supplementary.map((section, index) => ({
+        id: `supplementary:${section.part}:${section.title}`,
+        kind: "supplementary" as const,
+        title: section.title,
+        subtitle: `Part ${section.part} - Additional reflection ${index + 1}`,
+        section,
+      })),
+    ],
+    [employeeCategories, supplementary],
+  );
 
   const [answers, setAnswers] = useState<Record<string, CategoryAnswer>>(() =>
     Object.fromEntries(
@@ -58,18 +87,15 @@ export function SelfForm({
     const stored = (existing as Record<string, unknown>).__supplementary as Record<string, string> | undefined;
     const defaults: Record<string, string> = {};
     for (const sec of supplementary) {
-      for (const q of sec.questions) {
-        defaults[q.id] = stored?.[q.id] ?? "";
-      }
+      for (const q of sec.questions) defaults[q.id] = stored?.[q.id] ?? "";
     }
     return defaults;
   });
 
+  const [currentStep, setCurrentStep] = useState(0);
   const [pending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(!!submittedAt);
-  // formOpen: controls whether form body is visible. Default open only for first-time submission (not yet submitted).
   const [formOpen, setFormOpen] = useState(!submittedAt);
-  // reviewing: true = edit mode, false = view-only mode (used after submission)
   const [reviewing, setReviewing] = useState(false);
   const [highlightedCriteria, setHighlightedCriteria] = useState<string | null>(null);
   const criteriaRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -77,16 +103,39 @@ export function SelfForm({
 
   const isLocked = !editable;
   const deadline = new Date(editableUntil);
-  const now = new Date();
-  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  const step = steps[Math.min(currentStep, Math.max(steps.length - 1, 0))];
+  const showSubmittedReview = submitted && formOpen && !reviewing;
+  const statusText = selfStatus.replace(/_/g, " ").toLowerCase();
+
+  const totalScore = employeeCategories.reduce((s, c) => s + (answers[c.name]?.score ?? 0), 0);
+  const totalMax = employeeCategories.reduce((s, c) => s + c.maxPoints, 0);
+  const totalFields =
+    employeeCategories.reduce((s, c) => s + 1 + c.questions.length, 0) +
+    supplementary.reduce((s, sec) => s + sec.questions.length, 0);
+  const filledFields =
+    employeeCategories.reduce((s, c) => {
+      const ans = answers[c.name];
+      let count = ans?.comment?.trim() ? 1 : 0;
+      for (const q of c.questions) {
+        if (ans?.questionAnswers?.[q]?.trim()) count++;
+      }
+      return s + count;
+    }, 0) +
+    supplementary.reduce(
+      (s, sec) => s + sec.questions.filter((q) => suppAnswers[q.id]?.trim()).length,
+      0,
+    );
+  const progressPct = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
 
   function scrollToMissed(catName: string) {
-    const el = criteriaRefs.current[catName];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const targetIndex = steps.findIndex((candidate) => candidate.kind === "category" && candidate.category.name === catName);
+    if (targetIndex >= 0) setCurrentStep(targetIndex);
+    window.setTimeout(() => {
+      criteriaRefs.current[catName]?.scrollIntoView({ behavior: "smooth", block: "center" });
       setHighlightedCriteria(catName);
-      setTimeout(() => setHighlightedCriteria(null), 2500);
-    }
+      window.setTimeout(() => setHighlightedCriteria(null), 2500);
+    }, 80);
   }
 
   function setScore(name: string, score: number) {
@@ -115,440 +164,698 @@ export function SelfForm({
     setSuppAnswers((prev) => ({ ...prev, [id]: value }));
   }
 
-  type PerformerPreset = "high" | "average" | "low";
-  const [performerPreset, setPerformerPreset] = useState<PerformerPreset>("high");
+  function validateStep(candidate: WizardStep, announce = true): boolean {
+    if (candidate.kind === "category") {
+      const cat = candidate.category;
+      const ans = answers[cat.name];
+      for (const q of cat.questions) {
+        if (!ans?.questionAnswers?.[q]?.trim()) {
+          if (announce) {
+            toast.error(`Answer all questions in: ${cat.name}`);
+            scrollToMissed(cat.name);
+          }
+          return false;
+        }
+      }
+      if (!ans?.comment?.trim()) {
+        if (announce) {
+          toast.error(`Add summary comment for: ${cat.name}`);
+          scrollToMissed(cat.name);
+        }
+        return false;
+      }
+      return true;
+    }
+
+    for (const q of candidate.section.questions) {
+      if (!suppAnswers[q.id]?.trim()) {
+        if (announce) toast.error(`Answer all questions in Part ${candidate.section.part}: ${candidate.section.title}`);
+        return false;
+      }
+      if (q.numericOnly && !/^\d+$/.test(suppAnswers[q.id].trim())) {
+        if (announce) toast.error(`"${q.text.split("?")[0]}?" - enter numbers only`);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function validateAll(): boolean {
+    return steps.every((candidate) => validateStep(candidate, true));
+  }
+
+  function goNext() {
+    if (!step) return;
+    if (!isLocked && !validateStep(step)) return;
+    setCurrentStep((value) => Math.min(value + 1, steps.length - 1));
+  }
 
   function demoFill() {
     if (isLocked) return;
     const multipliers: Record<PerformerPreset, number> = { high: 0.9, average: 0.65, low: 0.4 };
-    const base = multipliers[performerPreset];
-    const COMMENTS: Record<PerformerPreset, (cat: string) => string> = {
+    const comments: Record<PerformerPreset, (cat: string) => string> = {
       high: (c) => `I consistently delivered high-quality results in ${c.toLowerCase()}, exceeding expectations.`,
       average: (c) => `I met expectations in ${c.toLowerCase()} and am working to improve further.`,
       low: (c) => `I faced challenges in ${c.toLowerCase()} and am actively seeking guidance to improve.`,
     };
-    const QUESTION_ANSWER: Record<PerformerPreset, string> = {
+    const questionAnswer: Record<PerformerPreset, string> = {
       high: "I proactively took ownership, collaborated effectively, and delivered results ahead of schedule.",
       average: "I completed assigned tasks on time and collaborated with the team when needed.",
       low: "I completed the basic requirements but struggled with some areas that need improvement.",
     };
     const newAnswers: Record<string, CategoryAnswer> = {};
-    employeeCategories.forEach((cat, i) => {
-      const jitter = ((i % 3) - 1) * 0.05;
-      const ratio = Math.min(1, Math.max(0.1, base + jitter));
-      const score = Math.round(cat.maxPoints * ratio);
-      const qAnswers: Record<string, string> = {};
-      cat.questions.forEach((q) => { qAnswers[q] = QUESTION_ANSWER[performerPreset]; });
-      newAnswers[cat.name] = { score, comment: COMMENTS[performerPreset](cat.name), questionAnswers: qAnswers };
+    employeeCategories.forEach((cat, index) => {
+      const ratio = Math.min(1, Math.max(0.1, multipliers[performerPreset] + ((index % 3) - 1) * 0.05));
+      newAnswers[cat.name] = {
+        score: Math.round(cat.maxPoints * ratio),
+        comment: comments[performerPreset](cat.name),
+        questionAnswers: Object.fromEntries(cat.questions.map((q) => [q, questionAnswer[performerPreset]])),
+      };
     });
     setAnswers(newAnswers);
+
     const newSupp: Record<string, string> = {};
     for (const sec of supplementary) {
       for (const q of sec.questions) {
-        if (q.numericOnly) {
-          newSupp[q.id] = performerPreset === "high" ? "50000" : performerPreset === "average" ? "30000" : "15000";
-        } else if (q.type === "choice" && q.choices) {
-          newSupp[q.id] = q.choices[performerPreset === "high" ? 0 : performerPreset === "average" ? 1 : 2] ?? q.choices[0];
-        } else {
-          newSupp[q.id] = QUESTION_ANSWER[performerPreset];
-        }
+        if (q.numericOnly) newSupp[q.id] = performerPreset === "high" ? "50000" : performerPreset === "average" ? "30000" : "15000";
+        else if (q.type === "choice" && q.choices) newSupp[q.id] = q.choices[performerPreset === "high" ? 0 : performerPreset === "average" ? 1 : 2] ?? q.choices[0];
+        else newSupp[q.id] = questionAnswer[performerPreset];
       }
     }
     setSuppAnswers(newSupp);
-    toast.success("Demo data filled — review before submitting");
+    toast.success("Demo data filled - review before submitting");
   }
+
+  const [performerPreset, setPerformerPreset] = useState<PerformerPreset>("high");
 
   function submit() {
     if (isLocked) {
-      toast.error("Edit window has closed — form is read-only.");
+      toast.error("Edit window has closed - form is read-only.");
       return;
     }
-    for (const cat of employeeCategories) {
-      const ans = answers[cat.name];
-      for (const q of cat.questions) {
-        if (!ans.questionAnswers?.[q]?.trim()) {
-          toast.error(`Answer all questions in: ${cat.name}`, {
-            action: { label: "Go there", onClick: () => scrollToMissed(cat.name) },
-          });
-          scrollToMissed(cat.name);
-          return;
-        }
-      }
-      if (!ans?.comment?.trim()) {
-        toast.error(`Add summary comment for: ${cat.name}`, {
-          action: { label: "Go there", onClick: () => scrollToMissed(cat.name) },
-        });
-        scrollToMissed(cat.name);
-        return;
-      }
-    }
-    for (const sec of supplementary) {
-      for (const q of sec.questions) {
-        if (!suppAnswers[q.id]?.trim()) {
-          toast.error(`Answer all questions in Part ${sec.part}: ${sec.title}`);
-          return;
-        }
-        if (q.numericOnly && !/^\d+$/.test(suppAnswers[q.id].trim())) {
-          toast.error(`"${q.text.split("?")[0]}?" — enter numbers only`);
-          return;
-        }
-      }
-    }
+    if (!validateAll()) return;
     startTransition(async () => {
       const payload = { ...answers, __supplementary: suppAnswers };
       const res = await submitSelfAction({ cycleId, answers: payload });
-      if (!res.ok) { toast.error(res.error); return; }
-      const deadlineStr = new Date(res.editableUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-      toast.success(
-        submitted
-          ? `Changes saved! You can edit until ${deadlineStr}.`
-          : `Successfully submitted! You have 3 business days to review and edit (until ${deadlineStr}).`,
-        { duration: 8000 },
-      );
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const deadlineStr = new Date(res.editableUntil).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+      toast.success(submitted ? "Changes saved" : "Thank you for your submission", {
+        description: submitted
+          ? `You can edit until ${deadlineStr}.`
+          : `You have 3 business days to review and edit it until ${deadlineStr}.`,
+        duration: 5000,
+      });
       setSubmitted(true);
       setReviewing(false);
+      setFormOpen(true);
       router.refresh();
     });
   }
 
-  const totalScore = employeeCategories.reduce((s, c) => s + (answers[c.name]?.score ?? 0), 0);
-  const totalMax = employeeCategories.reduce((s, c) => s + c.maxPoints, 0);
-
-  const totalFields = employeeCategories.reduce((s, c) => {
-    return s + 1 + c.questions.length;
-  }, 0) + supplementary.reduce((s, sec) => s + sec.questions.length, 0);
-
-  const filledFields = employeeCategories.reduce((s, c) => {
-    const ans = answers[c.name];
-    let count = 0;
-    if (ans?.comment?.trim()) count++;
-    for (const q of c.questions) {
-      if (ans?.questionAnswers?.[q]?.trim()) count++;
-    }
-    return s + count;
-  }, 0) + supplementary.reduce((s, sec) => {
-    return s + sec.questions.filter((q) => suppAnswers[q.id]?.trim()).length;
-  }, 0);
-
-  const progressPct = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
-
   return (
     <div className="space-y-6">
-      {/* Submitted: View / Edit action card */}
       {submitted && (
-        <div className={`rounded-xl border px-4 py-4 space-y-3 ${
-          isLocked
-            ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700"
-            : "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
-        }`}>
-          <div className="flex items-start gap-3">
-            <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${isLocked ? "bg-slate-400" : "bg-green-500"}`}>
-              {isLocked
-                ? <Lock className="size-4 text-white" />
-                : <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`font-semibold text-sm ${isLocked ? "text-slate-700 dark:text-slate-300" : "text-green-800 dark:text-green-300"}`}>
-                {isLocked ? "Self-assessment submitted — deadline passed" : "Self-assessment submitted"}
-              </p>
-              <p className={`text-xs mt-0.5 ${isLocked ? "text-slate-500" : "text-green-700 dark:text-green-400"}`}>
-                {isLocked
-                  ? `Locked on ${deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} — view only`
-                  : `Edit deadline: ${deadline.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`
-                }
-              </p>
-              {lastModifiedAt && (
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Last saved: {new Date(lastModifiedAt).toLocaleString("en-IN")}
-                  {editCount > 0 ? ` · ${editCount} edit${editCount !== 1 ? "s" : ""} made` : ""}
-                </p>
-              )}
-              {!isLocked && (
-                <p className={`text-xs mt-0.5 ${isLocked ? "text-slate-400" : "text-green-600 dark:text-green-500"}`}>
-                  {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining to edit` : "Edit window closes today"}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => { setFormOpen((v) => !v); setReviewing(false); }}
-              className={`flex-1 h-9 text-sm ${
-                isLocked
-                  ? "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400"
-                  : "border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-400"
-              }`}
-            >
-              {formOpen ? "Hide Form" : "View Form"}
-            </Button>
-            {!isLocked && (
-              <Button
-                type="button"
-                onClick={() => { setFormOpen(true); setReviewing(true); }}
-                className="flex-1 h-9 text-sm"
-              >
-                Edit Form
-              </Button>
-            )}
-          </div>
-        </div>
+        <SubmittedBanner
+          isLocked={isLocked}
+          deadline={deadline}
+          lastModifiedAt={lastModifiedAt}
+          editCount={editCount}
+          daysLeft={daysLeft}
+          formOpen={formOpen}
+          onToggleView={() => {
+            setFormOpen((value) => !value);
+            setReviewing(false);
+          }}
+          onEdit={() => {
+            setFormOpen(true);
+            setReviewing(true);
+          }}
+        />
       )}
 
-      {/* Form body — hidden until opened via View/Edit button (or on first submission) */}
-      {formOpen && <div className="space-y-6">
-
-      {/* Progress bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600 dark:text-slate-400 font-medium">Form Progress</span>
-          <span className={`font-bold text-lg ${progressPct === 100 ? "text-green-600" : "text-blue-600"}`}>
-            {progressPct}%
-          </span>
-        </div>
-        <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              progressPct === 100 ? "bg-green-500" : "bg-blue-600"
-            }`}
-            style={{ width: `${progressPct}%` }}
+      {formOpen && (
+        showSubmittedReview ? (
+          <SubmittedReview
+            employeeCategories={employeeCategories}
+            supplementary={supplementary}
+            answers={answers}
+            suppAnswers={suppAnswers}
+            totalScore={totalScore}
+            totalMax={totalMax}
+            statusText={statusText}
           />
-        </div>
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
-          <span>{filledFields} / {totalFields} fields completed</span>
-          <span>Self-score: {totalScore} / {totalMax}</span>
-        </div>
-      </div>
+        ) : (
+          <div className="space-y-5">
+            <ProgressPanel
+              progressPct={progressPct}
+              filledFields={filledFields}
+              totalFields={totalFields}
+              totalScore={totalScore}
+              totalMax={totalMax}
+              currentStep={currentStep}
+              steps={steps}
+              onStepClick={(index) => setCurrentStep(index)}
+            />
 
-      {/* Part A */}
-      <div className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1">
-          Part A — Performance Self-Assessment
-        </h2>
-        <div className="space-y-4">
-          {employeeCategories.map((cat, idx) => {
-            const ans = answers[cat.name] ?? { score: 0, comment: "", questionAnswers: {} };
-            const isHighlighted = highlightedCriteria === cat.name;
-            return (
+            {step && (
               <motion.div
-                key={cat.name}
-                ref={(el) => { criteriaRefs.current[cat.name] = el; }}
+                key={step.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.04 }}
-                className={`bg-white dark:bg-slate-900 border rounded-xl p-4 space-y-4 transition-all duration-500 ${
-                  isHighlighted
-                    ? "border-amber-400 shadow-lg shadow-amber-100 dark:shadow-amber-900/20 ring-2 ring-amber-300 dark:ring-amber-600"
-                    : "border-slate-200 dark:border-slate-700"
-                } ${isLocked ? "opacity-80" : ""}`}
+                className="space-y-4"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <div className="font-semibold text-sm text-slate-900 dark:text-white">{cat.name}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{cat.items.join(" · ")}</div>
+                    <p className="ds-label text-primary">Step {currentStep + 1} of {steps.length}</p>
+                    <h2 className="mt-1 text-lg font-normal text-foreground">{step.title}</h2>
+                    <p className="text-xs text-muted-foreground">{step.subtitle}</p>
                   </div>
-                  <span className="shrink-0 text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-full px-2 py-0.5">
-                    max {cat.maxPoints} pts
+                  <span className="w-fit rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
+                    {step.kind === "category" ? `Max ${step.category.maxPoints} pts` : `Part ${step.section.part}`}
                   </span>
                 </div>
 
-                <div className="space-y-3">
-                  {cat.questions.map((question, qIdx) => (
-                    <div key={qIdx} className="space-y-1">
-                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        {qIdx + 1}. {question}
-                      </label>
-                      <Textarea
-                        value={ans.questionAnswers?.[question] ?? ""}
-                        onChange={(e) => setQuestionAnswer(cat.name, question, e.target.value)}
-                        rows={2}
-                        placeholder="Your answer..."
-                        className="resize-none text-sm"
-                        disabled={isLocked}
-                        readOnly={isLocked}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>Self-rating</span>
-                    <span className="font-bold text-blue-600">{ans.score} / {cat.maxPoints}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={cat.maxPoints}
-                    step={1}
-                    value={ans.score}
-                    onChange={(e) => setScore(cat.name, Number(e.target.value))}
-                    className={`w-full h-2 ${isLocked ? "accent-slate-400 cursor-not-allowed" : "accent-blue-600"}`}
-                    disabled={isLocked}
+                {step.kind === "category" ? (
+                  <CategoryStep
+                    category={step.category}
+                    answer={answers[step.category.name] ?? { score: 0, comment: "", questionAnswers: {} }}
+                    isLocked={isLocked}
+                    highlighted={highlightedCriteria === step.category.name}
+                    setRef={(el) => { criteriaRefs.current[step.category.name] = el; }}
+                    onScore={setScore}
+                    onComment={setComment}
+                    onQuestionAnswer={setQuestionAnswer}
                   />
-                  <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>0</span>
-                    <span>{Math.round(cat.maxPoints / 2)}</span>
-                    <span>{cat.maxPoints}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Summary / Justification for self-rating
-                  </label>
-                  <Textarea
-                    value={ans.comment}
-                    onChange={(e) => setComment(cat.name, e.target.value)}
-                    rows={2}
-                    placeholder={`Summarize your performance in ${cat.name.toLowerCase()}...`}
-                    className="resize-none text-sm"
-                    disabled={isLocked}
-                    readOnly={isLocked}
+                ) : (
+                  <SupplementaryStep
+                    section={step.section}
+                    answers={suppAnswers}
+                    isLocked={isLocked}
+                    onAnswer={setSuppAnswer}
                   />
-                </div>
+                )}
               </motion.div>
-            );
-          })}
+            )}
+
+            <WizardControls
+              isLocked={isLocked}
+              currentStep={currentStep}
+              stepsLength={steps.length}
+              pending={pending}
+              submitted={submitted}
+              onPrevious={() => setCurrentStep((value) => Math.max(0, value - 1))}
+              onNext={goNext}
+              onSubmit={submit}
+            />
+
+            {!isLocked && (
+              <DemoFill
+                performerPreset={performerPreset}
+                setPerformerPreset={setPerformerPreset}
+                onFill={demoFill}
+              />
+            )}
+
+            {submitted && !isLocked && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                Edit window closes: <strong>{deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>
+                {editCount > 0 ? ` - ${editCount} edit${editCount !== 1 ? "s" : ""} made` : ""}
+              </p>
+            )}
+
+            {isLocked && (
+              <p className="py-2 text-center text-xs text-muted-foreground">
+                Form is read-only. Editing closed on {deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.
+              </p>
+            )}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function SubmittedBanner({
+  isLocked,
+  deadline,
+  lastModifiedAt,
+  editCount,
+  daysLeft,
+  formOpen,
+  onToggleView,
+  onEdit,
+}: {
+  isLocked: boolean;
+  deadline: Date;
+  lastModifiedAt: string | null;
+  editCount: number;
+  daysLeft: number;
+  formOpen: boolean;
+  onToggleView: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <div className={`rounded-xl border px-4 py-4 space-y-3 ${
+      isLocked
+        ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700"
+        : "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+    }`}>
+      <div className="flex items-start gap-3">
+        <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${isLocked ? "bg-slate-400" : "bg-green-500"}`}>
+          {isLocked ? <Lock className="size-4 text-white" /> : <CheckCircle2 className="size-4 text-white" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-semibold ${isLocked ? "text-slate-700 dark:text-slate-300" : "text-green-800 dark:text-green-300"}`}>
+            {isLocked ? "Self-assessment submitted - deadline passed" : "Self-assessment submitted"}
+          </p>
+          <p className={`mt-0.5 text-xs ${isLocked ? "text-slate-500" : "text-green-700 dark:text-green-400"}`}>
+            {isLocked
+              ? `Locked on ${deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} - view only`
+              : `Edit deadline: ${deadline.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`}
+          </p>
+          {lastModifiedAt && (
+            <p className="mt-0.5 text-[10px] text-slate-400">
+              Last saved: {new Date(lastModifiedAt).toLocaleString("en-IN")}
+              {editCount > 0 ? ` - ${editCount} edit${editCount !== 1 ? "s" : ""} made` : ""}
+            </p>
+          )}
+          {!isLocked && (
+            <p className="mt-0.5 text-xs text-green-600 dark:text-green-500">
+              {daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining to edit` : "Edit window closes today"}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" onClick={onToggleView} className="h-9 flex-1 text-sm">
+          {formOpen ? "Hide Form" : "View Form"}
+        </Button>
+        {!isLocked && (
+          <Button type="button" onClick={onEdit} className="h-9 flex-1 text-sm">
+            Edit Form
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProgressPanel({
+  progressPct,
+  filledFields,
+  totalFields,
+  totalScore,
+  totalMax,
+  currentStep,
+  steps,
+  onStepClick,
+}: {
+  progressPct: number;
+  filledFields: number;
+  totalFields: number;
+  totalScore: number;
+  totalMax: number;
+  currentStep: number;
+  steps: WizardStep[];
+  onStepClick: (index: number) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card px-4 py-3 space-y-3">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-muted-foreground">Form Progress</span>
+        <span className={`text-lg font-bold ${progressPct === 100 ? "text-green-600" : "text-primary"}`}>
+          {progressPct}%
+        </span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${progressPct === 100 ? "bg-green-500" : "bg-primary"}`}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>{filledFields} / {totalFields} fields completed</span>
+        <span>Self-score: {totalScore} / {totalMax}</span>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+        {steps.map((candidate, index) => (
+          <button
+            key={candidate.id}
+            type="button"
+            title={candidate.title}
+            onClick={() => onStepClick(index)}
+            className={`size-2.5 rounded-full transition-all ${
+              index === currentStep
+                ? "w-7 bg-primary"
+                : index < currentStep
+                ? "bg-green-500"
+                : "bg-border hover:bg-muted-foreground/50"
+            }`}
+            aria-label={`Go to step ${index + 1}: ${candidate.title}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CategoryStep({
+  category,
+  answer,
+  isLocked,
+  highlighted,
+  setRef,
+  onScore,
+  onComment,
+  onQuestionAnswer,
+}: {
+  category: CriteriaCategory;
+  answer: CategoryAnswer;
+  isLocked: boolean;
+  highlighted: boolean;
+  setRef: (el: HTMLDivElement | null) => void;
+  onScore: (name: string, score: number) => void;
+  onComment: (name: string, comment: string) => void;
+  onQuestionAnswer: (catName: string, question: string, value: string) => void;
+}) {
+  return (
+    <div
+      ref={setRef}
+      className={`rounded-xl border bg-card p-4 space-y-4 transition-all duration-500 ${
+        highlighted ? "border-amber-400 ring-2 ring-amber-300 dark:ring-amber-600" : "border-border"
+      } ${isLocked ? "opacity-80" : ""}`}
+    >
+      <div className="space-y-3">
+        {category.questions.map((question, index) => (
+          <div key={question} className="space-y-1">
+            <label className="text-xs font-medium text-foreground">
+              {index + 1}. {question}
+            </label>
+            <Textarea
+              value={answer.questionAnswers?.[question] ?? ""}
+              onChange={(e) => onQuestionAnswer(category.name, question, e.target.value)}
+              rows={3}
+              placeholder="Your answer..."
+              className="resize-none text-sm"
+              disabled={isLocked}
+              readOnly={isLocked}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1 border-t border-border pt-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Self-rating</span>
+          <span className="font-bold text-primary">{answer.score} / {category.maxPoints}</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={category.maxPoints}
+          step={1}
+          value={answer.score}
+          onChange={(e) => onScore(category.name, Number(e.target.value))}
+          className={`h-2 w-full ${isLocked ? "accent-slate-400 cursor-not-allowed" : "accent-primary"}`}
+          disabled={isLocked}
+        />
+        <div className="flex justify-between text-[10px] text-muted-foreground">
+          <span>0</span>
+          <span>{Math.round(category.maxPoints / 2)}</span>
+          <span>{category.maxPoints}</span>
         </div>
       </div>
 
-      {/* Parts B, C, D — supplementary sections */}
-      {supplementary.map((sec, secIdx) => (
-        <motion.div
-          key={sec.title}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: (employeeCategories.length + secIdx) * 0.04 }}
-          className="space-y-3"
-        >
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 px-1">
-            Part {sec.part} — {sec.title}
-          </h2>
-          <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4 ${isLocked ? "opacity-80" : ""}`}>
-            {sec.questions.map((q, qIdx) => (
-              <div key={q.id} className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-pre-line">
-                  {qIdx + 1}. {q.text}
-                </label>
-                {q.type === "choice" && q.choices ? (
-                  <div className="space-y-1.5 pl-1">
-                    {q.choices.map((choice) => (
-                      <label
-                        key={choice}
-                        className={`flex items-start gap-2 ${isLocked ? "cursor-not-allowed" : "cursor-pointer"} group`}
-                      >
-                        <input
-                          type="radio"
-                          name={q.id}
-                          value={choice}
-                          checked={suppAnswers[q.id] === choice}
-                          onChange={() => setSuppAnswer(q.id, choice)}
-                          className="mt-0.5 accent-blue-600 shrink-0"
-                          disabled={isLocked}
-                        />
-                        <span className={`text-xs ${suppAnswers[q.id] === choice ? "text-blue-600 font-medium" : "text-slate-600 dark:text-slate-400"}`}>
-                          {choice}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                ) : q.numericOnly ? (
-                  <div className="space-y-1">
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={suppAnswers[q.id] ?? ""}
-                      onChange={(e) => setSuppAnswer(q.id, e.target.value.replace(/[^0-9]/g, ""))}
-                      placeholder="Enter amount in ₹..."
-                      className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={isLocked}
-                      readOnly={isLocked}
-                    />
-                    <p className="text-[10px] text-slate-400">Numbers only — enter annual amount in rupees</p>
-                  </div>
-                ) : (
-                  <Textarea
-                    value={suppAnswers[q.id] ?? ""}
-                    onChange={(e) => setSuppAnswer(q.id, e.target.value)}
-                    rows={2}
-                    placeholder="Your answer..."
-                    className="resize-none text-sm"
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-foreground">
+          Summary / Justification for self-rating
+        </label>
+        <Textarea
+          value={answer.comment}
+          onChange={(e) => onComment(category.name, e.target.value)}
+          rows={3}
+          placeholder={`Summarize your performance in ${category.name.toLowerCase()}...`}
+          className="resize-none text-sm"
+          disabled={isLocked}
+          readOnly={isLocked}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SupplementaryStep({
+  section,
+  answers,
+  isLocked,
+  onAnswer,
+}: {
+  section: SupplementarySection;
+  answers: Record<string, string>;
+  isLocked: boolean;
+  onAnswer: (id: string, value: string) => void;
+}) {
+  return (
+    <div className={`rounded-xl border border-border bg-card p-4 space-y-4 ${isLocked ? "opacity-80" : ""}`}>
+      {section.questions.map((question, index) => (
+        <div key={question.id} className="space-y-1.5">
+          <label className="whitespace-pre-line text-xs font-medium text-foreground">
+            {index + 1}. {question.text}
+          </label>
+          {question.type === "choice" && question.choices ? (
+            <div className="space-y-1.5 pl-1">
+              {question.choices.map((choice) => (
+                <label key={choice} className={`flex items-start gap-2 ${isLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                  <input
+                    type="radio"
+                    name={question.id}
+                    value={choice}
+                    checked={answers[question.id] === choice}
+                    onChange={() => onAnswer(question.id, choice)}
+                    className="mt-0.5 shrink-0 accent-primary"
                     disabled={isLocked}
-                    readOnly={isLocked}
                   />
-                )}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      ))}
-
-      {/* Submit / save actions — only when not locked */}
-      {!isLocked && (
-        <div className="space-y-3">
-          {submitted && (
-            <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-              <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Edit window closes: <strong>{deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</strong>
-              {editCount > 0 && ` · ${editCount} edit${editCount !== 1 ? "s" : ""} made`}
-            </div>
-          )}
-
-          {/* Demo Fill */}
-          <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
-              <Wand2 className="size-3.5" />
-              Demo Fill — auto-fill all fields
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              {(["high", "average", "low"] as PerformerPreset[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPerformerPreset(p)}
-                  className={`text-[10px] px-2.5 py-1 rounded-full border transition-colors font-medium ${
-                    performerPreset === p
-                      ? "bg-amber-500 text-white border-amber-500"
-                      : "border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                  }`}
-                >
-                  {p === "high" ? "High Performer" : p === "average" ? "Average Performer" : "Low Performer"}
-                </button>
+                  <span className={`text-xs ${answers[question.id] === choice ? "font-medium text-primary" : "text-muted-foreground"}`}>
+                    {choice}
+                  </span>
+                </label>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={demoFill}
-              className="w-full text-xs border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 rounded-lg py-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center justify-center gap-1.5 font-medium transition-colors"
-            >
-              <Wand2 className="size-3" />
-              Auto-fill all fields
-            </button>
+          ) : question.numericOnly ? (
+            <div className="space-y-1">
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={answers[question.id] ?? ""}
+                onChange={(e) => onAnswer(question.id, e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="Enter amount in rupees..."
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isLocked}
+                readOnly={isLocked}
+              />
+              <p className="text-[10px] text-muted-foreground">Numbers only - enter annual amount in rupees</p>
+            </div>
+          ) : (
+            <Textarea
+              value={answers[question.id] ?? ""}
+              onChange={(e) => onAnswer(question.id, e.target.value)}
+              rows={3}
+              placeholder="Your answer..."
+              className="resize-none text-sm"
+              disabled={isLocked}
+              readOnly={isLocked}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WizardControls({
+  isLocked,
+  currentStep,
+  stepsLength,
+  pending,
+  submitted,
+  onPrevious,
+  onNext,
+  onSubmit,
+}: {
+  isLocked: boolean;
+  currentStep: number;
+  stepsLength: number;
+  pending: boolean;
+  submitted: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSubmit: () => void;
+}) {
+  const isFinal = currentStep >= stepsLength - 1;
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onPrevious}
+        disabled={currentStep === 0}
+        className="h-10 gap-2"
+      >
+        <ArrowLeft className="size-4" />
+        Previous
+      </Button>
+      {isFinal ? (
+        <Button type="button" onClick={onSubmit} disabled={pending || isLocked} className="h-10 gap-2">
+          {pending ? (submitted ? "Saving..." : "Submitting...") : submitted ? "Save Changes" : "Submit"}
+          <CheckCircle2 className="size-4" />
+        </Button>
+      ) : (
+        <Button type="button" onClick={onNext} className="h-10 gap-2">
+          Next
+          <ArrowRight className="size-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function DemoFill({
+  performerPreset,
+  setPerformerPreset,
+  onFill,
+}: {
+  performerPreset: PerformerPreset;
+  setPerformerPreset: (value: PerformerPreset) => void;
+  onFill: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-3 space-y-2 dark:border-amber-700 dark:bg-amber-950/20">
+      <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+        <Wand2 className="size-3.5" />
+        Demo Fill - auto-fill all fields
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {(["high", "average", "low"] as PerformerPreset[]).map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setPerformerPreset(preset)}
+            className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+              performerPreset === preset
+                ? "border-amber-500 bg-amber-500 text-white"
+                : "border-amber-300 text-amber-600 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30"
+            }`}
+          >
+            {preset === "high" ? "High Performer" : preset === "average" ? "Average Performer" : "Low Performer"}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onFill}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-300 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/30"
+      >
+        <Wand2 className="size-3" />
+        Auto-fill all fields
+      </button>
+    </div>
+  );
+}
+
+function SubmittedReview({
+  employeeCategories,
+  supplementary,
+  answers,
+  suppAnswers,
+  totalScore,
+  totalMax,
+  statusText,
+}: {
+  employeeCategories: CriteriaCategory[];
+  supplementary: SupplementarySection[];
+  answers: Record<string, CategoryAnswer>;
+  suppAnswers: Record<string, string>;
+  totalScore: number;
+  totalMax: number;
+  statusText: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border bg-card px-4 py-3">
+        <p className="ds-label text-primary">Submitted Review</p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-normal text-foreground">Completed self-assessment</h2>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="rounded-full border border-border bg-muted px-2.5 py-1 capitalize text-muted-foreground">{statusText}</span>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+              {totalScore} / {totalMax}
+            </span>
           </div>
-
-          <Button onClick={submit} disabled={pending} className="w-full h-11">
-            {pending
-              ? (submitted ? "Saving..." : "Submitting...")
-              : submitted
-              ? "Save Changes"
-              : "Submit Self-Assessment"}
-          </Button>
         </div>
-      )}
+      </div>
 
-      {/* Read-only footer when locked */}
-      {isLocked && (
-        <div className="text-center text-xs text-slate-400 py-2">
-          Form is read-only. Editing closed on {deadline.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.
-        </div>
-      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {employeeCategories.map((category) => {
+          const answer = answers[category.name] ?? { score: 0, comment: "", questionAnswers: {} };
+          return (
+            <div key={category.name} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">{category.name}</h3>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{category.items.join(", ")}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  {answer.score} / {category.maxPoints}
+                </span>
+              </div>
+              <div className="mt-3 space-y-3">
+                {category.questions.map((question, index) => (
+                  <div key={question}>
+                    <p className="text-[11px] font-medium text-muted-foreground">{index + 1}. {question}</p>
+                    <p className="mt-1 whitespace-pre-wrap rounded-lg bg-muted/50 px-3 py-2 text-xs text-foreground">
+                      {answer.questionAnswers?.[question] || "-"}
+                    </p>
+                  </div>
+                ))}
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground">Summary</p>
+                  <p className="mt-1 whitespace-pre-wrap rounded-lg bg-muted/50 px-3 py-2 text-xs text-foreground">
+                    {answer.comment || "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
-      </div>} {/* end formOpen wrapper */}
+        {supplementary.map((section) => (
+          <div key={`${section.part}:${section.title}`} className="rounded-xl border border-border bg-card p-4">
+            <p className="ds-label text-primary">Part {section.part}</p>
+            <h3 className="mt-1 text-sm font-semibold text-foreground">{section.title}</h3>
+            <div className="mt-3 space-y-3">
+              {section.questions.map((question, index) => (
+                <div key={question.id}>
+                  <p className="whitespace-pre-line text-[11px] font-medium text-muted-foreground">
+                    {index + 1}. {question.text}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap rounded-lg bg-muted/50 px-3 py-2 text-xs text-foreground">
+                    {suppAnswers[question.id] || "-"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

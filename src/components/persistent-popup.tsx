@@ -32,6 +32,7 @@ const iconByType: Record<string, React.ReactNode> = {
 };
 
 const MAX_VISIBLE = 3;
+const STANDARD_POPUP_DURATION_MS = 5000;
 
 export function PersistentPopup({ initialNotifications }: Props) {
   const [queue, setQueue] = useState<PopupNotification[]>(() =>
@@ -92,11 +93,35 @@ export function PersistentPopup({ initialNotifications }: Props) {
     setBusy(null);
   }, []);
 
+  const dismissAll = useCallback(() => {
+    const ids = queue.map((n) => n.id);
+    setQueue([]);
+    void Promise.all(
+      ids.map((id) =>
+        fetch("/api/notifications/dismiss", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }).catch(() => null)
+      )
+    );
+  }, [queue]);
+
   const visible = queue.slice(0, MAX_VISIBLE);
   const overflow = queue.length - MAX_VISIBLE;
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] flex flex-col-reverse gap-2 w-[360px] max-w-[calc(100vw-2rem)]">
+      {queue.length > 0 && (
+        <button
+          type="button"
+          onClick={dismissAll}
+          className="self-end rounded-full border border-border bg-background/90 px-3 py-1.5 text-[11px] font-normal text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
+          aria-label="Dismiss all persistent notifications"
+        >
+          Dismiss all
+        </button>
+      )}
       {overflow > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -137,6 +162,14 @@ function NotificationToast({
 }) {
   const isUrgent = n.urgent;
   const isBusy = busy === n.id;
+
+  // Auto-dismiss standard, non-urgent notifications after exactly 5s.
+  useEffect(() => {
+    if (isUrgent) return;
+    const t = setTimeout(() => onDismiss(n.id), STANDARD_POPUP_DURATION_MS);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n.id, isUrgent]);
 
   return (
     <motion.div

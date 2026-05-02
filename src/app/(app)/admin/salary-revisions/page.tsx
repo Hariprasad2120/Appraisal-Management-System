@@ -38,10 +38,10 @@ export default async function SalaryRevisionsPage({
   const fmtMonth = (d: Date) =>
     d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 
-  const statusColors: Record<string, string> = {
-    Approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    Pending:  "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-    Rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  const statusBadge: Record<string, string> = {
+    Approved: "ds-badge ds-badge-green",
+    Pending:  "ds-badge ds-badge-amber",
+    Rejected: "ds-badge ds-badge-red",
   };
 
   return (
@@ -49,10 +49,10 @@ export default async function SalaryRevisionsPage({
       <FadeIn>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <TrendingUp className="size-6 text-[#008993]" /> Salary Revisions
+            <h1 className="ds-h1 flex items-center gap-2">
+              <TrendingUp className="size-6 text-primary" /> Salary Revisions
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="ds-body mt-1">
               {revisions.length} revision{revisions.length !== 1 ? "s" : ""} across {uniqueEmps} employee{uniqueEmps !== 1 ? "s" : ""}
             </p>
           </div>
@@ -66,20 +66,18 @@ export default async function SalaryRevisionsPage({
       <FadeIn delay={0.05}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Total Revisions", value: revisions.length, icon: IndianRupee, color: "text-[#008993]", bg: "bg-[#008993]/10" },
-            { label: "Employees",       value: uniqueEmps,        icon: Users,        color: "text-blue-600",  bg: "bg-blue-50 dark:bg-blue-950/30" },
-            { label: "Approved",        value: totalApproved,     icon: CheckCircle,  color: "text-green-600", bg: "bg-green-50 dark:bg-green-950/30" },
-            { label: "Pending",         value: totalPending,      icon: TrendingUp,   color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30" },
+            { label: "Total Revisions", value: revisions.length, icon: IndianRupee, iconColor: "text-primary",        iconBg: "bg-primary/10",                   accent: "stat-teal" },
+            { label: "Employees",       value: uniqueEmps,        icon: Users,        iconColor: "text-blue-400",       iconBg: "bg-blue-500/10",                  accent: "stat-cyan" },
+            { label: "Approved",        value: totalApproved,     icon: CheckCircle,  iconColor: "text-green-500",      iconBg: "bg-green-500/10",                 accent: "stat-green" },
+            { label: "Pending",         value: totalPending,      icon: TrendingUp,   iconColor: "text-amber-500",      iconBg: "bg-amber-500/10",                 accent: "stat-amber" },
           ].map((s) => (
-            <Card key={s.label} className="border-0 shadow-sm">
-              <CardContent className="p-4">
-                <div className={`inline-flex rounded-lg p-1.5 ${s.bg} mb-2`}>
-                  <s.icon className={`size-4 ${s.color}`} />
-                </div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">{s.value}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
-              </CardContent>
-            </Card>
+            <div key={s.label} className={`bg-card border border-border rounded-xl p-4 shadow-sm ${s.accent}`}>
+              <div className={`inline-flex rounded-[8px] p-1.5 ${s.iconBg} mb-2`}>
+                <s.icon className={`size-4 ${s.iconColor}`} />
+              </div>
+              <div className="ds-stat text-2xl">{s.value}</div>
+              <div className="ds-small mt-0.5">{s.label}</div>
+            </div>
           ))}
         </div>
       </FadeIn>
@@ -151,67 +149,62 @@ export default async function SalaryRevisionsPage({
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-slate-500 border-b bg-slate-50 dark:bg-slate-800/50">
-                    <th className="py-3 px-4 font-medium">Emp #</th>
-                    <th className="px-4 font-medium">Name</th>
-                    <th className="px-4 font-medium">Department</th>
-                    <th className="px-4 font-medium">{byDate ? "↓ " : ""}Effective</th>
-                    <th className="px-4 font-medium">Payout</th>
-                    <th className="px-4 font-medium">Gross</th>
-                    <th className="px-4 font-medium">CTC</th>
-                    <th className="px-4 font-medium">Revised CTC</th>
-                    <th className="px-4 font-medium">Rev %</th>
-                    <th className="px-4 font-medium">Basic</th>
-                    <th className="px-4 font-medium">HRA</th>
-                    <th className="px-4 font-medium">Travelling</th>
-                    <th className="px-4 font-medium">Fixed Allw.</th>
-                    <th className="px-4 font-medium">Status</th>
+                  <tr className="text-left border-b border-border bg-muted/40">
+                    <th className="py-2.5 px-4 ds-label">Emp #</th>
+                    <th className="px-4 ds-label">Name</th>
+                    <th className="px-4 ds-label">Department</th>
+                    <th className="px-4 ds-label">{byDate ? "↓ " : ""}Effective</th>
+                    <th className="px-4 ds-label">Revised CTC</th>
+                    <th className="px-4 ds-label">Rev %</th>
+                    <th className="px-4 ds-label">Status</th>
+                    <th className="px-4 ds-label">Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-border">
                   {revisions.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-muted-foreground/50 ds-small">
                         No revision records found.
                       </td>
                     </tr>
                   ) : (
                     revisions.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-2.5 px-4 text-slate-500">
-                          <Link
-                            href={`/admin/salary-revisions?emp=${r.user.employeeNumber ?? ""}`}
-                            className="hover:text-[#008993] transition-colors"
-                          >
-                            {r.user.employeeNumber ?? "—"}
-                          </Link>
+                      <tr key={r.id} className="hover:bg-muted/30 transition-colors group/row">
+                        <td className="py-2.5 px-4 text-muted-foreground font-mono">
+                          {r.user.employeeNumber ?? "—"}
                         </td>
-                        <td className="px-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">
-                          <Link href={`/admin/employees/${r.user.id}`} className="hover:text-[#008993] transition-colors">
+                        <td className="px-4 font-semibold text-foreground whitespace-nowrap">
+                          <Link
+                            href={`/admin/employees/${r.user.id}/assign`}
+                            className="transition-colors hover:text-primary hover:underline"
+                          >
                             {toTitleCase(r.user.name)}
                           </Link>
                         </td>
-                        <td className="px-4 text-slate-500 whitespace-nowrap">{r.user.department ?? "—"}</td>
-                        <td className="px-4 text-slate-600 whitespace-nowrap">{fmtMonth(r.effectiveFrom)}</td>
-                        <td className="px-4 text-slate-600 whitespace-nowrap">{fmtMonth(r.payoutMonth)}</td>
-                        <td className="px-4 text-slate-700 dark:text-slate-300">{fmt(Number(r.grossAnnum))}</td>
-                        <td className="px-4 text-slate-700 dark:text-slate-300">{fmt(Number(r.ctcAnnum))}</td>
-                        <td className="px-4 font-semibold text-slate-900 dark:text-white">{fmt(Number(r.revisedCtc))}</td>
+                        <td className="px-4 text-muted-foreground whitespace-nowrap">{r.user.department ?? "—"}</td>
+                        <td className="px-4 text-muted-foreground font-mono whitespace-nowrap">{fmtMonth(r.effectiveFrom)}</td>
+                        <td className="px-4 font-semibold text-foreground">{fmt(Number(r.revisedCtc))}</td>
                         <td className="px-4">
                           {r.revisionPercentage ? (
-                            <span className="text-green-600 font-medium">{Number(r.revisionPercentage)}%</span>
+                            <span className={`font-medium font-mono ${Number(r.revisionPercentage) >= 0 ? "text-green-500" : "text-red-400"}`}>
+                              {Number(r.revisionPercentage) >= 0 ? "+" : ""}{Number(r.revisionPercentage)}%
+                            </span>
                           ) : (
-                            <span className="text-slate-400">—</span>
+                            <span className="text-muted-foreground/50">—</span>
                           )}
                         </td>
-                        <td className="px-4 text-slate-600">{Number(r.basic) > 0 ? fmt(Number(r.basic)) : "—"}</td>
-                        <td className="px-4 text-slate-600">{Number(r.hra) > 0 ? fmt(Number(r.hra)) : "—"}</td>
-                        <td className="px-4 text-slate-600">{Number(r.travelling) > 0 ? fmt(Number(r.travelling)) : "—"}</td>
-                        <td className="px-4 text-slate-600">{Number(r.fixedAllowance) > 0 ? fmt(Number(r.fixedAllowance)) : "—"}</td>
                         <td className="px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[r.status] ?? ""}`}>
+                          <span className={statusBadge[r.status] ?? "ds-badge ds-badge-gray"}>
                             {r.status}
                           </span>
+                        </td>
+                        <td className="px-4">
+                          <Link
+                            href={`/admin/employees/${r.user.id}`}
+                            className="text-primary hover:underline font-medium whitespace-nowrap text-xs"
+                          >
+                            View employee →
+                          </Link>
                         </td>
                       </tr>
                     ))

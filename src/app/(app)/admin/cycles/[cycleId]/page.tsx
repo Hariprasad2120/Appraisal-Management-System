@@ -57,10 +57,10 @@ export default async function CycleRatingsPage({
           <ArrowLeft className="size-3.5" /> {role === "ADMIN" || secondaryRole === "ADMIN" ? "Back to Cycles" : "Back to History"}
         </Link>
         <div className="mt-2">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h1 className="ds-h1">
             {toTitleCase(cycle.user.name)} — Ratings Detail
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="ds-body mt-1">
             {cycle.type} cycle · {cycle.status.replace(/_/g, " ")}
           </p>
         </div>

@@ -11,7 +11,6 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from "recharts";
 
 type ChartEntry = { name: string; score: number; hike: number };
@@ -47,43 +46,43 @@ export function ManagementCharts({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
       {/* Bar chart: rating scores */}
-      <div className="bg-[#111] border border-[#1a1a1a] rounded-xl p-4">
+      <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-300">Appraisal Scores (Decided Cycles)</h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Normalised score out of 100 — last {chartData.length} decided</p>
+            <h3 className="text-sm font-semibold text-foreground">Appraisal Scores (Decided Cycles)</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Normalised score out of 100 - last {chartData.length} decided</p>
           </div>
         </div>
         {chartData.length === 0 ? (
-          <div className="flex items-center justify-center h-48 text-slate-600 text-sm">
+          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
             No decided cycles yet
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
                 dataKey="name"
-                tick={{ fill: "#666", fontSize: 10 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 domain={[0, 100]}
-                tick={{ fill: "#666", fontSize: 10 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
                 contentStyle={{
-                  background: "#0d0d0d",
-                  border: "1px solid #1a1a1a",
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
                   borderRadius: 8,
                   fontSize: 12,
-                  color: "#e0e0e0",
+                  color: "var(--foreground)",
                 }}
                 formatter={(val) => [`${val}`, "Score"]}
-                cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                cursor={{ fill: "rgba(14,138,149,0.06)" }}
               />
               <Bar dataKey="score" radius={[4, 4, 0, 0]} maxBarSize={40}>
                 {chartData.map((entry, i) => (
@@ -96,10 +95,10 @@ export function ManagementCharts({
       </div>
 
       {/* Pie/donut: cycle status distribution */}
-      <div className="bg-[#111] border border-[#1a1a1a] rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-4">Cycle Status Distribution</h3>
+      <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Cycle Status Distribution</h3>
         {statusCounts.length === 0 ? (
-          <div className="flex items-center justify-center h-48 text-slate-600 text-sm">
+          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
             No cycles
           </div>
         ) : (
@@ -125,11 +124,11 @@ export function ManagementCharts({
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    background: "#0d0d0d",
-                    border: "1px solid #1a1a1a",
+                    background: "var(--card)",
+                    border: "1px solid var(--border)",
                     borderRadius: 8,
                     fontSize: 11,
-                    color: "#e0e0e0",
+                    color: "var(--foreground)",
                   }}
                 />
               </PieChart>
@@ -142,9 +141,9 @@ export function ManagementCharts({
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ background: STATUS_COLORS[s.status] ?? "#475569" }}
                     />
-                    <span className="text-slate-500 truncate max-w-[140px]">{s.label}</span>
+                    <span className="text-muted-foreground truncate max-w-[140px]">{s.label}</span>
                   </div>
-                  <span className="text-slate-400 font-semibold">{s.count}</span>
+                  <span className="text-foreground font-semibold">{s.count}</span>
                 </div>
               ))}
             </div>

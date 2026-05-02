@@ -18,15 +18,6 @@ import { ManagementCharts } from "../management/management-charts";
 import { getSystemDate } from "@/lib/system-date";
 import { computeCycleStatus } from "@/lib/workflow";
 
-const STATUS_BADGE: Record<string, string> = {
-  RATINGS_COMPLETE: "bg-green-100 text-green-700",
-  MANAGEMENT_REVIEW: "bg-green-100 text-green-700",
-  DATE_VOTING: "bg-purple-100 text-purple-700",
-  SCHEDULED: "bg-teal-100 text-teal-700",
-  DECIDED: "bg-emerald-100 text-emerald-700",
-  CLOSED: "bg-slate-100 text-slate-500",
-};
-
 export default async function PartnerDashboard() {
   const session = await auth();
   const now = await getSystemDate();
@@ -130,15 +121,15 @@ export default async function PartnerDashboard() {
               <Building2 className="size-5 text-[#008993]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">
-                {session?.user ? `Good ${getGreeting(now)}, ${toTitleCase(session.user.name?.split(" ")[0] ?? "there")}` : "Partner Dashboard"}
+              <h1 className="text-2xl font-normal text-foreground">
+                Partner Dashboard
               </h1>
-              <p className="text-slate-400 text-sm mt-0.5">Appraisal &amp; workforce overview — Adarsh Shipping</p>
+              <p className="text-muted-foreground text-sm mt-0.5">Appraisal &amp; workforce overview - Adarsh Shipping</p>
             </div>
           </div>
           <Link
             href="/history"
-            className="flex items-center gap-2 border border-[#1a1a1a] text-slate-300 rounded-lg px-4 py-2 text-sm font-medium hover:border-[#008993] hover:text-[#00cec4] transition-colors"
+            className="flex items-center gap-2 border border-border text-foreground rounded-lg px-4 py-2 text-sm font-medium hover:border-primary hover:text-primary transition-colors"
           >
             <Activity className="size-4" />
             Full History
@@ -149,13 +140,13 @@ export default async function PartnerDashboard() {
       {/* KPI cards */}
       <StaggerList className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Employees", value: allEmployees.length, icon: <Users className="size-5 text-[#008993]" />, color: "text-white" },
+          { label: "Total Employees", value: allEmployees.length, icon: <Users className="size-5 text-[#008993]" />, color: "text-foreground" },
           { label: "Active Appraisals", value: totalActive, icon: <Clock className="size-5 text-amber-400" />, color: "text-amber-400" },
           { label: "Ready for Decision", value: totalReady, icon: <Activity className="size-5 text-blue-400" />, color: "text-blue-400" },
           { label: "Decided", value: totalDecided, icon: <CheckCircle2 className="size-5 text-green-400" />, color: "text-green-400" },
         ].map((kpi) => (
           <StaggerItem key={kpi.label}>
-            <Card className="border border-[#1a1a1a] bg-[#111] shadow-none">
+            <Card className="border border-border bg-card shadow-sm">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-2">
                   {kpi.icon}
@@ -171,19 +162,19 @@ export default async function PartnerDashboard() {
       {/* Notifications */}
       {recentNotifs.length > 0 && (
         <FadeIn delay={0.12}>
-          <div className="border border-[#1a1a1a] rounded-xl bg-[#111] overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-[#1a1a1a] flex items-center justify-between">
-              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+          <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                 <Bell className="size-3.5" /> Notifications
               </span>
               <Link href="/notifications" className="text-[11px] text-[#00cec4] hover:underline">View all</Link>
             </div>
-            <div className="divide-y divide-[#1a1a1a]">
+            <div className="divide-y divide-border">
               {recentNotifs.map((n) => (
                 <div key={n.id} className="px-5 py-3 flex items-start gap-3">
                   <span className="size-1.5 rounded-full bg-[#008993] shrink-0 mt-1.5" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-slate-300 line-clamp-2">{n.message}</p>
+                    <p className="text-sm text-foreground line-clamp-2">{n.message}</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">{n.createdAt.toLocaleString("en-IN")}</p>
                   </div>
                   {n.link && <Link href={n.link} className="text-[11px] text-[#00cec4] shrink-0 hover:underline">View</Link>}
@@ -202,9 +193,9 @@ export default async function PartnerDashboard() {
       {/* Top performers */}
       {employeePerf.length > 0 && (
         <FadeIn delay={0.2}>
-          <Card className="border border-[#1a1a1a] bg-[#111] shadow-none">
+          <Card className="border border-border bg-card shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+              <CardTitle className="text-sm text-foreground flex items-center gap-2">
                 <TrendingUp className="size-4 text-[#008993]" />
                 Top Performers
               </CardTitle>
@@ -213,7 +204,7 @@ export default async function PartnerDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs text-slate-500 border-b border-[#1a1a1a] bg-[#0d0d0d]">
+                    <tr className="text-left text-xs text-muted-foreground border-b border-border bg-muted/40">
                       <th className="py-3 px-4 font-medium">#</th>
                       <th className="px-4 font-medium">Employee</th>
                       <th className="px-4 font-medium">Avg Rating</th>
@@ -223,12 +214,12 @@ export default async function PartnerDashboard() {
                       <th className="px-4 font-medium">Gross / yr</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1a1a1a]">
+                  <tbody className="divide-y divide-border">
                     {employeePerf.map((e, i) => (
-                      <tr key={e.id} className="hover:bg-white/[0.02] transition-colors">
+                      <tr key={e.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-2.5 px-4 text-slate-500 text-xs">{i + 1}</td>
-                        <td className="px-4 font-medium text-slate-200">
-                          <Link href={`/admin/employees/${e.id}`} className="hover:text-[#00cec4] transition-colors">
+                        <td className="px-4 font-medium text-foreground">
+                          <Link href={`/admin/employees/${e.id}/assign`} className="hover:text-[#00cec4] transition-colors">
                             {toTitleCase(e.name)}
                           </Link>
                         </td>
@@ -259,9 +250,9 @@ export default async function PartnerDashboard() {
 
       {/* Salary overview */}
       <FadeIn delay={0.25}>
-        <Card className="border border-[#1a1a1a] bg-[#111] shadow-none">
+          <Card className="border border-border bg-card shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-300 flex items-center gap-2">
+            <CardTitle className="text-sm text-foreground flex items-center gap-2">
               <IndianRupee className="size-4 text-[#ff8333]" />
               Workforce Salary Overview
             </CardTitle>
@@ -270,7 +261,7 @@ export default async function PartnerDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-slate-500 border-b border-[#1a1a1a] bg-[#0d0d0d]">
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border bg-muted/40">
                     <th className="py-3 px-4 font-medium">Employee</th>
                     <th className="px-4 font-medium">Gross / yr</th>
                     <th className="px-4 font-medium">CTC / yr</th>
@@ -279,7 +270,7 @@ export default async function PartnerDashboard() {
                     <th className="px-4 font-medium">Last Hike</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1a1a1a]">
+                <tbody className="divide-y divide-border">
                   {allEmployees.slice(0, 25).map((emp) => {
                     const decidedCyc = emp.cyclesAsEmployee.filter(
                       (c) => c.status === "DECIDED" && c.ratings.length > 0,
@@ -289,13 +280,13 @@ export default async function PartnerDashboard() {
                       : null;
                     const lastHike = decidedCyc[0]?.decision?.finalAmount;
                     return (
-                      <tr key={emp.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-2.5 px-4 font-medium text-slate-200">
-                          <Link href={`/admin/employees/${emp.id}`} className="hover:text-[#00cec4] transition-colors">
+                      <tr key={emp.id} className="hover:bg-muted/40 transition-colors">
+                        <td className="py-2.5 px-4 font-medium text-foreground">
+                          <Link href={`/admin/employees/${emp.id}/assign`} className="hover:text-[#00cec4] transition-colors">
                             {toTitleCase(emp.name)}
                           </Link>
                         </td>
-                        <td className="px-4 text-slate-300 font-semibold text-xs">
+                        <td className="px-4 text-foreground font-semibold text-xs">
                           {emp.salary ? fmt(Number(emp.salary.grossAnnum)) : "—"}
                         </td>
                         <td className="px-4 text-slate-400 text-xs">
@@ -330,9 +321,3 @@ export default async function PartnerDashboard() {
   );
 }
 
-function getGreeting(now: Date): string {
-  const h = now.getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
-  return "evening";
-}

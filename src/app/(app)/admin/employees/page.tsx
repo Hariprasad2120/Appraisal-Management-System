@@ -24,115 +24,66 @@ async function loadUsers() {
 }
 
 const SECTION_CONFIG = [
-  {
-    key: "PARTNER",
-    label: "Directors / Partners",
-    roles: ["PARTNER"],
-    color: "bg-violet-100 text-violet-700",
-    badgeColor: "bg-violet-100 text-violet-700",
-    delay: 0.08,
-  },
-  {
-    key: "MANAGEMENT",
-    label: "Management",
-    roles: ["MANAGEMENT"],
-    color: "bg-indigo-100 text-indigo-700",
-    badgeColor: "bg-indigo-100 text-indigo-700",
-    delay: 0.12,
-  },
-  {
-    key: "MANAGER",
-    label: "Managers",
-    roles: ["MANAGER"],
-    color: "bg-blue-100 text-blue-700",
-    badgeColor: "bg-blue-100 text-blue-700",
-    delay: 0.16,
-  },
-  {
-    key: "TL",
-    label: "Team Leads",
-    roles: ["TL"],
-    color: "bg-amber-100 text-amber-700",
-    badgeColor: "bg-amber-100 text-amber-700",
-    delay: 0.20,
-  },
-  {
-    key: "HR",
-    label: "HR Staff",
-    roles: ["HR"],
-    color: "bg-green-100 text-green-700",
-    badgeColor: "bg-green-100 text-green-700",
-    delay: 0.24,
-  },
-  {
-    key: "ADMIN",
-    label: "Admins",
-    roles: ["ADMIN"],
-    color: "bg-red-100 text-red-700",
-    badgeColor: "bg-red-100 text-red-700",
-    delay: 0.28,
-  },
-  {
-    key: "EMPLOYEE",
-    label: "Staff",
-    roles: ["EMPLOYEE"],
-    color: "bg-slate-100 text-slate-600",
-    badgeColor: "bg-slate-100 text-slate-600",
-    delay: 0.32,
-  },
+  { key: "PARTNER",    label: "Directors / Partners", roles: ["PARTNER"],    badgeClass: "ds-badge ds-badge-sq ds-badge-purple", delay: 0.08 },
+  { key: "MANAGEMENT", label: "Management",           roles: ["MANAGEMENT"], badgeClass: "ds-badge ds-badge-sq ds-badge-blue",   delay: 0.12 },
+  { key: "MANAGER",    label: "Managers",             roles: ["MANAGER"],    badgeClass: "ds-badge ds-badge-sq ds-badge-blue",   delay: 0.16 },
+  { key: "TL",         label: "Team Leads",           roles: ["TL"],         badgeClass: "ds-badge ds-badge-sq ds-badge-amber",  delay: 0.20 },
+  { key: "HR",         label: "HR Staff",             roles: ["HR"],         badgeClass: "ds-badge ds-badge-sq ds-badge-teal",   delay: 0.24 },
+  { key: "ADMIN",      label: "Admins",               roles: ["ADMIN"],      badgeClass: "ds-badge ds-badge-sq ds-badge-orange", delay: 0.28 },
+  { key: "EMPLOYEE",   label: "Staff",                roles: ["EMPLOYEE"],   badgeClass: "ds-badge ds-badge-sq ds-badge-gray",   delay: 0.32 },
 ] as const;
 
-function EmployeeTable({ users, badgeColor, showCycle }: { users: UserWithExtras[]; badgeColor: string; showCycle: boolean }) {
+function EmployeeTable({ users, badgeClass, showCycle }: { users: UserWithExtras[]; badgeClass: string; showCycle: boolean }) {
   if (users.length === 0) return null;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs text-slate-500 border-b bg-slate-50 dark:bg-slate-800/50">
-            <th className="py-3 px-4 font-medium">Emp #</th>
-            <th className="px-4 font-medium">Name</th>
-            <th className="px-4 font-medium">Role</th>
-            <th className="px-4 font-medium">Department</th>
-            <th className="px-4 font-medium">Location</th>
-            <th className="px-4 font-medium">Joining</th>
-            <th className="px-4 font-medium">Gross/yr</th>
-            {showCycle && <th className="px-4 font-medium">Active Cycle</th>}
-            <th className="px-4 font-medium w-8"></th>
+          <tr className="text-left border-b border-border bg-muted/40">
+            <th className="py-2.5 px-4 ds-label">Emp #</th>
+            <th className="px-4 ds-label">Name</th>
+            <th className="px-4 ds-label">Role</th>
+            <th className="px-4 ds-label">Department</th>
+            <th className="px-4 ds-label">Location</th>
+            <th className="px-4 ds-label">Joining</th>
+            <th className="px-4 ds-label">Gross/yr</th>
+            {showCycle && <th className="px-4 ds-label">Active Cycle</th>}
+            <th className="px-4 ds-label w-8"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+        <tbody className="divide-y divide-border">
           {users.map((u) => {
             const activeCycle = u.cyclesAsEmployee[0];
             return (
-              <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group">
-                <td className="py-3 px-4 text-slate-500">
+              <tr key={u.id} className="hover:bg-muted/30 transition-colors cursor-pointer group">
+                <td className="py-3 px-4 text-muted-foreground font-mono text-xs">
                   <Link href={`/admin/employees/${u.id}`} className="block">{u.employeeNumber ?? "—"}</Link>
                 </td>
                 <td className="px-4">
-                  <Link href={`/admin/employees/${u.id}`} className="block font-medium text-slate-900 dark:text-white hover:text-[#008993] transition-colors">
+                  <Link href={`/admin/employees/${u.id}`} className="block font-semibold text-foreground hover:text-primary transition-colors">
                     {toTitleCase(u.name)}
                   </Link>
                 </td>
                 <td className="px-4">
                   <Link href={`/admin/employees/${u.id}`} className="block">
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${badgeColor}`}>{u.role}</span>
+                    <span className={badgeClass}>{u.role}</span>
                     {u.secondaryRole && (
-                      <span className="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-slate-100 text-slate-500">{u.secondaryRole}</span>
+                      <span className="ml-1 ds-badge ds-badge-sq ds-badge-gray">{u.secondaryRole}</span>
                     )}
                   </Link>
                 </td>
-                <td className="px-4 text-slate-500 text-xs">
+                <td className="px-4 text-muted-foreground text-xs">
                   <Link href={`/admin/employees/${u.id}`} className="block">{u.department ?? "—"}</Link>
                 </td>
-                <td className="px-4 text-slate-500 text-xs">
+                <td className="px-4 text-muted-foreground text-xs">
                   <Link href={`/admin/employees/${u.id}`} className="block">{u.location ?? "—"}</Link>
                 </td>
-                <td className="px-4 text-slate-500">
+                <td className="px-4 text-muted-foreground font-mono text-xs">
                   <Link href={`/admin/employees/${u.id}`} className="block">
                     {u.joiningDate.toLocaleDateString()}
                   </Link>
                 </td>
-                <td className="px-4 text-slate-600">
+                <td className="px-4 text-muted-foreground text-xs">
                   <Link href={`/admin/employees/${u.id}`} className="block">
                     {u.salary ? `₹${Number(u.salary.grossAnnum).toLocaleString()}` : "—"}
                   </Link>
@@ -141,17 +92,17 @@ function EmployeeTable({ users, badgeColor, showCycle }: { users: UserWithExtras
                   <td className="px-4">
                     <Link href={`/admin/employees/${u.id}`} className="block">
                       {activeCycle ? (
-                        <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full px-2 py-0.5">
+                        <span className="ds-badge ds-badge-cyan">
                           {activeCycle.type} · {activeCycle.status.replace(/_/g, " ")}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">None</span>
+                        <span className="text-xs text-muted-foreground/50">None</span>
                       )}
                     </Link>
                   </td>
                 )}
                 <td className="px-4">
-                  <Link href={`/admin/employees/${u.id}`} className="text-slate-400 group-hover:text-slate-600">
+                  <Link href={`/admin/employees/${u.id}`} className="text-muted-foreground/40 group-hover:text-primary transition-colors">
                     <ChevronRight className="size-4" />
                   </Link>
                 </td>
@@ -175,8 +126,8 @@ export default async function EmployeesPage() {
       <FadeIn>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Employees</h1>
-            <p className="text-slate-500 text-sm mt-1">{users.length} total users</p>
+            <h1 className="ds-h1">Employees</h1>
+            <p className="ds-body mt-1">{users.length} total users</p>
           </div>
           <Link href="/admin/employees/new">
             <Button className="flex items-center gap-2">
@@ -195,13 +146,13 @@ export default async function EmployeesPage() {
             <FadeIn key={sec.key} delay={sec.delay}>
               <Card className="border-0 shadow-sm">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
+                  <CardTitle className="text-sm font-semibold text-foreground">
                     {sec.label}
-                    <span className="ml-2 text-xs font-normal text-slate-400">({group.length})</span>
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">({group.length})</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <EmployeeTable users={group} badgeColor={sec.badgeColor} showCycle={showCycle} />
+                  <EmployeeTable users={group} badgeClass={sec.badgeClass} showCycle={showCycle} />
                 </CardContent>
               </Card>
             </FadeIn>

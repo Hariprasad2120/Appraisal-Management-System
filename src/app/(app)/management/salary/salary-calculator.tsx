@@ -55,7 +55,7 @@ export function SalaryCalculator({ employees, slabs }: { employees: Employee[]; 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-5">
             <div className="text-xs text-slate-500 mb-1">Total Current Cost (Gross)</div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+            <div className="ds-h1">
               ₹{(totals.totalCurrentCost / 100000).toFixed(1)}L
             </div>
             <div className="text-xs text-slate-400">per annum</div>
@@ -104,20 +104,20 @@ export function SalaryCalculator({ employees, slabs }: { employees: Employee[]; 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-slate-500 border-b bg-slate-50 dark:bg-slate-800/50">
-                  <th className="py-3 px-4 font-medium">Employee</th>
-                  <th className="px-4 font-medium">Avg Rating</th>
-                  <th className="px-4 font-medium">Slab</th>
-                  <th className="px-4 font-medium">Hike %</th>
-                  <th className="px-4 font-medium">Current Gross</th>
-                  <th className="px-4 font-medium">Increment</th>
-                  <th className="px-4 font-medium">New Gross</th>
+                <tr className="text-left border-b border-border bg-muted/40">
+                  <th className="py-2.5 px-4 ds-label">Employee</th>
+                  <th className="px-4 ds-label">Avg Rating</th>
+                  <th className="px-4 ds-label">Slab</th>
+                  <th className="px-4 ds-label">Hike %</th>
+                  <th className="px-4 ds-label">Current Gross</th>
+                  <th className="px-4 ds-label">Increment</th>
+                  <th className="px-4 ds-label">New Gross</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border">
                 {employees.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-slate-400">
+                    <td colSpan={7} className="py-10 text-center text-muted-foreground/50">
                       No employees ready for salary review
                     </td>
                   </tr>
@@ -129,7 +129,7 @@ export function SalaryCalculator({ employees, slabs }: { employees: Employee[]; 
                   const currentSlab = getSlab(hike);
 
                   return (
-                    <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
                       <td className="py-3 px-4">
                         <div className="font-medium text-slate-900 dark:text-white">{toTitleCase(emp.name)}</div>
                         <div className="text-xs text-slate-400">{emp.department}</div>

@@ -6,9 +6,9 @@ import Link from "next/link";
 import {
   Bell, CheckCircle, CheckCheck, AlertTriangle, Info,
   LogIn, Star, Ticket, Calendar, UserCheck, ClipboardList,
-  Filter,
+  Filter, Trash2,
 } from "lucide-react";
-import { markAllReadAction, markOneReadAction } from "./actions";
+import { markAllReadAction, markOneReadAction, deleteAllNotificationsAction } from "./actions";
 
 type NotificationRow = {
   id: string;
@@ -124,6 +124,13 @@ export function NotificationsPanel({
     });
   };
 
+  const handleDeleteAll = () => {
+    startTransition(async () => {
+      await deleteAllNotificationsAction();
+      setRows([]);
+    });
+  };
+
   const filtered = rows.filter((n) => {
     if (tab === "unread") return !n.read;
     if (tab === "important") return n.important || n.urgent || n.critical;
@@ -167,16 +174,28 @@ export function NotificationsPanel({
           ))}
         </div>
 
-        {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllRead}
-            disabled={isPending}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          >
-            <CheckCheck className="size-3.5" />
-            Mark all read
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllRead}
+              disabled={isPending}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              <CheckCheck className="size-3.5" />
+              Mark all read
+            </button>
+          )}
+          {rows.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={isPending}
+              className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="size-3.5" />
+              Delete all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* List */}

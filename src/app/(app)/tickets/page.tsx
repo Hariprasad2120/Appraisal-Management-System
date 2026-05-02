@@ -24,10 +24,10 @@ export default async function TicketsPage() {
     <div className="space-y-6 max-w-3xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h1 className="ds-h1 flex items-center gap-2">
             <Ticket className="size-6" /> Support Tickets
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="ds-body mt-1">
             Report issues with the appraisal system. Our admin team will respond promptly.
           </p>
         </div>

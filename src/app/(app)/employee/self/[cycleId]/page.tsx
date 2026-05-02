@@ -44,7 +44,7 @@ export default async function SelfPage({ params }: { params: Promise<{ cycleId: 
   const StatusIcon = cfg.icon;
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="w-full max-w-6xl space-y-5">
       <FadeIn>
         <Link
           href="/employee"

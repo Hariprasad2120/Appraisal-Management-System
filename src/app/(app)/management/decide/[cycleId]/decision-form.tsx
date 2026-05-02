@@ -220,7 +220,9 @@ export function DecisionForm({
         tentativeDate2: new Date(tentDate2).toISOString(),
       });
       if (!res.ok) { toast.error(res.error); return; }
-      toast.success("Decision recorded — HR notified to confirm meeting date");
+      toast.success("Final decision recorded", {
+        description: "HR has been notified to confirm the meeting date.",
+      });
       router.push("/management");
       router.refresh();
     });

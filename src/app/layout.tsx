@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/components/session-provider";
@@ -8,25 +8,15 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Suspense } from "react";
 import { NavigationProgress } from "@/components/navigation-progress";
 
-const fontSans = DM_Sans({
+const fontSans = localFont({
+  src: "../../Adarsh Shipping Design System/fonts/Kiona-Regular.ttf",
   variable: "--font-sans",
-  subsets: ["latin"],
-  axes: ["opsz"],
   display: "swap",
 });
 
 const fontMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const fontHeading = localFont({
-  src: [
-    { path: "./fonts/Kiona-Regular.ttf", weight: "400", style: "normal" },
-    { path: "./fonts/Kiona-Italic.ttf", weight: "400", style: "italic" },
-  ],
-  variable: "--font-heading",
   display: "swap",
 });
 
@@ -43,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fontSans.variable} ${fontMono.variable} ${fontHeading.variable}`}
+      className={`${fontSans.variable} ${fontMono.variable} dark`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col antialiased" suppressHydrationWarning>

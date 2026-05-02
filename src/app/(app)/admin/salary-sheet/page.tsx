@@ -6,8 +6,8 @@ export default function SalarySheetPage() {
     <div className="space-y-5">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Salary Structure Generator</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Salary Structure Generator</h1>
+          <p className="ds-body mt-1">
             Auto-calculates PF, ESI, gratuity, PT, insurance, and take-home
           </p>
         </div>

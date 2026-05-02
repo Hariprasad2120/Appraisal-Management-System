@@ -24,7 +24,7 @@ export default async function HrMomListPage() {
     include: {
       cycle: {
         include: {
-          user: { select: { name: true, department: true } },
+          user: { select: { id: true, name: true, department: true } },
           decision: { select: { finalAmount: true, finalRating: true } },
           moms: { where: { role: "HR" }, select: { id: true, createdAt: true } },
         },
@@ -45,8 +45,8 @@ export default async function HrMomListPage() {
     <div className="space-y-6 max-w-4xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Minutes of Meeting</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Minutes of Meeting</h1>
+          <p className="ds-body mt-1">
             MOM for employees you reviewed — {withMom.length} recorded
           </p>
         </div>
@@ -61,12 +61,16 @@ export default async function HrMomListPage() {
             <StaggerList className="space-y-2">
               {withoutMom.map((a) => (
                 <StaggerItem key={a.id}>
-                  <Link href={`/reviewer/mom/${a.cycle.id}`}>
-                    <Card className="border-0 shadow-sm border-l-4 border-l-amber-400 hover:shadow-md transition-shadow cursor-pointer">
+                  <Card className="border-0 shadow-sm border-l-4 border-l-amber-400 hover:shadow-md transition-shadow">
                       <CardContent className="p-4 flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-slate-900 dark:text-white">
-                            {toTitleCase(a.cycle.user.name)}
+                            <Link
+                              href={`/admin/employees/${a.cycle.user.id}/assign`}
+                              className="transition-colors hover:text-primary hover:underline"
+                            >
+                              {toTitleCase(a.cycle.user.name)}
+                            </Link>
                           </div>
                           <div className="text-xs text-slate-400 mt-0.5">
                             {a.cycle.user.department ?? "—"} ·{" "}
@@ -80,14 +84,16 @@ export default async function HrMomListPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[10px] bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                          <Link
+                            href={`/reviewer/mom/${a.cycle.id}`}
+                            className="text-[10px] bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium transition-colors hover:bg-amber-200 dark:hover:bg-amber-900/50"
+                          >
                             Record MOM
-                          </span>
+                          </Link>
                           <ChevronRight className="size-4 text-slate-400" />
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
                 </StaggerItem>
               ))}
             </StaggerList>
@@ -104,12 +110,16 @@ export default async function HrMomListPage() {
             <StaggerList className="space-y-2">
               {withMom.map((a) => (
                 <StaggerItem key={a.id}>
-                  <Link href={`/reviewer/mom/${a.cycle.id}`}>
-                    <Card className="border-0 shadow-sm border-l-4 border-l-green-400 hover:shadow-md transition-shadow cursor-pointer">
+                  <Card className="border-0 shadow-sm border-l-4 border-l-green-400 hover:shadow-md transition-shadow">
                       <CardContent className="p-4 flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-slate-900 dark:text-white">
-                            {toTitleCase(a.cycle.user.name)}
+                            <Link
+                              href={`/admin/employees/${a.cycle.user.id}/assign`}
+                              className="transition-colors hover:text-primary hover:underline"
+                            >
+                              {toTitleCase(a.cycle.user.name)}
+                            </Link>
                           </div>
                           <div className="text-xs text-slate-400 mt-0.5">
                             {a.cycle.user.department ?? "—"} ·{" "}
@@ -128,14 +138,16 @@ export default async function HrMomListPage() {
                               ₹{Number(a.cycle.decision.finalAmount).toLocaleString("en-IN")}/yr
                             </span>
                           )}
-                          <span className="text-[10px] bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                          <Link
+                            href={`/reviewer/mom/${a.cycle.id}`}
+                            className="text-[10px] bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full font-medium flex items-center gap-1 transition-colors hover:bg-green-200 dark:hover:bg-green-900/50"
+                          >
                             <CheckCircle className="size-3" /> Recorded
-                          </span>
+                          </Link>
                           <ChevronRight className="size-4 text-slate-400" />
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
                 </StaggerItem>
               ))}
             </StaggerList>
@@ -156,7 +168,12 @@ export default async function HrMomListPage() {
                     <CardContent className="p-4 flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-slate-900 dark:text-white">
-                          {toTitleCase(a.cycle.user.name)}
+                          <Link
+                            href={`/admin/employees/${a.cycle.user.id}/assign`}
+                            className="transition-colors hover:text-primary hover:underline"
+                          >
+                            {toTitleCase(a.cycle.user.name)}
+                          </Link>
                         </div>
                         <div className="text-xs text-slate-400 mt-0.5">
                           {a.cycle.user.department ?? "—"} ·{" "}
@@ -184,7 +201,7 @@ export default async function HrMomListPage() {
       {assignments.length === 0 && (
         <FadeIn delay={0.05}>
           <Card className="border-0 shadow-sm">
-            <CardContent className="py-12 text-center text-slate-400 text-sm">
+            <CardContent className="py-12 text-center text-muted-foreground/50 text-sm">
               No appraisal assignments found.
             </CardContent>
           </Card>

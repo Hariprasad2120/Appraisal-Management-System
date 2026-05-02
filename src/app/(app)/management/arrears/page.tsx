@@ -13,7 +13,7 @@ export default async function ManagementArrearsPage() {
   const arrears = await prisma.arrear.findMany({
     where: { status: "PENDING_APPROVAL" },
     include: {
-      user: { select: { name: true, department: true, designation: true } },
+      user: { select: { id: true, name: true, department: true, designation: true } },
       cycle: {
         select: {
           id: true,
@@ -26,6 +26,30 @@ export default async function ManagementArrearsPage() {
     },
     orderBy: { createdAt: "asc" },
   });
+  const arrearCards = arrears.map((arrear) => ({
+    id: arrear.id,
+    cycleId: arrear.cycleId,
+    arrearDays: arrear.arrearDays,
+    arrearAmount: Number(arrear.arrearAmount),
+    dailyRate: Number(arrear.dailyRate),
+    periodFrom: arrear.periodFrom.toISOString(),
+    periodTo: arrear.periodTo.toISOString(),
+    user: arrear.user,
+    cycle: {
+      id: arrear.cycle.id,
+      type: arrear.cycle.type,
+      scheduledDate: arrear.cycle.scheduledDate?.toISOString() ?? null,
+      self: arrear.cycle.self
+        ? { submittedAt: arrear.cycle.self.submittedAt?.toISOString() ?? null }
+        : null,
+      decision: arrear.cycle.decision
+        ? {
+            finalAmount: Number(arrear.cycle.decision.finalAmount),
+            finalRating: arrear.cycle.decision.finalRating,
+          }
+        : null,
+    },
+  }));
 
   const recentlyProcessed = await prisma.arrear.findMany({
     where: { status: { in: ["APPROVED", "REJECTED", "PAID"] } },
@@ -41,8 +65,8 @@ export default async function ManagementArrearsPage() {
     <div className="space-y-6 max-w-4xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Arrear Approvals</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="ds-h1">Arrear Approvals</h1>
+          <p className="ds-body mt-1">
             Review and approve arrear payouts for delayed appraisals.
           </p>
         </div>
@@ -50,7 +74,7 @@ export default async function ManagementArrearsPage() {
 
       {/* Pending approvals */}
       <FadeIn delay={0.05}>
-        {arrears.length === 0 ? (
+        {arrearCards.length === 0 ? (
           <Card className="border-0 shadow-sm">
             <CardContent className="p-8 text-center">
               <p className="text-sm text-slate-500">No pending arrear approvals.</p>
@@ -58,7 +82,7 @@ export default async function ManagementArrearsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {arrears.map((arrear) => (
+            {arrearCards.map((arrear) => (
               <ArrearApprovalCard key={arrear.id} arrear={arrear} />
             ))}
           </div>
@@ -75,7 +99,7 @@ export default async function ManagementArrearsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-border">
                 {recentlyProcessed.map((a) => (
                   <div key={a.id} className="px-4 py-3 flex items-center justify-between text-sm">
                     <div>

@@ -129,7 +129,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
     <div className="space-y-5 max-w-5xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h1 className="ds-h1">
             Finalize: {toTitleCase(cycle.user.name)}
           </h1>
           <div className="flex items-center gap-3 mt-1">

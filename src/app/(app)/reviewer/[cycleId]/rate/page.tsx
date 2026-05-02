@@ -6,12 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isRatingOpen } from "@/lib/workflow";
 import { getSystemDate } from "@/lib/system-date";
 import { RateForm } from "./rate-form";
+import { PostCommentForm } from "../post-comment-form";
+import { RatingReviewForm } from "../rating-review-form";
+import { RatingDisagreementForm } from "../rating-disagreement-form";
 import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
 import {
   SUPPLEMENTARY_SECTIONS,
   getCriteriaForRole,
   GRADE_BANDS,
+  type CriteriaCategory,
 } from "@/lib/criteria";
 import { getMergedCriteria } from "@/lib/criteria-overrides";
 import { isManagement, isAdmin } from "@/lib/rbac";
@@ -29,6 +33,24 @@ type SelfAnswers = Record<
   string,
   { score: number; comment: string; questionAnswers?: Record<string, string> }
 > & { __supplementary?: Record<string, string> };
+
+function parseRatingComments(comments: string | null, categories: CriteriaCategory[]) {
+  const byCategory: Record<string, string> = {};
+  const overall: string[] = [];
+
+  for (const block of (comments ?? "").split(/\n{2,}/)) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(/^\[(.+?)\]:\s*([\s\S]*)$/);
+    if (match && categories.some((cat) => cat.name === match[1])) {
+      byCategory[match[1]] = match[2].trim();
+    } else {
+      overall.push(trimmed);
+    }
+  }
+
+  return { overall: overall.join("\n\n"), byCategory };
+}
 
 /** Roles whose salary is confidential from reviewers */
 const SALARY_CONFIDENTIAL_ROLES = ["HR", "MANAGER"] as const;
@@ -108,6 +130,33 @@ export default async function RatePage({
   const currentGrade = submittedAvg !== null
     ? GRADE_BANDS.find((b) => submittedAvg >= b.minNormalized && submittedAvg <= b.maxNormalized) ?? null
     : null;
+  const parsedComments = parseRatingComments(existing?.comments ?? null, mergedCategories);
+  const submittedCategoryScores = existing && submittedScores
+    ? mergedCategories
+        .map((cat) => ({
+          name: cat.name,
+          score: submittedScores[cat.name] ?? 0,
+          maxPoints: cat.maxPoints,
+        }))
+        .filter((cat) => submittedScores[cat.name] !== -1)
+    : [];
+
+  const existingReviews = existing
+    ? await prisma.ratingReview.findMany({
+        where: { ratingId: existing.id },
+        orderBy: { updatedAt: "desc" },
+      })
+    : [];
+  const existingDisagreement = existing
+    ? await prisma.ratingDisagreement.findFirst({ where: { ratingId: existing.id } })
+    : null;
+  const peerRatings = existing
+    ? await prisma.rating.findMany({
+        where: { cycleId },
+        include: { reviewer: { select: { id: true, name: true, role: true } } },
+        orderBy: { submittedAt: "asc" },
+      })
+    : [];
 
   return (
     <div className="max-w-[1400px] mx-auto">
@@ -121,10 +170,10 @@ export default async function RatePage({
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              <h1 className="ds-h1">
                 {existing ? "Submitted Rating — " : "Rate "}{toTitleCase(emp.name)}
               </h1>
-              <p className="text-slate-500 text-sm mt-1">
+              <p className="ds-body mt-1">
                 {assignment.role} Reviewer · {assignment.cycle.type} cycle
               </p>
             </div>
@@ -250,18 +299,18 @@ export default async function RatePage({
                   <div className="overflow-x-auto">
                     <table className="text-xs w-full">
                       <thead>
-                        <tr className="text-left text-slate-400 border-b bg-slate-50 dark:bg-slate-800/50">
-                          <th className="py-2 px-4 font-medium">Effective</th>
-                          <th className="px-4 font-medium">Gross / yr</th>
-                          <th className="px-4 font-medium">CTC / yr</th>
-                          <th className="px-4 font-medium">Revised CTC</th>
-                          <th className="px-4 font-medium">Rev %</th>
-                          <th className="px-4 font-medium">Status</th>
+                        <tr className="text-left border-b border-border bg-muted/40">
+                          <th className="py-2.5 px-4 ds-label">Effective</th>
+                          <th className="px-4 ds-label">Gross / yr</th>
+                          <th className="px-4 ds-label">CTC / yr</th>
+                          <th className="px-4 ds-label">Revised CTC</th>
+                          <th className="px-4 ds-label">Rev %</th>
+                          <th className="px-4 ds-label">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      <tbody className="divide-y divide-border">
                         {revisions.map((r) => (
-                          <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <tr key={r.id} className="hover:bg-muted/30 transition-colors">
                             <td className="py-2 px-4 text-slate-600 whitespace-nowrap">{fmtMonth(r.effectiveFrom)}</td>
                             <td className="px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmt(Number(r.grossAnnum))}</td>
                             <td className="px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmt(Number(r.ctcAnnum))}</td>
@@ -429,6 +478,7 @@ export default async function RatePage({
                   <div className="space-y-2">
                     {mergedCategories.map((cat) => {
                       const raw = submittedScores[cat.name];
+                      if (raw === undefined) return null;
                       const isAO = raw === -1;
                       const pct = isAO ? null : Math.round((raw / cat.maxPoints) * 100);
                       return (
@@ -449,19 +499,116 @@ export default async function RatePage({
                               />
                             </div>
                           )}
+                          {parsedComments.byCategory[cat.name] && (
+                            <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                              <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                Criterion comment
+                              </span>
+                              {parsedComments.byCategory[cat.name]}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  {existing.comments && (
+                  {parsedComments.overall && (
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Overall Comment</p>
                       <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">
-                        {existing.comments}
+                        {parsedComments.overall}
                       </p>
                     </div>
                   )}
                 </div>
+
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Peer Ratings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {peerRatings.length === 0 ? (
+                      <p className="text-xs text-slate-400">No peer ratings submitted yet.</p>
+                    ) : (
+                      peerRatings.map((rating) => {
+                        const ratingScores = rating.scores as Record<string, number>;
+                        return (
+                          <div key={rating.id} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  {toTitleCase(rating.reviewer.name)}
+                                  {rating.reviewerId === session.user.id ? " (you)" : ""}
+                                </p>
+                                <p className="text-[10px] text-slate-400">{rating.role}</p>
+                              </div>
+                              <span className="rounded-full bg-[#0e8a95]/10 px-2 py-0.5 text-xs font-bold text-[#0e8a95]">
+                                {rating.averageScore.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-1.5">
+                              {mergedCategories.map((cat) => {
+                                const value = ratingScores[cat.name];
+                                if (value === undefined) return null;
+                                return (
+                                  <div key={cat.name} className="rounded bg-slate-50 px-2 py-1 text-[10px] dark:bg-slate-800/60">
+                                    <span className="block truncate text-slate-400">{cat.name}</span>
+                                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                      {value === -1 ? "Avg out" : `${value}/${cat.maxPoints}`}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </CardContent>
+                </Card>
+
+                {submittedCategoryScores.length > 0 && (
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Revise Or Evaluate</CardTitle>
+                      <p className="text-xs text-slate-500">
+                        These notes stay attached to this submitted rating. Your original score remains unchanged.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <PostCommentForm
+                        ratingId={existing.id}
+                        existingComment={existing.postComment ?? null}
+                      />
+                      <RatingReviewForm
+                        ratingId={existing.id}
+                        cycleId={cycleId}
+                        categoryScores={submittedCategoryScores}
+                        existingReviews={existingReviews.map((review) => ({
+                          criteriaName: review.criteriaName,
+                          revisedScore: review.revisedScore,
+                          justification: review.justification,
+                          updatedAt: review.updatedAt.toISOString(),
+                        }))}
+                      />
+                      <RatingDisagreementForm
+                        ratingId={existing.id}
+                        cycleId={cycleId}
+                        categoryScores={submittedCategoryScores}
+                        existing={
+                          existingDisagreement
+                            ? {
+                                evaluation: existingDisagreement.evaluation as "ACCURATE" | "OVERRATED" | "UNDERRATED",
+                                comment: existingDisagreement.comment,
+                                revisedScores: existingDisagreement.revisedScores as Record<string, number> | null,
+                                ceilingMin: existingDisagreement.ceilingMin ? Number(existingDisagreement.ceilingMin) : null,
+                                ceilingMax: existingDisagreement.ceilingMax ? Number(existingDisagreement.ceilingMax) : null,
+                              }
+                            : null
+                        }
+                      />
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             ) : (
               <RateForm

@@ -17,6 +17,10 @@ export function LoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const caseSensitiveInputStyle = {
+    fontFamily: "Arial, Helvetica, sans-serif",
+    letterSpacing: "0",
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +53,7 @@ export function LoginForm() {
         <div className="space-y-1.5">
           <Label
             htmlFor="email"
-            className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+            className="text-xs font-medium text-muted-foreground"
           >
             Email address
           </Label>
@@ -59,8 +63,12 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             placeholder="name@adarshshipping.in"
-            className="h-11 bg-input border-border focus:border-primary focus:ring-primary/20 transition-all duration-200"
+            className="h-11 bg-input border-border normal-case focus:border-primary focus:ring-primary/20 transition-all duration-200"
+            style={caseSensitiveInputStyle}
           />
         </div>
 
@@ -68,7 +76,7 @@ export function LoginForm() {
         <div className="space-y-1.5">
           <Label
             htmlFor="password"
-            className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+            className="text-xs font-medium text-muted-foreground"
           >
             Password
           </Label>
@@ -79,8 +87,12 @@ export function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="Enter your password"
-              className="h-11 pr-10 bg-input border-border focus:border-primary focus:ring-primary/20 transition-all duration-200"
+              className="h-11 pr-10 bg-input border-border normal-case focus:border-primary focus:ring-primary/20 transition-all duration-200"
+              style={caseSensitiveInputStyle}
             />
             <button
               type="button"

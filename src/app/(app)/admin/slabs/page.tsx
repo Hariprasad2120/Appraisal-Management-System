@@ -51,8 +51,8 @@ export default async function SlabsPage() {
       <FadeIn>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Increment Slabs</h1>
-            <p className="text-slate-500 text-sm mt-1">Hike % by grade and salary tier</p>
+            <h1 className="ds-h1">Increment Slabs</h1>
+            <p className="ds-body mt-1">Hike % by grade and salary tier</p>
           </div>
           <form action={async () => { "use server"; await seedSlabsAction(); }}>
             <button
@@ -91,30 +91,30 @@ export default async function SlabsPage() {
             </CardHeader>
             <CardContent className="p-0 pb-2">
               {slabs.length === 0 ? (
-                <p className="text-center text-slate-400 py-10 text-sm">
+                <p className="text-center text-muted-foreground/50 py-10 text-sm">
                   No slabs — click &quot;Seed Defaults&quot; to populate
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="text-xs w-full">
                     <thead>
-                      <tr className="text-left text-slate-400 border-b bg-slate-50 dark:bg-slate-800/50">
-                        <th className="py-3 px-4 font-medium">Grade</th>
-                        <th className="px-4 font-medium">Score Band</th>
-                        <th className="px-4 font-medium">Label</th>
+                      <tr className="text-left border-b border-border bg-muted/40">
+                        <th className="py-2.5 px-4 ds-label">Grade</th>
+                        <th className="px-4 ds-label">Score Band</th>
+                        <th className="px-4 ds-label">Label</th>
                         {tiersPresent.map((t) => (
-                          <th key={t} className="px-4 font-medium">{TIER_LABELS[t] ?? t}</th>
+                          <th key={t} className="px-4 ds-label">{TIER_LABELS[t] ?? t}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody className="divide-y divide-border">
                       {gradeOrder.map((grade) => {
                         const band = GRADE_BANDS.find((b) => b.grade === grade);
                         const gradeSlabs = slabsByGrade.get(grade) ?? [];
                         if (gradeSlabs.length === 0) return null;
 
                         return (
-                          <tr key={grade} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
+                          <tr key={grade} className="hover:bg-muted/30 transition-colors group">
                             <td className="py-2.5 px-4">
                               <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${gradeColors[grade] ?? "bg-slate-100 text-slate-600"}`}>
                                 {grade}
@@ -181,17 +181,17 @@ export default async function SlabsPage() {
               <div className="overflow-x-auto">
                 <table className="text-xs w-full">
                   <thead>
-                    <tr className="text-left text-slate-400 border-b bg-slate-50 dark:bg-slate-800/50">
-                      <th className="py-2 px-4 font-medium">Label</th>
-                      <th className="px-4 font-medium">Rating Band</th>
-                      <th className="px-4 font-medium">Tier</th>
-                      <th className="px-4 font-medium">Hike %</th>
+                    <tr className="text-left border-b border-border bg-muted/40">
+                      <th className="py-2.5 px-4 ds-label">Label</th>
+                      <th className="px-4 ds-label">Rating Band</th>
+                      <th className="px-4 ds-label">Tier</th>
+                      <th className="px-4 ds-label">Hike %</th>
                       <th className="px-4" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-border">
                     {customSlabs.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <tr key={s.id} className="hover:bg-muted/30">
                         <td className="py-2 px-4 font-medium text-slate-900 dark:text-white">{s.label}</td>
                         <td className="px-4 text-slate-500">{s.minRating}–{s.maxRating}</td>
                         <td className="px-4 text-slate-500">{TIER_LABELS[s.salaryTier] ?? s.salaryTier}</td>
