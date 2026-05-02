@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { Session } from "next-auth";
-import { auth } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
+import type { Role } from "@/generated/prisma/enums";
 import { canAccessPath, ROLE_HOME } from "@/lib/rbac";
 
 const PUBLIC_PATHS = ["/login", "/api/auth", "/api/logo"];
@@ -16,9 +16,15 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  let session: Session | null;
+  let token: {
+    role?: Role;
+    secondaryRole?: Role | null;
+  } | null;
   try {
-    session = await auth();
+    token = await getToken({
+      req: request,
+      secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    });
   } catch {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -26,14 +32,14 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (!session?.user) {
+  if (!token?.role) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }
 
-  const { role, secondaryRole } = session.user;
+  const { role, secondaryRole } = token;
 
   if (pathname === "/" || pathname === "/dashboard") {
     const url = request.nextUrl.clone();
