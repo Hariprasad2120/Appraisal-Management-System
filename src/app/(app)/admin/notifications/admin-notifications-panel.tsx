@@ -53,7 +53,7 @@ function statusBadge(n: NotificationRow) {
     read: "bg-blue-500/20 text-blue-400 border-blue-500/40",
   };
   return (
-    <span className={`inline-block text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${map[s] ?? ""}`}>
+    <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded border ${map[s] ?? ""}`}>
       {s}
     </span>
   );
@@ -182,7 +182,7 @@ export function AdminNotificationsPanel({ notifications: initial }: Props) {
 
       {/* Table */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-muted/50 px-4 py-2.5 grid grid-cols-[1fr_160px_100px_80px_120px] gap-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="bg-muted/50 px-4 py-2.5 grid grid-cols-[1fr_160px_100px_80px_120px] gap-4 text-[11px] font-semibold text-muted-foreground">
           <span>Message</span>
           <span>User</span>
           <span>Triggered</span>

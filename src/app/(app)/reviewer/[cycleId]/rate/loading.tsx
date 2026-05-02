@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton } from "@/components/skeletons";
 
 export default function RateLoading() {
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="w-full max-w-2xl space-y-6">
       <PageHeaderSkeleton />
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <Skeleton className="h-4 w-44 rounded" />

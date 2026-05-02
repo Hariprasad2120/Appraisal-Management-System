@@ -257,7 +257,7 @@ export function DecisionForm({
 
       {/* ── Reviewer cards — fully expanded ── */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Reviewer Ratings</h2>
+        <h2 className="text-sm font-semibold text-slate-500">Reviewer Ratings</h2>
         {reviewerRatings.map((r) => (
           <Card key={r.id} className={`border-0 shadow-sm border-l-4 ${roleColors[r.role] ?? ""}`}>
             <CardHeader className="pb-2">
@@ -280,7 +280,7 @@ export function DecisionForm({
             <CardContent className="space-y-4 pt-0">
               {/* All criteria — fully visible */}
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Criteria Scores</p>
+                <p className="text-[10px] font-semibold text-slate-400 mb-2">Criteria Scores</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
                   {r.criteriaBreakdown.map((c) => (
                     <div key={c.name} className="flex items-center justify-between gap-2">
@@ -299,7 +299,7 @@ export function DecisionForm({
               {/* Revised criteria detail */}
               {r.criteriaBreakdown.some((c) => c.revisedScore !== null) && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-500 mb-1">Revisions</p>
+                  <p className="text-[10px] font-semibold text-purple-500 mb-1">Revisions</p>
                   <div className="space-y-1.5">
                     {r.criteriaBreakdown.filter((c) => c.revisedScore !== null).map((c) => (
                       <div key={c.name} className="rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900 p-2">
@@ -317,20 +317,20 @@ export function DecisionForm({
 
               {/* Comments */}
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Comments</p>
+                <p className="text-[10px] font-semibold text-slate-400 mb-1">Comments</p>
                 <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 rounded-lg p-2 whitespace-pre-line">{r.comments}</p>
               </div>
 
               {r.postComment && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-500 mb-1">Post Note</p>
+                  <p className="text-[10px] font-semibold text-amber-500 mb-1">Post Note</p>
                   <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">{r.postComment}</p>
                 </div>
               )}
 
               {r.disagreement && (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-500 mb-1">Rating Evaluation</p>
+                  <p className="text-[10px] font-semibold text-orange-500 mb-1">Rating Evaluation</p>
                   <div className={`rounded-lg border p-2.5 text-xs space-y-1 ${
                     r.disagreement.evaluation === "ACCURATE"
                       ? "border-green-300 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400"
@@ -354,14 +354,14 @@ export function DecisionForm({
       {/* ── Self-Assessment ── */}
       {selfAnswers && Object.keys(selfAnswers).length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
             <ClipboardList className="size-4" /> Self-Assessment
           </h2>
           <Card className="border-0 shadow-sm">
             <CardContent className="pt-4 space-y-3">
               {Object.entries(selfAnswers).map(([key, val]) => (
                 <div key={key} className="border-b border-slate-100 dark:border-slate-800 pb-3 last:border-0 last:pb-0">
-                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{key}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 mb-1">{key}</p>
                   {typeof val === "object" && val !== null && "score" in val ? (
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1.5">
@@ -387,7 +387,7 @@ export function DecisionForm({
 
         {/* Left: Management Rating */}
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
             <Users className="size-4" /> Management Rating
           </h2>
           <Card className="border-0 shadow-sm border-l-4 border-l-[#008993]">
@@ -455,7 +455,7 @@ export function DecisionForm({
 
         {/* Right: Decision form + Comparison */}
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
             <Star className="size-4" /> Decision
           </h2>
 
@@ -464,7 +464,7 @@ export function DecisionForm({
             <CardContent className="pt-4 space-y-4">
               {/* Weighted score breakdown */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Score Composition</p>
+                <p className="text-xs font-semibold text-slate-500">Score Composition</p>
                 <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 space-y-1.5 text-xs">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Self Assessment (10%)</span>
@@ -490,7 +490,7 @@ export function DecisionForm({
               {/* Matched slab */}
               {matchedSlab ? (
                 <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 space-y-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-green-600">Increment Slab</p>
+                  <p className="text-[10px] font-semibold text-green-600">Increment Slab</p>
                   <p className="text-sm font-bold text-green-700 dark:text-green-400">{matchedSlab.label}</p>
                   <p className="text-xs text-green-600">Score {matchedSlab.minRating}–{matchedSlab.maxRating} · Tier: {matchedSlab.salaryTier.replace(/_/g, " ")} · Hike: <strong>{matchedSlab.hikePercent}%</strong></p>
                 </div>
@@ -581,7 +581,7 @@ export function DecisionForm({
 
               {/* Tentative meeting dates — proposed alongside decision */}
               <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-                <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <Label className="text-xs font-semibold text-slate-500">
                   Propose Tentative Meeting Dates
                 </Label>
                 <p className="text-[10px] text-slate-400">
@@ -631,7 +631,7 @@ export function DecisionForm({
             <CardContent className="pt-0 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
-                  <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Current Gross</div>
+                  <div className="text-[10px] text-slate-400 mb-1">Current Gross</div>
                   <div className="text-lg font-bold text-slate-700 dark:text-slate-200">₹{(grossAnnum / 100000).toFixed(2)}L</div>
                   <div className="text-[10px] text-slate-400">per annum</div>
                 </div>
@@ -641,7 +641,7 @@ export function DecisionForm({
                   animate={{ scale: 1, opacity: 1 }}
                   className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 border border-green-200 dark:border-green-800"
                 >
-                  <div className="text-[10px] text-green-600 uppercase tracking-wider mb-1">After Hike</div>
+                  <div className="text-[10px] text-green-600 mb-1">After Hike</div>
                   <div className="text-lg font-bold text-green-700 dark:text-green-400">₹{(newGross / 100000).toFixed(2)}L</div>
                   <div className="text-[10px] text-green-600">per annum</div>
                 </motion.div>
@@ -677,7 +677,7 @@ export function DecisionForm({
                 return (
                   <div key={r.id} className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{r.role}</span>
+                      <span className="text-[10px] font-bold text-slate-500">{r.role}</span>
                       <span className="text-[10px] text-slate-400">{r.reviewerName}</span>
                       <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 ml-auto">{r.averageScore.toFixed(2)}</span>
                     </div>

@@ -42,95 +42,275 @@ function item(
   iconColor: string,
   activeBg: string,
   activeBar: string,
-  activeLabel: string
+  activeLabel: string,
 ): NavItem {
   return { href, label, icon, iconColor, activeBg, activeBar, activeLabel };
 }
 
 // DS per-item color palette
 const C = {
-  teal:   { color: "#2dd4bf", activeBg: "rgba(14,137,149,0.12)",  bar: "#0e8a95", label: "#2dd4bf" },
-  blue:   { color: "#60a5fa", activeBg: "rgba(59,130,246,0.10)",  bar: "#3b82f6", label: "#60a5fa" },
-  purple: { color: "#a78bfa", activeBg: "rgba(124,58,237,0.10)", bar: "#7c3aed", label: "#a78bfa" },
-  cyan:   { color: "#22d3ee", activeBg: "rgba(0,206,196,0.09)",  bar: "#00cec4", label: "#22d3ee" },
-  green:  { color: "#4ade80", activeBg: "rgba(34,197,94,0.09)",  bar: "#22c55e", label: "#4ade80" },
-  amber:  { color: "#fbbf24", activeBg: "rgba(255,170,45,0.09)", bar: "#ffaa2d", label: "#fbbf24" },
-  orange: { color: "#fb923c", activeBg: "rgba(255,131,51,0.09)", bar: "#ff8333", label: "#fb923c" },
-  rose:   { color: "#fb7185", activeBg: "rgba(244,63,94,0.09)",  bar: "#f43f5e", label: "#fb7185" },
-  slate:  { color: "#94a3b8", activeBg: "rgba(100,116,139,0.09)", bar: "#64748b", label: "#94a3b8" },
+  teal: {
+    color: "#2dd4bf",
+    activeBg: "rgba(14,137,149,0.12)",
+    bar: "#0e8a95",
+    label: "#2dd4bf",
+  },
+  blue: {
+    color: "#60a5fa",
+    activeBg: "rgba(59,130,246,0.10)",
+    bar: "#3b82f6",
+    label: "#60a5fa",
+  },
+  purple: {
+    color: "#a78bfa",
+    activeBg: "rgba(124,58,237,0.10)",
+    bar: "#7c3aed",
+    label: "#a78bfa",
+  },
+  cyan: {
+    color: "#22d3ee",
+    activeBg: "rgba(0,206,196,0.09)",
+    bar: "#00cec4",
+    label: "#22d3ee",
+  },
+  green: {
+    color: "#4ade80",
+    activeBg: "rgba(34,197,94,0.09)",
+    bar: "#22c55e",
+    label: "#4ade80",
+  },
+  amber: {
+    color: "#fbbf24",
+    activeBg: "rgba(255,170,45,0.09)",
+    bar: "#ffaa2d",
+    label: "#fbbf24",
+  },
+  orange: {
+    color: "#fb923c",
+    activeBg: "rgba(255,131,51,0.09)",
+    bar: "#ff8333",
+    label: "#fb923c",
+  },
+  rose: {
+    color: "#fb7185",
+    activeBg: "rgba(244,63,94,0.09)",
+    bar: "#f43f5e",
+    label: "#fb7185",
+  },
+  slate: {
+    color: "#94a3b8",
+    activeBg: "rgba(100,116,139,0.09)",
+    bar: "#64748b",
+    label: "#94a3b8",
+  },
 };
 
-function mkItem(href: string, label: string, icon: React.ReactNode, c: typeof C[keyof typeof C]): NavItem {
+function mkItem(
+  href: string,
+  label: string,
+  icon: React.ReactNode,
+  c: (typeof C)[keyof typeof C],
+): NavItem {
   return item(href, label, icon, c.color, c.activeBg, c.bar, c.label);
 }
 
 function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
   const sz = "size-[15px]";
-  const dashboard = mkItem(ROLE_HOME[role], "Dashboard", <LayoutDashboard className={sz} />, C.teal);
+  const dashboard = mkItem(
+    ROLE_HOME[role],
+    "Dashboard",
+    <LayoutDashboard className={sz} />,
+    C.teal,
+  );
 
   if (role === "ADMIN") {
     return [
       dashboard,
-      mkItem("/admin/employees",       "Employees",             <Users className={sz} />,         C.blue),
-      mkItem("/admin/appraisals",      "Appraisals",            <UserCheck className={sz} />,      C.purple),
-      mkItem("/admin/cycles",          "All Cycles",            <ClipboardList className={sz} />,  C.cyan),
-      mkItem("/admin/mom",             "Minutes of Meeting",    <Building2 className={sz} />,      C.slate),
-      mkItem("/admin/slabs",           "Increment Slabs",       <Layers className={sz} />,         C.amber),
-      mkItem("/admin/extensions",      "Extensions",            <Settings className={sz} />,       C.orange),
-      mkItem("/admin/criteria",        "Criteria Questions",    <ListChecks className={sz} />,     C.orange),
-      mkItem("/admin/tickets",         "Support Tickets",       <Ticket className={sz} />,         C.rose),
-      mkItem("/admin/salary-sheet",    "Salary Sheet",          <BarChart3 className={sz} />,      C.green),
-      mkItem("/admin/salary-revisions","Salary Revisions",      <TrendingUp className={sz} />,     C.green),
-      mkItem("/admin/notifications",   "Notification Center",   <Bell className={sz} />,           C.amber),
-      mkItem("/admin/sessions",        "Session Monitor",       <MonitorCheck className={sz} />,   C.slate),
-      mkItem("/admin/simulation",      "Simulation",            <FlaskConical className={sz} />,   C.slate),
-      mkItem("/history",               "History",               <History className={sz} />,        C.slate),
+      mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
+      mkItem(
+        "/admin/appraisals",
+        "Appraisals",
+        <UserCheck className={sz} />,
+        C.purple,
+      ),
+      mkItem(
+        "/admin/cycles",
+        "All Cycles",
+        <ClipboardList className={sz} />,
+        C.cyan,
+      ),
+      mkItem(
+        "/admin/mom",
+        "Minutes of Meeting",
+        <Building2 className={sz} />,
+        C.slate,
+      ),
+      mkItem(
+        "/admin/slabs",
+        "Increment Slabs",
+        <Layers className={sz} />,
+        C.amber,
+      ),
+      mkItem(
+        "/admin/extensions",
+        "Extensions",
+        <Settings className={sz} />,
+        C.orange,
+      ),
+      mkItem(
+        "/admin/criteria",
+        "Criteria Questions",
+        <ListChecks className={sz} />,
+        C.orange,
+      ),
+      mkItem(
+        "/admin/tickets",
+        "Support Tickets",
+        <Ticket className={sz} />,
+        C.rose,
+      ),
+      mkItem(
+        "/admin/salary-sheet",
+        "Salary Sheet",
+        <BarChart3 className={sz} />,
+        C.green,
+      ),
+      mkItem(
+        "/admin/salary-revisions",
+        "Salary Revisions",
+        <TrendingUp className={sz} />,
+        C.green,
+      ),
+      mkItem(
+        "/admin/notifications",
+        "Notification Center",
+        <Bell className={sz} />,
+        C.amber,
+      ),
+      mkItem(
+        "/admin/sessions",
+        "Session Monitor",
+        <MonitorCheck className={sz} />,
+        C.slate,
+      ),
+      mkItem(
+        "/admin/simulation",
+        "Simulation",
+        <FlaskConical className={sz} />,
+        C.slate,
+      ),
+      mkItem("/history", "History", <History className={sz} />, C.slate),
     ];
   }
   if (role === "MANAGEMENT") {
     return [
       dashboard,
-      mkItem("/management/mom",    "Minutes of Meeting", <Building2 className={sz} />,  C.slate),
-      mkItem("/management/salary", "Salary Calculator",  <BarChart3 className={sz} />,  C.green),
-      mkItem("/management/slabs",  "Increment Slabs",    <Layers className={sz} />,     C.amber),
-      mkItem("/admin/employees",   "Employees",          <Users className={sz} />,      C.blue),
-      mkItem("/history",           "History",            <History className={sz} />,    C.slate),
-      mkItem("/notifications",     "Notifications",      <Bell className={sz} />,       C.amber),
-      mkItem("/tickets",           "Support Tickets",    <Ticket className={sz} />,     C.rose),
+      mkItem(
+        "/management/mom",
+        "Minutes of Meeting",
+        <Building2 className={sz} />,
+        C.slate,
+      ),
+      mkItem(
+        "/management/salary",
+        "Salary Calculator",
+        <BarChart3 className={sz} />,
+        C.green,
+      ),
+      mkItem(
+        "/management/slabs",
+        "Increment Slabs",
+        <Layers className={sz} />,
+        C.amber,
+      ),
+      mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
+      mkItem("/history", "History", <History className={sz} />, C.slate),
+      mkItem(
+        "/notifications",
+        "Notifications",
+        <Bell className={sz} />,
+        C.amber,
+      ),
+      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
     ];
   }
   if (role === "HR" || role === "TL" || role === "MANAGER") {
     return [
-      mkItem("/reviewer",     "Dashboard",           <LayoutDashboard className={sz} />, C.teal),
-      ...(role === "HR" ? [mkItem("/reviewer/mom", "Minutes of Meeting", <Building2 className={sz} />, C.slate)] : []),
-      mkItem("/employee",     "My Appraisal",        <Star className={sz} />,            C.purple),
-      mkItem("/history",      "History",             <History className={sz} />,         C.slate),
-      mkItem("/notifications","Notifications",       <Bell className={sz} />,            C.amber),
-      mkItem("/tickets",      "Support Tickets",     <Ticket className={sz} />,          C.rose),
+      mkItem(
+        "/reviewer",
+        "Dashboard",
+        <LayoutDashboard className={sz} />,
+        C.teal,
+      ),
+      ...(role === "HR"
+        ? [
+            mkItem(
+              "/reviewer/mom",
+              "Minutes of Meeting",
+              <Building2 className={sz} />,
+              C.slate,
+            ),
+          ]
+        : []),
+      mkItem(
+        "/assignments",
+        "All Assignments",
+        <ClipboardList className={sz} />,
+        C.blue,
+      ),
+      mkItem("/employee", "My Appraisal", <Star className={sz} />, C.purple),
+      mkItem(
+        "/history",
+        "Appraisal History",
+        <History className={sz} />,
+        C.slate,
+      ),
+      mkItem(
+        "/notifications",
+        "Notifications",
+        <Bell className={sz} />,
+        C.amber,
+      ),
+      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
     ];
   }
   if (role === "EMPLOYEE") {
     return [
       dashboard,
-      mkItem("/history",       "History",         <History className={sz} />, C.slate),
-      mkItem("/notifications", "Notifications",   <Bell className={sz} />,    C.amber),
-      mkItem("/tickets",       "Support Tickets", <Ticket className={sz} />,  C.rose),
+      mkItem("/history", "History", <History className={sz} />, C.slate),
+      mkItem(
+        "/notifications",
+        "Notifications",
+        <Bell className={sz} />,
+        C.amber,
+      ),
+      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
     ];
   }
   if (role === "PARTNER") {
     return [
-      mkItem("/partner",       "Dashboard",       <LayoutDashboard className={sz} />, C.teal),
-      mkItem("/admin/employees","Employees",      <Users className={sz} />,           C.blue),
-      mkItem("/history",       "History",         <History className={sz} />,         C.slate),
-      mkItem("/notifications", "Notifications",   <Bell className={sz} />,            C.amber),
-      mkItem("/tickets",       "Support Tickets", <Ticket className={sz} />,          C.rose),
+      mkItem(
+        "/partner",
+        "Dashboard",
+        <LayoutDashboard className={sz} />,
+        C.teal,
+      ),
+      mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
+      mkItem("/history", "History", <History className={sz} />, C.slate),
+      mkItem(
+        "/notifications",
+        "Notifications",
+        <Bell className={sz} />,
+        C.amber,
+      ),
+      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
     ];
   }
   return [
     dashboard,
-    mkItem("/history",       "History",         <History className={sz} />, C.slate),
-    mkItem("/notifications", "Notifications",   <Bell className={sz} />,    C.amber),
-    mkItem("/tickets",       "Support Tickets", <Ticket className={sz} />,  C.rose),
+    mkItem("/history", "History", <History className={sz} />, C.slate),
+    mkItem("/notifications", "Notifications", <Bell className={sz} />, C.amber),
+    mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
   ];
 }
 
@@ -156,7 +336,7 @@ export function SidebarNav({
             (other) =>
               other.href !== item.href &&
               pathname.startsWith(other.href) &&
-              other.href.length > item.href.length
+              other.href.length > item.href.length,
           );
         const isActive = exactMatch || (prefixMatch && !longerMatchExists);
 
@@ -176,7 +356,7 @@ export function SidebarNav({
               title={item.label}
               className={cn(
                 "relative grid h-[34px] grid-cols-[52px_1fr] items-center rounded-[4px] transition-colors duration-200 group/nav overflow-hidden",
-                "hover:bg-white/5"
+                "hover:bg-white/5",
               )}
               style={isActive ? { background: item.activeBg } : undefined}
             >

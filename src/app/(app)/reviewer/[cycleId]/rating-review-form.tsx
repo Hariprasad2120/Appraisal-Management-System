@@ -98,7 +98,7 @@ export function RatingReviewForm({
         {/* Existing reviews */}
         {existingReviews.length > 0 && (
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Submitted Reviews</p>
+            <p className="text-[10px] font-semibold text-slate-400">Submitted Reviews</p>
             {existingReviews.map((r) => {
               const cat = categoryScores.find((c) => c.name === r.criteriaName);
               return (

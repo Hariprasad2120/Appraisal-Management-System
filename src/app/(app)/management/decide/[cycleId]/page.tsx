@@ -126,7 +126,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
     !!cycle.claimedById && actorId && cycle.claimedById !== actorId && actorRole !== "ADMIN";
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-5">
       <FadeIn>
         <div>
           <h1 className="ds-h1">

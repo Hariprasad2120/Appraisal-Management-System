@@ -15,14 +15,14 @@ export default async function NotificationsPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="w-full max-w-3xl space-y-6">
       <FadeIn>
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <Bell className="size-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
+            <h1 className="ds-h1 heading-icon-none">Notifications</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
               {notifications.filter((n) => !n.read).length} unread
             </p>

@@ -48,7 +48,7 @@ export default async function CycleRatingsPage({
   const fmt = (d: Date) => d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full max-w-4xl space-y-6">
       <FadeIn>
         <Link
           href={role === "ADMIN" || secondaryRole === "ADMIN" ? "/admin/cycles" : "/history"}
@@ -119,7 +119,7 @@ export default async function CycleRatingsPage({
               <CardContent className="space-y-4">
                 {/* Original scores table */}
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1">
+                  <p className="text-[10px] font-semibold text-slate-400 mb-2 flex items-center gap-1">
                     <Star className="size-3" /> Original Submission
                   </p>
                   <div className="overflow-x-auto">
@@ -164,7 +164,7 @@ export default async function CycleRatingsPage({
                 {/* Review layer details */}
                 {reviews.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-500 mb-2 flex items-center gap-1">
+                    <p className="text-[10px] font-semibold text-purple-500 mb-2 flex items-center gap-1">
                       <ClipboardEdit className="size-3" /> Edited / Review Ratings
                     </p>
                     <div className="space-y-2">
@@ -197,13 +197,13 @@ export default async function CycleRatingsPage({
                 {/* Comments */}
                 {rating.comments && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Comments</p>
+                    <p className="text-[10px] font-semibold text-slate-400 mb-1">Comments</p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">{rating.comments}</p>
                   </div>
                 )}
                 {rating.postComment && (
                   <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900 rounded-lg p-2.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 mb-1">Post-submission note</p>
+                    <p className="text-[10px] font-semibold text-amber-600 mb-1">Post-submission note</p>
                     <p className="text-xs text-slate-600 dark:text-slate-400">{rating.postComment}</p>
                   </div>
                 )}

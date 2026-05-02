@@ -121,11 +121,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <AppHeader userName={name ?? ""} />
+        <AppHeader userName={name ?? ""} sessionToken={session.user.sessionToken} />
 
         {/* Main content */}
         <main className="min-h-0 flex-1 overflow-auto overflow-x-hidden p-4 md:p-6">
-          <div className="mx-auto w-full max-w-[1600px]">
+          <div className="mx-auto w-full max-w-7xl">
             {children}
           </div>
         </main>

@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton, CardRowsSkeleton } from "@/components/ske
 
 export default function ReviewerCycleLoading() {
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="w-full max-w-3xl space-y-6">
       <PageHeaderSkeleton />
       {/* Reviewer info card */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">

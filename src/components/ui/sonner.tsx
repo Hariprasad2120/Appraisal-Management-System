@@ -13,7 +13,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <>
       <Sonner
         theme={theme as ToasterProps["theme"]}
-        position="bottom-right"
+        position="top-center"
         richColors
         closeButton
         className="toaster group"
@@ -69,7 +69,7 @@ function DismissAllToasts() {
     <button
       type="button"
       onClick={() => toast.dismiss()}
-      className="fixed bottom-2 right-4 z-[10000] inline-flex items-center gap-1.5 rounded-full border border-border bg-popover/95 px-3 py-1.5 text-[11px] font-normal text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
+      className="fixed right-4 top-20 z-[10000] inline-flex items-center gap-1.5 rounded-full border border-border bg-popover/95 px-3 py-1.5 text-[11px] font-normal text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
       aria-label="Dismiss all notifications"
     >
       <XIcon className="size-3" />

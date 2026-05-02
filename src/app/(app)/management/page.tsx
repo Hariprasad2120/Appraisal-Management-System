@@ -216,7 +216,7 @@ export default async function ManagementDashboard() {
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl">
       <FadeIn>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -266,7 +266,7 @@ export default async function ManagementDashboard() {
         <FadeIn delay={0.12}>
           <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
             <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                 <Bell className="size-3.5" /> Notifications
               </span>
               <Link href="/notifications" className="text-[11px] text-primary hover:underline">View all</Link>

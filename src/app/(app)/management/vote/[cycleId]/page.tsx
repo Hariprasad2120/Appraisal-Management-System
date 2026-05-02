@@ -28,7 +28,7 @@ export default async function VotePage({ params }: { params: Promise<{ cycleId: 
   const proposed = cycle.tentativeDate1 && cycle.tentativeDate2;
 
   return (
-    <div className="space-y-5 max-w-xl">
+    <div className="w-full max-w-xl space-y-5">
       <FadeIn>
         <div>
           <h1 className="ds-h1">

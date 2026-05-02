@@ -32,7 +32,6 @@ const iconByType: Record<string, React.ReactNode> = {
 };
 
 const MAX_VISIBLE = 3;
-const STANDARD_POPUP_DURATION_MS = 5000;
 
 export function PersistentPopup({ initialNotifications }: Props) {
   const [queue, setQueue] = useState<PopupNotification[]>(() =>
@@ -111,12 +110,12 @@ export function PersistentPopup({ initialNotifications }: Props) {
   const overflow = queue.length - MAX_VISIBLE;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col-reverse gap-2 w-[360px] max-w-[calc(100vw-2rem)]">
+    <div className="fixed bottom-4 right-4 z-[9999] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col-reverse gap-2">
       {queue.length > 0 && (
         <button
           type="button"
           onClick={dismissAll}
-          className="self-end rounded-full border border-border bg-background/90 px-3 py-1.5 text-[11px] font-normal text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
+          className="self-end rounded-full border border-border bg-popover/95 px-3 py-1.5 text-[11px] font-normal text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
           aria-label="Dismiss all persistent notifications"
         >
           Dismiss all
@@ -126,7 +125,7 @@ export function PersistentPopup({ initialNotifications }: Props) {
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-xs text-center text-muted-foreground bg-background/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5"
+          className="rounded-lg border border-border bg-popover/95 px-3 py-1.5 text-center text-xs text-muted-foreground shadow-lg backdrop-blur"
         >
           +{overflow} more notification{overflow > 1 ? "s" : ""}
         </motion.div>
@@ -163,14 +162,6 @@ function NotificationToast({
   const isUrgent = n.urgent;
   const isBusy = busy === n.id;
 
-  // Auto-dismiss standard, non-urgent notifications after exactly 5s.
-  useEffect(() => {
-    if (isUrgent) return;
-    const t = setTimeout(() => onDismiss(n.id), STANDARD_POPUP_DURATION_MS);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [n.id, isUrgent]);
-
   return (
     <motion.div
       layout
@@ -179,10 +170,10 @@ function NotificationToast({
       exit={{ opacity: 0, x: 24, scale: 0.92, transition: { duration: 0.18 } }}
       transition={{ type: "spring", stiffness: 320, damping: 28, delay: index * 0.04 }}
       className={[
-        "relative rounded-xl shadow-lg border overflow-hidden",
+        "relative overflow-hidden rounded-xl border shadow-lg backdrop-blur",
         isUrgent
-          ? "bg-red-950/95 border-red-500/60 shadow-red-950/50"
-          : "bg-[#0d1117]/95 border-[#00cec4]/20",
+          ? "border-red-400/60 bg-popover/95 shadow-red-950/20"
+          : "border-border/80 bg-popover/95",
       ].join(" ")}
       style={{ backdropFilter: "blur(12px)" }}
     >
@@ -195,29 +186,31 @@ function NotificationToast({
         {/* Header row */}
         <div className="flex items-start gap-2.5">
           <div className="mt-0.5 shrink-0">
-            {isUrgent
-              ? <ShieldAlert className="size-4 text-red-400" />
-              : (iconByType[n.type] ?? <Bell className="size-4 text-[#00cec4]" />)
-            }
+            <div className={isUrgent ? "rounded-full bg-red-500/10 p-1" : "rounded-full bg-primary/10 p-1"}>
+              {isUrgent
+                ? <ShieldAlert className="size-4 text-red-500" />
+                : (iconByType[n.type] ?? <Bell className="size-4 text-primary" />)
+              }
+            </div>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">
               {isUrgent && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded">
+                <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-500">
                   Urgent
                 </span>
               )}
               {n.important && !isUrgent && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded">
+                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
                   Important
                 </span>
               )}
             </div>
-            <p className="text-xs text-white/85 leading-relaxed line-clamp-3">{n.message}</p>
+            <p className="line-clamp-3 text-xs leading-relaxed text-popover-foreground">{n.message}</p>
             {n.link && (
               <Link
                 href={n.link}
-                className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-[#00cec4] hover:text-[#008993] font-medium transition-colors"
+                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
                 onClick={() => !isUrgent && onDismiss(n.id)}
               >
                 View details →
@@ -229,7 +222,7 @@ function NotificationToast({
             <button
               onClick={() => onDismiss(n.id)}
               disabled={isBusy}
-              className="shrink-0 text-white/30 hover:text-white/70 transition-colors mt-0.5"
+              className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Close"
             >
               <X className="size-3.5" />
@@ -247,7 +240,7 @@ function NotificationToast({
               "h-7 text-[11px] font-semibold flex-1",
               isUrgent
                 ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-[#00cec4] hover:bg-[#008993] text-black",
+                : "bg-primary hover:bg-primary/90 text-primary-foreground",
             ].join(" ")}
           >
             {isBusy ? "..." : isUrgent ? "Acknowledge & Close" : "Acknowledge"}
@@ -258,7 +251,7 @@ function NotificationToast({
               variant="ghost"
               disabled={isBusy}
               onClick={() => onDismiss(n.id)}
-              className="h-7 text-[11px] text-white/40 hover:text-white/70 px-2"
+              className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground"
             >
               Close
             </Button>

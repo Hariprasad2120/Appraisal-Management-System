@@ -65,7 +65,7 @@ export function HrScheduleForm({
       </p>
 
       <div className="space-y-2">
-        <Label className="text-xs font-semibold uppercase tracking-wide">Select Confirmed Date</Label>
+        <Label className="text-xs font-semibold">Select Confirmed Date</Label>
         <div className="space-y-2">
           {[d1, d2].map((d, i) => (
             <label
@@ -98,7 +98,7 @@ export function HrScheduleForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wide">Notification Message</Label>
+        <Label className="text-xs font-semibold">Notification Message</Label>
         <p className="text-[10px] text-slate-400">This message will be sent to management, admin, and the employee.</p>
         <Textarea
           value={message}

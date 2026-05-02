@@ -51,7 +51,7 @@ export default async function ManagementReschedulePage({
   });
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="w-full max-w-7xl space-y-6">
       <FadeIn>
         <div>
           <h1 className="ds-h1">Meeting Reschedule</h1>

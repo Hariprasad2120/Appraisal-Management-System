@@ -47,7 +47,7 @@ export function CriteriaShell({
       </div>
 
       {/* Editors */}
-      <div className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-2">
         {items.map(({ category, override, index }) => (
           <FadeIn key={category.name} delay={index * 0.04}>
             <CriteriaEditor

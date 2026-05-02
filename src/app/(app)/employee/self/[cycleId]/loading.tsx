@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton } from "@/components/skeletons";
 
 export default function SelfAssessmentLoading() {
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="w-full max-w-2xl space-y-6">
       <PageHeaderSkeleton />
       <div className="rounded-xl border border-border bg-card p-5 space-y-6">
         {Array.from({ length: 4 }).map((_, section) => (

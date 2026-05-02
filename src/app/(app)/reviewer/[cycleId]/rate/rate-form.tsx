@@ -318,7 +318,7 @@ export function RateForm({
 
             {/* Per-category comment */}
             <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+              <label className="text-[10px] font-medium text-slate-400">
                 Comment for this criterion
               </label>
               <Textarea

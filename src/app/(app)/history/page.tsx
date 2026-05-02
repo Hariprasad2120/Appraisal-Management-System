@@ -9,14 +9,12 @@ import { HistoryFilters } from "./history-filters";
 const STATUS_COLORS: Record<string, string> = {
   DECIDED:
     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  CLOSED:
-    "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  CLOSED: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
   RATINGS_COMPLETE:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   MANAGEMENT_REVIEW:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  SCHEDULED:
-    "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  SCHEDULED: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
   PENDING_SELF:
     "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   SELF_SUBMITTED:
@@ -32,7 +30,12 @@ const STATUS_COLORS: Record<string, string> = {
 export default async function HistoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; q?: string; status?: string }>;
+  searchParams: Promise<{
+    month?: string;
+    year?: string;
+    q?: string;
+    status?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const session = await auth();
@@ -71,18 +74,26 @@ export default async function HistoryPage({
     where,
     include: {
       user: {
-        select: { id: true, name: true, employeeNumber: true, department: true },
+        select: {
+          id: true,
+          name: true,
+          employeeNumber: true,
+          department: true,
+        },
       },
       decision: { include: { slab: true } },
       ratings: { select: { averageScore: true, role: true, reviewerId: true } },
-      assignments: { select: { reviewerId: true, reviewer: { select: { name: true } } } },
+      assignments: {
+        select: { reviewerId: true, reviewer: { select: { name: true } } },
+      },
     },
     orderBy: { startDate: "desc" },
     take: 200,
   });
 
   const filtered = cycles.filter((c) => {
-    if (sp.month && c.startDate.getMonth() !== Number(sp.month) - 1) return false;
+    if (sp.month && c.startDate.getMonth() !== Number(sp.month) - 1)
+      return false;
     if (sp.year && c.startDate.getFullYear() !== Number(sp.year)) return false;
     return true;
   });
@@ -91,12 +102,10 @@ export default async function HistoryPage({
   const canViewCycleDetail = isAdminRole || isManagementOrPartner;
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto">
+    <div className="space-y-5 max-w-7xl">
       <FadeIn>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {isReviewerRole ? "My Review History" : "Appraisal History"}
-          </h1>
+          <h1 className="ds-h1">Appraisal History</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {isReviewerRole
               ? "Appraisals you were assigned to review"
@@ -139,14 +148,21 @@ export default async function HistoryPage({
                     <th className="px-4 font-medium">Grade</th>
                     <th className="px-4 font-medium">Slab</th>
                     <th className="px-4 font-medium">Final Hike</th>
-                    {isReviewerRole && <th className="px-4 font-medium">My Rating</th>}
-                    {canViewCycleDetail && <th className="px-4 font-medium">Detail</th>}
+                    {isReviewerRole && (
+                      <th className="px-4 font-medium">My Rating</th>
+                    )}
+                    {canViewCycleDetail && (
+                      <th className="px-4 font-medium">Detail</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                      <td
+                        colSpan={10}
+                        className="py-12 text-center text-muted-foreground"
+                      >
                         No records found
                       </td>
                     </tr>
@@ -194,7 +210,8 @@ export default async function HistoryPage({
                         <td className="px-4">
                           <span
                             className={`text-xs rounded-full px-2 py-0.5 font-medium ${
-                              STATUS_COLORS[c.status] ?? "bg-muted text-muted-foreground"
+                              STATUS_COLORS[c.status] ??
+                              "bg-muted text-muted-foreground"
                             }`}
                           >
                             {c.status.replace(/_/g, " ")}

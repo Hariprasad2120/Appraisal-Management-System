@@ -38,7 +38,7 @@ export default async function ManagementMomListPage() {
   );
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full max-w-4xl space-y-6">
       <FadeIn>
         <div>
           <h1 className="ds-h1">Minutes of Meeting</h1>
@@ -48,10 +48,11 @@ export default async function ManagementMomListPage() {
         </div>
       </FadeIn>
 
-      {meetingPassed.length > 0 && (
-        <FadeIn delay={0.05}>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-purple-600 mb-3 flex items-center gap-2">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {meetingPassed.length > 0 && (
+          <FadeIn delay={0.05}>
+            <div>
+            <h2 className="text-xs font-semibold text-purple-600 mb-3 flex items-center gap-2">
               <ClipboardList className="size-3.5" /> Meetings Held ({meetingPassed.length})
             </h2>
             <StaggerList className="space-y-2">
@@ -113,14 +114,14 @@ export default async function ManagementMomListPage() {
                 );
               })}
             </StaggerList>
-          </div>
-        </FadeIn>
-      )}
+            </div>
+          </FadeIn>
+        )}
 
-      {upcoming.length > 0 && (
-        <FadeIn delay={0.1}>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-3 flex items-center gap-2">
+        {upcoming.length > 0 && (
+          <FadeIn delay={0.1}>
+            <div>
+            <h2 className="text-xs font-semibold text-blue-600 mb-3 flex items-center gap-2">
               <Clock className="size-3.5" /> Upcoming Meetings ({upcoming.length})
             </h2>
             <StaggerList className="space-y-2">
@@ -162,9 +163,10 @@ export default async function ManagementMomListPage() {
                 </StaggerItem>
               ))}
             </StaggerList>
-          </div>
-        </FadeIn>
-      )}
+            </div>
+          </FadeIn>
+        )}
+      </div>
 
       {scheduledCycles.length === 0 && (
         <FadeIn delay={0.05}>

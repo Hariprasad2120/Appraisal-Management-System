@@ -97,7 +97,7 @@ export default async function ReviewerCycleView({
     assignment?.availability === "AVAILABLE" && ratingOpen && !myRating;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className="max-w-5xl space-y-5">
       <FadeIn>
         <Link
           href="/reviewer"
@@ -153,7 +153,7 @@ export default async function ReviewerCycleView({
           <FadeIn delay={0.08}>
             <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-border">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                <p className="text-xs font-semibold text-muted-foreground">
                   Reviewer Progress
                 </p>
               </div>
@@ -269,7 +269,7 @@ export default async function ReviewerCycleView({
             <FadeIn delay={0.12}>
               <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  <p className="text-xs font-semibold text-muted-foreground">
                     Post-Submission Actions
                   </p>
                   <span className="text-[10px] text-muted-foreground italic">

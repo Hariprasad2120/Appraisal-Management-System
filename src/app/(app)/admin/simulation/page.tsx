@@ -46,7 +46,7 @@ export default async function SimulationPage() {
   }));
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="w-full max-w-3xl space-y-6">
       <FadeIn>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Time Travel / Simulation</h1>

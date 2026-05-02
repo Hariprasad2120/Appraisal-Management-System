@@ -40,7 +40,7 @@ export default async function HrSchedulePage({
   }
 
   return (
-    <div className="max-w-lg space-y-5">
+    <div className="w-full max-w-lg space-y-5">
       <FadeIn>
         <div>
           <h1 className="ds-h1">Schedule Meeting</h1>

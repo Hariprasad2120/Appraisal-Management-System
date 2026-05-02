@@ -62,7 +62,7 @@ export default async function ManagementArrearsPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full max-w-4xl space-y-6">
       <FadeIn>
         <div>
           <h1 className="ds-h1">Arrear Approvals</h1>

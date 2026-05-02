@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Clock3 } from "lucide-react";
+import { CalendarDays, Clock3, Sun, Sunrise, Sunset } from "lucide-react";
 
 function toTitleCase(value: string) {
   return value
@@ -20,11 +20,25 @@ function getGreeting(date: Date) {
   return "Good Evening";
 }
 
-export function AppHeader({ userName }: { userName: string }) {
+function getGreetingPeriod(date: Date | null) {
+  if (!date) return "afternoon";
+  const hour = date.getHours();
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+export function AppHeader({
+  userName,
+  sessionToken,
+}: {
+  userName: string;
+  sessionToken: string;
+}) {
   const [now, setNow] = useState<Date | null>(null);
   const firstName = useMemo(
     () => toTitleCase(userName.split(" ")[0] || "there"),
-    [userName]
+    [userName],
   );
 
   useEffect(() => {
@@ -37,16 +51,18 @@ export function AppHeader({ userName }: { userName: string }) {
   }, []);
 
   useEffect(() => {
-    const dateKey = new Date().toISOString().slice(0, 10);
-    const storageKey = `welcome-toast:${userName}:${dateKey}`;
+    const storageKey = `welcome-toast:${sessionToken}`;
     if (window.sessionStorage.getItem(storageKey)) return;
     window.sessionStorage.setItem(storageKey, "shown");
     toast.success(`Welcome back, ${firstName}`, {
       description: "Your performance workspace is ready.",
+      duration: 5000,
+      position: "top-center",
     });
-  }, [firstName, userName]);
+  }, [firstName, sessionToken]);
 
   const greeting = now ? getGreeting(now) : "Good Day";
+  const greetingPeriod = getGreetingPeriod(now);
   const dateLabel = now
     ? now.toLocaleDateString("en-IN", {
         weekday: "long",
@@ -71,7 +87,16 @@ export function AppHeader({ userName }: { userName: string }) {
       <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="ds-label text-primary">Performance Management</p>
-          <h1 className="mt-1 text-xl font-normal tracking-normal text-foreground md:text-2xl">
+          <h1 className="mt-1 flex items-center gap-3 text-xl font-normal tracking-normal text-foreground md:text-2xl">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+              {greetingPeriod === "morning" ? (
+                <Sunrise className="size-[18px] text-primary" />
+              ) : greetingPeriod === "evening" ? (
+                <Sunset className="size-[18px] text-primary" />
+              ) : (
+                <Sun className="size-[18px] text-primary" />
+              )}
+            </span>
             {greeting}, {firstName}
           </h1>
         </div>

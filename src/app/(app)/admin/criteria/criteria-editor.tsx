@@ -49,6 +49,10 @@ export function CriteriaEditor({
   }
 
   function removeQuestion(id: number) {
+    const confirmed = window.confirm(
+      "Remove this question from the category? This change is not saved until you click Save Changes.",
+    );
+    if (!confirmed) return;
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   }
 

@@ -32,7 +32,7 @@ export default async function EditEmployeePage({
   const updateSalary = upsertSalaryAction.bind(null, id);
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit: {toTitleCase(user.name)}</h1>
         <Link href={`/admin/employees/${id}`} className="text-sm underline">

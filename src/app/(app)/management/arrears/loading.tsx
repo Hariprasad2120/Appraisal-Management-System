@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton } from "@/components/skeletons";
 
 export default function ArrearsLoading() {
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="w-full max-w-4xl space-y-5">
       <PageHeaderSkeleton />
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="rounded-xl border border-border bg-card border-l-4 border-l-amber-300 p-5 space-y-4">

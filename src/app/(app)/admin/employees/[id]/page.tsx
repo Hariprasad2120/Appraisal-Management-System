@@ -4,24 +4,45 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteEmployeeAction, deleteSalaryAction, toggleActiveAction } from "../actions";
+import {
+  deleteEmployeeAction,
+  deleteSalaryAction,
+  toggleActiveAction,
+} from "../actions";
 import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
 import { canBeAppraised, isAdmin } from "@/lib/rbac";
 import {
-  User, Calendar, Briefcase, MapPin, Phone, Mail,
-  IndianRupee, ChevronRight, ShieldOff, ShieldCheck,
+  User,
+  Calendar,
+  Briefcase,
+  MapPin,
+  Phone,
+  Mail,
+  IndianRupee,
+  ChevronRight,
+  ShieldOff,
+  ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 
-export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeeDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const session = await auth();
-  const canEdit = session?.user ? isAdmin(session.user.role, session.user.secondaryRole) : false;
+  const canEdit = session?.user
+    ? isAdmin(session.user.role, session.user.secondaryRole)
+    : false;
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
       salary: true,
-      reportingManager: { select: { id: true, name: true, employeeNumber: true } },
+      reportingManager: {
+        select: { id: true, name: true, employeeNumber: true },
+      },
       cyclesAsEmployee: {
         orderBy: { startDate: "desc" },
         take: 5,
@@ -45,40 +66,65 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   };
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-5">
       <FadeIn>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/admin/employees" className="text-xs text-slate-400 hover:text-slate-600">
+            <Link
+              href="/admin/employees"
+              className="text-xs text-slate-400 hover:text-slate-600"
+            >
               ← Employees
             </Link>
           </div>
           {canEdit && (
             <div className="flex gap-2">
+              {isAppraisable && (
+                <Link href={`/admin/employees/${user.id}/assign`}>
+                  <Button variant="outline" size="sm">
+                    <ClipboardList className="size-3.5 mr-1.5" />
+                    Assign Appraisal
+                  </Button>
+                </Link>
+              )}
               <Link href={`/admin/employees/${user.id}/edit`}>
-                <Button variant="outline" size="sm">Edit</Button>
+                <Button variant="outline" size="sm">
+                  Edit
+                </Button>
               </Link>
               <form action={toggleActiveAction}>
                 <input type="hidden" name="id" value={user.id} />
-                <input type="hidden" name="active" value={String(user.active)} />
+                <input
+                  type="hidden"
+                  name="active"
+                  value={String(user.active)}
+                />
                 <Button
                   type="submit"
                   variant="outline"
                   size="sm"
-                  className={user.active
-                    ? "text-orange-600 border-orange-300 hover:bg-orange-50"
-                    : "text-green-600 border-green-300 hover:bg-green-50"}
+                  className={
+                    user.active
+                      ? "text-orange-600 border-orange-300 hover:bg-orange-50"
+                      : "text-green-600 border-green-300 hover:bg-green-50"
+                  }
                 >
                   {user.active ? (
-                    <><ShieldOff className="size-3.5 mr-1.5" /> Revoke Access</>
+                    <>
+                      <ShieldOff className="size-3.5 mr-1.5" /> Revoke Access
+                    </>
                   ) : (
-                    <><ShieldCheck className="size-3.5 mr-1.5" /> Restore Access</>
+                    <>
+                      <ShieldCheck className="size-3.5 mr-1.5" /> Restore Access
+                    </>
                   )}
                 </Button>
               </form>
               <form action={deleteEmployeeAction}>
                 <input type="hidden" name="id" value={user.id} />
-                <Button type="submit" variant="destructive" size="sm">Delete</Button>
+                <Button type="submit" variant="destructive" size="sm">
+                  Delete
+                </Button>
               </form>
             </div>
           )}
@@ -112,7 +158,9 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                       {toTitleCase(user.name)}
                     </h1>
                   )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColors[user.role] ?? "bg-slate-100 text-slate-600"}`}>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColors[user.role] ?? "bg-slate-100 text-slate-600"}`}
+                  >
                     {user.role}
                   </span>
                   {!user.active && (
@@ -126,9 +174,24 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                   {user.employeeNumber && ` · Emp #${user.employeeNumber}`}
                 </p>
                 <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-400">
-                  {user.email && <span className="flex items-center gap-1"><Mail className="size-3" />{user.email}</span>}
-                  {user.workPhone && <span className="flex items-center gap-1"><Phone className="size-3" />{user.workPhone}</span>}
-                  {user.location && <span className="flex items-center gap-1"><MapPin className="size-3" />{user.location}</span>}
+                  {user.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="size-3" />
+                      {user.email}
+                    </span>
+                  )}
+                  {user.workPhone && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="size-3" />
+                      {user.workPhone}
+                    </span>
+                  )}
+                  {user.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3" />
+                      {user.location}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -147,9 +210,15 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             </CardHeader>
             <CardContent>
               <dl className="space-y-2.5 text-sm">
-                <InfoRow label="First Name" value={toTitleCase(user.firstName)} />
+                <InfoRow
+                  label="First Name"
+                  value={toTitleCase(user.firstName)}
+                />
                 <InfoRow label="Last Name" value={toTitleCase(user.lastName)} />
-                <InfoRow label="Father Name" value={toTitleCase(user.fatherName)} />
+                <InfoRow
+                  label="Father Name"
+                  value={toTitleCase(user.fatherName)}
+                />
                 <InfoRow label="DOB" value={user.dob?.toLocaleDateString()} />
                 <InfoRow label="Gender" value={user.gender} />
                 <InfoRow label="Marital Status" value={user.maritalStatus} />
@@ -173,7 +242,10 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             </CardHeader>
             <CardContent>
               <dl className="space-y-2.5 text-sm">
-                <InfoRow label="Joining Date" value={user.joiningDate.toLocaleDateString()} />
+                <InfoRow
+                  label="Joining Date"
+                  value={user.joiningDate.toLocaleDateString()}
+                />
                 <InfoRow label="Employment Type" value={user.employmentType} />
                 <InfoRow label="Employee Status" value={user.employeeStatus} />
                 <InfoRow label="Source of Hire" value={user.sourceOfHire} />
@@ -187,7 +259,10 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                   }
                 />
                 <InfoRow label="Present Address" value={user.presentAddress} />
-                <InfoRow label="Permanent Address" value={user.permanentAddress} />
+                <InfoRow
+                  label="Permanent Address"
+                  value={user.permanentAddress}
+                />
               </dl>
             </CardContent>
           </Card>
@@ -211,18 +286,47 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
             <CardContent>
               {user.salary ? (
                 <dl className="space-y-2.5 text-sm">
-                  <InfoRow label="Gross (Annual)" value={`₹${Number(user.salary.grossAnnum).toLocaleString()}`} highlight />
-                  <InfoRow label="Gross (Monthly)" value={`₹${Math.round(Number(user.salary.grossAnnum) / 12).toLocaleString()}`} highlight />
-                  <InfoRow label="CTC (Annual)" value={`₹${Number(user.salary.ctcAnnum).toLocaleString()}`} />
-                  <InfoRow label="Basic" value={`₹${Number(user.salary.basic).toLocaleString()}`} />
-                  <InfoRow label="HRA" value={`₹${Number(user.salary.hra).toLocaleString()}`} />
-                  <InfoRow label="Conveyance" value={`₹${Number(user.salary.conveyance).toLocaleString()}`} />
-                  <InfoRow label="Fixed Allowance" value={`₹${Number(user.salary.fixedAllowance).toLocaleString()}`} />
-                  <InfoRow label="Stipend" value={`₹${Number(user.salary.stipend).toLocaleString()}`} />
+                  <InfoRow
+                    label="Gross (Annual)"
+                    value={`₹${Number(user.salary.grossAnnum).toLocaleString()}`}
+                    highlight
+                  />
+                  <InfoRow
+                    label="Gross (Monthly)"
+                    value={`₹${Math.round(Number(user.salary.grossAnnum) / 12).toLocaleString()}`}
+                    highlight
+                  />
+                  <InfoRow
+                    label="CTC (Annual)"
+                    value={`₹${Number(user.salary.ctcAnnum).toLocaleString()}`}
+                  />
+                  <InfoRow
+                    label="Basic"
+                    value={`₹${Number(user.salary.basic).toLocaleString()}`}
+                  />
+                  <InfoRow
+                    label="HRA"
+                    value={`₹${Number(user.salary.hra).toLocaleString()}`}
+                  />
+                  <InfoRow
+                    label="Conveyance"
+                    value={`₹${Number(user.salary.conveyance).toLocaleString()}`}
+                  />
+                  <InfoRow
+                    label="Fixed Allowance"
+                    value={`₹${Number(user.salary.fixedAllowance).toLocaleString()}`}
+                  />
+                  <InfoRow
+                    label="Stipend"
+                    value={`₹${Number(user.salary.stipend).toLocaleString()}`}
+                  />
                   <div className="pt-2">
                     <form action={deleteSalaryAction}>
                       <input type="hidden" name="userId" value={user.id} />
-                      <button type="submit" className="text-xs text-red-500 hover:text-red-700">
+                      <button
+                        type="submit"
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
                         Clear salary record
                       </button>
                     </form>
@@ -261,7 +365,10 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                       <Calendar className="size-4" /> Appraisal Cycles
                     </span>
                     {isAppraisable && canEdit && (
-                      <Link href={`/admin/employees/${user.id}/assign`} className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                      <Link
+                        href={`/admin/employees/${user.id}/assign`}
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
+                      >
                         Assign <ChevronRight className="size-3" />
                       </Link>
                     )}
@@ -278,13 +385,18 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {user.cyclesAsEmployee.map((c) => (
-                        <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <tr
+                          key={c.id}
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        >
                           <td className="py-2 px-4">
                             <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded">
                               {c.type}
                             </span>
                           </td>
-                          <td className="px-4 text-slate-500">{c.startDate.toLocaleDateString()}</td>
+                          <td className="px-4 text-slate-500">
+                            {c.startDate.toLocaleDateString()}
+                          </td>
                           <td className="px-4">
                             <span className="text-blue-600 dark:text-blue-400">
                               {c.status.replace(/_/g, " ")}
@@ -297,7 +409,6 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
                 </CardContent>
               </Card>
             )}
-
           </div>
         </FadeIn>
       </div>
@@ -305,11 +416,21 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   );
 }
 
-function InfoRow({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: boolean }) {
+function InfoRow({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: React.ReactNode;
+  highlight?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-2">
       <dt className="text-xs text-slate-400 shrink-0">{label}</dt>
-      <dd className={`text-right truncate ${highlight ? "font-semibold text-slate-900 dark:text-white" : "text-slate-600 dark:text-slate-400"}`}>
+      <dd
+        className={`text-right truncate ${highlight ? "font-semibold text-slate-900 dark:text-white" : "text-slate-600 dark:text-slate-400"}`}
+      >
         {value ?? "—"}
       </dd>
     </div>

@@ -42,7 +42,7 @@ export default async function AdminMomListPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full max-w-4xl space-y-6">
       <FadeIn>
         <div>
           <h1 className="ds-h1">Minutes of Meeting</h1>
@@ -52,10 +52,11 @@ export default async function AdminMomListPage() {
         </div>
       </FadeIn>
 
-      {pending.length > 0 && (
-        <FadeIn delay={0.05}>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-2">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {pending.length > 0 && (
+          <FadeIn delay={0.05}>
+            <div>
+            <h2 className="text-xs font-semibold text-amber-600 mb-3 flex items-center gap-2">
               <Clock className="size-3.5" /> Pending MOM ({pending.length})
             </h2>
             <StaggerList className="space-y-2">
@@ -97,13 +98,13 @@ export default async function AdminMomListPage() {
                 </StaggerItem>
               ))}
             </StaggerList>
-          </div>
-        </FadeIn>
-      )}
+            </div>
+          </FadeIn>
+        )}
 
-      <FadeIn delay={0.1}>
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+        <FadeIn delay={0.1}>
+          <div>
+          <h2 className="text-xs font-semibold text-slate-500 mb-3 flex items-center gap-2">
             <ClipboardList className="size-3.5" /> Recorded MOMs ({moms.length})
           </h2>
           {moms.length === 0 ? (
@@ -157,8 +158,9 @@ export default async function AdminMomListPage() {
               ))}
             </StaggerList>
           )}
-        </div>
-      </FadeIn>
+          </div>
+        </FadeIn>
+      </div>
     </div>
   );
 }

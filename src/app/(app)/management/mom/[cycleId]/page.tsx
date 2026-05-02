@@ -67,7 +67,7 @@ ${cycle.ratings.map((r) => r.postComment ? `  ${r.role}: ${r.postComment}` : "")
   const originalFinalAmount = cycle.decision ? Number(cycle.decision.finalAmount) : 0;
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="w-full max-w-3xl space-y-5">
       <FadeIn>
         <div>
           <h1 className="ds-h1">

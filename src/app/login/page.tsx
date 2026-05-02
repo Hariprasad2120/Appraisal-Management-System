@@ -22,13 +22,16 @@ export default function LoginPage() {
               <p className="ds-label text-primary">
                 Appraisal Management Portal
               </p>
-              <h1 className="ds-h1" style={{ fontSize: "32px", letterSpacing: "0.03em" }}>
+              <h1
+                className="ds-h1 heading-icon-none"
+                style={{ fontSize: "32px", letterSpacing: "0.03em" }}
+              >
                 Performance.{" "}
                 <span className="text-gradient-teal">Rewarded fairly.</span>
               </h1>
               <p className="text-muted-foreground text-base leading-relaxed max-w-sm">
-                Manage employee reviews, self-assessments, ratings, and appraisal
-                workflows from one unified portal.
+                Manage employee reviews, self-assessments, ratings, and
+                appraisal workflows from one unified portal.
               </p>
             </div>
 
@@ -43,7 +46,9 @@ export default function LoginPage() {
                   key={feature.label}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card text-muted-foreground text-sm"
                 >
-                  <span className={`size-1.5 rounded-full ${feature.dot} inline-block`} />
+                  <span
+                    className={`size-1.5 rounded-full ${feature.dot} inline-block`}
+                  />
                   {feature.label}
                 </span>
               ))}
@@ -51,7 +56,9 @@ export default function LoginPage() {
 
             <div
               className="h-px w-40 opacity-30"
-              style={{ background: "linear-gradient(90deg, #0e8a95, transparent)" }}
+              style={{
+                background: "linear-gradient(90deg, #0e8a95, transparent)",
+              }}
             />
           </section>
 

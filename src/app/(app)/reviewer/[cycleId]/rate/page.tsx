@@ -159,7 +159,7 @@ export default async function RatePage({
     : [];
 
   return (
-    <div className="max-w-[1400px] mx-auto">
+    <div className="max-w-[1400px] ">
       <FadeIn>
         <div className="mb-5">
           <Link
@@ -222,7 +222,7 @@ export default async function RatePage({
                     { label: "Employment Type", value: emp.employmentType ?? "—" },
                   ].map((f) => (
                     <div key={f.label} className="space-y-0.5">
-                      <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">{f.label}</div>
+                      <div className="text-[10px] font-medium text-slate-400">{f.label}</div>
                       <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{f.value}</div>
                     </div>
                   ))}
@@ -246,7 +246,7 @@ export default async function RatePage({
                   <>
                     <div className="h-px bg-slate-100 dark:bg-slate-800" />
                     <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1">
+                      <div className="text-[10px] font-semibold text-slate-400 mb-2 flex items-center gap-1">
                         <IndianRupee className="size-3" /> Current Salary Structure
                       </div>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -269,7 +269,7 @@ export default async function RatePage({
                                 : "bg-slate-50 dark:bg-slate-800/50"
                             }`}
                           >
-                            <div className="text-[9px] uppercase tracking-wider text-slate-400">{f.label}</div>
+                            <div className="text-[9px] text-slate-400">{f.label}</div>
                             <div className={`text-xs font-semibold mt-0.5 ${f.highlight ? "text-[#008993]" : "text-slate-700 dark:text-slate-300"}`}>
                               {f.value}
                             </div>
@@ -380,7 +380,7 @@ export default async function RatePage({
 
                     {/* Part A */}
                     <div className="space-y-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                      <div className="text-[10px] font-semibold text-slate-400">
                         Part A — Performance
                       </div>
                       {mergedCategories.filter((c) => !c.reviewerOnly).map((cat) => {
@@ -413,7 +413,7 @@ export default async function RatePage({
                               ))}
                             {ans.comment && (
                               <div className="pl-3 border-l-2 border-[#008993]/30 text-slate-500">
-                                <span className="font-medium text-slate-400 text-[10px] uppercase tracking-wide">
+                                <span className="font-medium text-slate-400 text-[10px]">
                                   Summary:{" "}
                                 </span>
                                 {ans.comment}
@@ -427,12 +427,12 @@ export default async function RatePage({
                     {/* Parts B / C / D */}
                     {Object.keys(suppAnswers).length > 0 && (
                       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                        <div className="text-[10px] font-semibold text-slate-400">
                           Parts B / C / D
                         </div>
                         {SUPPLEMENTARY_SECTIONS.map((sec) => (
                           <div key={sec.title} className="space-y-2">
-                            <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                            <div className="text-[10px] font-medium text-slate-500">
                               Part {sec.part} — {sec.title}
                             </div>
                             {sec.questions.map((q) =>
@@ -501,7 +501,7 @@ export default async function RatePage({
                           )}
                           {parsedComments.byCategory[cat.name] && (
                             <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-                              <span className="block text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                              <span className="block text-[9px] font-semibold text-slate-400">
                                 Criterion comment
                               </span>
                               {parsedComments.byCategory[cat.name]}
@@ -513,7 +513,7 @@ export default async function RatePage({
                   </div>
                   {parsedComments.overall && (
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Overall Comment</p>
+                      <p className="text-[10px] font-semibold text-slate-400 mb-1">Overall Comment</p>
                       <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">
                         {parsedComments.overall}
                       </p>

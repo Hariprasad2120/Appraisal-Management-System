@@ -42,7 +42,7 @@ export default async function HrMomListPage() {
   );
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full max-w-4xl space-y-6">
       <FadeIn>
         <div>
           <h1 className="ds-h1">Minutes of Meeting</h1>
@@ -55,7 +55,7 @@ export default async function HrMomListPage() {
       {withoutMom.length > 0 && (
         <FadeIn delay={0.05}>
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-2">
+            <h2 className="text-xs font-semibold text-amber-600 mb-3 flex items-center gap-2">
               <Clock className="size-3.5" /> Awaiting MOM ({withoutMom.length})
             </h2>
             <StaggerList className="space-y-2">
@@ -104,7 +104,7 @@ export default async function HrMomListPage() {
       {withMom.length > 0 && (
         <FadeIn delay={0.1}>
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-green-600 mb-3 flex items-center gap-2">
+            <h2 className="text-xs font-semibold text-green-600 mb-3 flex items-center gap-2">
               <CheckCircle className="size-3.5" /> Recorded MOMs ({withMom.length})
             </h2>
             <StaggerList className="space-y-2">
@@ -158,7 +158,7 @@ export default async function HrMomListPage() {
       {upcoming.length > 0 && (
         <FadeIn delay={0.15}>
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-3 flex items-center gap-2">
+            <h2 className="text-xs font-semibold text-blue-600 mb-3 flex items-center gap-2">
               <ClipboardList className="size-3.5" /> Upcoming ({upcoming.length})
             </h2>
             <StaggerList className="space-y-2">

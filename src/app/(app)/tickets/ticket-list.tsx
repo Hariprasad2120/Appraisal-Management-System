@@ -86,7 +86,7 @@ function TicketCard({ ticket, currentUserId, isAdmin }: { ticket: Ticket; curren
 
             {ticket.comments.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <p className="text-xs font-medium text-slate-400 flex items-center gap-1">
                   <MessageCircle className="size-3" /> Conversation
                 </p>
                 {ticket.comments.map((c) => (

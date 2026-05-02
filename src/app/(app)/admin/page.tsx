@@ -105,6 +105,7 @@ export default async function AdminDashboard() {
     {
       label: "Due This Month",
       value: dueForAppraisal.length,
+      href: "/admin/appraisals",
       icon: Calendar,
       accent: "stat-cyan",
       iconColor: "text-cyan-600 dark:text-cyan-400",
@@ -114,6 +115,7 @@ export default async function AdminDashboard() {
     {
       label: "Active Cycles",
       value: activeCycles,
+      href: "/admin/cycles",
       icon: Clock,
       accent: "stat-amber",
       iconColor: "text-amber-600 dark:text-amber-400",
@@ -123,6 +125,7 @@ export default async function AdminDashboard() {
     {
       label: "Pending Availability",
       value: pendingAssignments,
+      href: "/admin/appraisals",
       icon: Users,
       accent: "stat-teal",
       iconColor: "text-teal-600 dark:text-teal-400",
@@ -132,6 +135,7 @@ export default async function AdminDashboard() {
     {
       label: "Pending Extensions",
       value: pendingExtensions,
+      href: "/admin/extensions",
       icon: AlertCircle,
       accent: "stat-orange",
       iconColor: "text-orange-600 dark:text-orange-400",
@@ -141,7 +145,7 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl">
       <FadeIn>
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
@@ -163,7 +167,10 @@ export default async function AdminDashboard() {
       <StaggerList className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
           <StaggerItem key={s.label}>
-            <div className={`bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 ${s.accent}`}>
+            <Link
+              href={s.href}
+              className={`block h-full bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 ${s.accent}`}
+            >
               {/* Icon row + arrow */}
               <div className="flex items-start justify-between mb-3">
                 <div className={`size-9 rounded-[10px] ${s.iconBg} flex items-center justify-center shrink-0`}>
@@ -175,7 +182,7 @@ export default async function AdminDashboard() {
               </div>
               <div className="ds-stat">{s.value}</div>
               <div className="ds-small mt-1">{s.label}</div>
-            </div>
+            </Link>
           </StaggerItem>
         ))}
       </StaggerList>
@@ -242,8 +249,13 @@ export default async function AdminDashboard() {
                     {dueForAppraisal.map((u) => {
                       const cycleType = autoCycleType(u.joiningDate, now);
                       return (
-                        <tr key={u.id} className="hover:bg-muted/40 transition-colors">
-                          <td className="py-3 px-2 text-muted-foreground font-mono text-xs">
+                        <tr key={u.id} className="relative cursor-pointer hover:bg-muted/40 transition-colors">
+                          <td className="relative py-3 px-2 text-muted-foreground font-mono text-xs">
+                            <Link
+                              href={`/admin/employees/${u.id}/assign`}
+                              className="absolute inset-y-0 left-0 z-10 w-[1000vw]"
+                              aria-label={`Assign appraisal for ${toTitleCase(u.name)}`}
+                            />
                             {u.employeeNumber ?? "—"}
                           </td>
                           <td className="px-2 font-semibold text-foreground">

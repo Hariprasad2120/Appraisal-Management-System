@@ -36,50 +36,154 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
   if (role === "ADMIN") {
     return [
       dashboard,
-      { href: "/admin/employees", label: "Employees", icon: <Users className="size-4" /> },
-      { href: "/admin/cycles", label: "All Cycles", icon: <ClipboardList className="size-4" /> },
-      { href: "/admin/slabs", label: "Increment Slabs", icon: <Layers className="size-4" /> },
-      { href: "/admin/extensions", label: "Extensions", icon: <Settings className="size-4" /> },
-      { href: "/admin/criteria", label: "Criteria", icon: <ListChecks className="size-4" /> },
-      { href: "/admin/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
-      { href: "/admin/salary-sheet", label: "Salary Sheet", icon: <BarChart3 className="size-4" /> },
-      { href: "/admin/salary-revisions", label: "Salary Revisions", icon: <TrendingUp className="size-4" /> },
-      { href: "/history", label: "History", icon: <History className="size-4" /> },
+      {
+        href: "/admin/employees",
+        label: "Employees",
+        icon: <Users className="size-4" />,
+      },
+      {
+        href: "/admin/cycles",
+        label: "All Cycles",
+        icon: <ClipboardList className="size-4" />,
+      },
+      {
+        href: "/admin/slabs",
+        label: "Increment Slabs",
+        icon: <Layers className="size-4" />,
+      },
+      {
+        href: "/admin/extensions",
+        label: "Extensions",
+        icon: <Settings className="size-4" />,
+      },
+      {
+        href: "/admin/criteria",
+        label: "Criteria",
+        icon: <ListChecks className="size-4" />,
+      },
+      {
+        href: "/admin/tickets",
+        label: "Support Tickets",
+        icon: <Ticket className="size-4" />,
+      },
+      {
+        href: "/admin/salary-sheet",
+        label: "Salary Sheet",
+        icon: <BarChart3 className="size-4" />,
+      },
+      {
+        href: "/admin/salary-revisions",
+        label: "Salary Revisions",
+        icon: <TrendingUp className="size-4" />,
+      },
+      {
+        href: "/history",
+        label: "History",
+        icon: <History className="size-4" />,
+      },
     ];
   }
   if (role === "MANAGEMENT") {
     return [
       dashboard,
-      { href: "/management/salary", label: "Salary Calculator", icon: <BarChart3 className="size-4" /> },
-      { href: "/admin/employees", label: "Employees", icon: <Users className="size-4" /> },
-      { href: "/history", label: "History", icon: <History className="size-4" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
+      {
+        href: "/management/salary",
+        label: "Salary Calculator",
+        icon: <BarChart3 className="size-4" />,
+      },
+      {
+        href: "/admin/employees",
+        label: "Employees",
+        icon: <Users className="size-4" />,
+      },
+      {
+        href: "/history",
+        label: "History",
+        icon: <History className="size-4" />,
+      },
+      {
+        href: "/tickets",
+        label: "Support Tickets",
+        icon: <Ticket className="size-4" />,
+      },
     ];
   }
   if (role === "HR" || role === "TL" || role === "MANAGER") {
     return [
-      { href: "/reviewer", label: "My Reviews", icon: <Star className="size-4" /> },
-      { href: "/employee", label: "My Appraisal", icon: <UserCheck className="size-4" /> },
-      { href: "/history", label: "History", icon: <History className="size-4" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
+      {
+        href: "/reviewer",
+        label: "My Reviews",
+        icon: <Star className="size-4" />,
+      },
+      {
+        href: "/assignments",
+        label: "Assignments",
+        icon: <ClipboardList className="size-4" />,
+      },
+      {
+        href: "/employee",
+        label: "My Appraisal",
+        icon: <UserCheck className="size-4" />,
+      },
+      {
+        href: "/history",
+        label: "Appraisal History",
+        icon: <History className="size-4" />,
+      },
+      {
+        href: "/tickets",
+        label: "Support Tickets",
+        icon: <Ticket className="size-4" />,
+      },
     ];
   }
   if (role === "EMPLOYEE") {
     return [
       dashboard,
-      { href: "/history", label: "History", icon: <History className="size-4" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
+      {
+        href: "/history",
+        label: "History",
+        icon: <History className="size-4" />,
+      },
+      {
+        href: "/tickets",
+        label: "Support Tickets",
+        icon: <Ticket className="size-4" />,
+      },
     ];
   }
   if (role === "PARTNER") {
     return [
-      { href: "/partner", label: "Dashboard", icon: <LayoutDashboard className="size-4" /> },
-      { href: "/admin/employees", label: "Employees", icon: <Users className="size-4" /> },
-      { href: "/history", label: "History", icon: <History className="size-4" /> },
-      { href: "/tickets", label: "Support Tickets", icon: <Ticket className="size-4" /> },
+      {
+        href: "/partner",
+        label: "Dashboard",
+        icon: <LayoutDashboard className="size-4" />,
+      },
+      {
+        href: "/admin/employees",
+        label: "Employees",
+        icon: <Users className="size-4" />,
+      },
+      {
+        href: "/history",
+        label: "History",
+        icon: <History className="size-4" />,
+      },
+      {
+        href: "/tickets",
+        label: "Support Tickets",
+        icon: <Ticket className="size-4" />,
+      },
     ];
   }
-  return [dashboard, { href: "/history", label: "History", icon: <History className="size-4" /> }];
+  return [
+    dashboard,
+    {
+      href: "/history",
+      label: "History",
+      icon: <History className="size-4" />,
+    },
+  ];
 }
 
 interface MobileNavProps {
@@ -144,7 +248,9 @@ export function MobileNav({
                     <div className="text-xs font-semibold text-foreground truncate max-w-[140px]">
                       {userName}
                     </div>
-                    <span className={`inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleColorClass}`}>
+                    <span
+                      className={`inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleColorClass}`}
+                    >
                       {userRole}
                     </span>
                   </div>
@@ -170,7 +276,7 @@ export function MobileNav({
                       (other) =>
                         other.href !== item.href &&
                         pathname.startsWith(other.href) &&
-                        other.href.length > item.href.length
+                        other.href.length > item.href.length,
                     );
                   const isActive =
                     exactMatch || (prefixMatch && !longerMatchExists);
@@ -184,13 +290,13 @@ export function MobileNav({
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
                         isActive
                           ? "bg-primary/10 text-primary font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted",
                       )}
                     >
                       <span
                         className={cn(
                           "shrink-0",
-                          isActive ? "text-primary" : "text-muted-foreground"
+                          isActive ? "text-primary" : "text-muted-foreground",
                         )}
                       >
                         {item.icon}
@@ -211,7 +317,9 @@ export function MobileNav({
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ reason: "LOGGED_OUT" }),
                       });
-                    } catch { /* silent */ }
+                    } catch {
+                      /* silent */
+                    }
                     await signOut({ callbackUrl: "/login" });
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

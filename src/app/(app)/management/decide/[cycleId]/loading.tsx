@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, Skeleton, FormSkeleton } from "@/components/skeleto
 
 export default function DecideLoading() {
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-6">
       <PageHeaderSkeleton />
       <div className="grid md:grid-cols-2 gap-6">
         {/* Left — management criteria */}

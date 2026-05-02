@@ -24,7 +24,7 @@ export default async function AvailabilityPage({
   if (assignment.availability !== "PENDING") redirect(`/reviewer/${cycleId}`);
 
   return (
-    <div className="max-w-md">
+    <div className="w-full max-w-md">
       <FadeIn>
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-3">

@@ -324,7 +324,7 @@ export function ContextualTips({ role }: { role: Role }) {
                 transition={{ duration: 0.16 }}
                 className="px-4 py-4"
               >
-                <p className="text-xs font-semibold text-[#00cec4] uppercase tracking-wider mb-1.5">
+                <p className="text-xs font-semibold text-[#00cec4] mb-1.5">
                   {tip.title}
                 </p>
                 <p className="text-sm text-white/80 leading-relaxed">{tip.body}</p>

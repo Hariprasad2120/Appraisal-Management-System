@@ -12,7 +12,7 @@ export default async function NewEmployeePage() {
   });
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">New Employee</h1>
         <Link href="/admin/employees" className="text-sm underline">
