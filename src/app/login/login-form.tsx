@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Loader2, AlertCircle, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { loginWithCredentials } from "./actions";
 
 export function LoginForm() {
   const params = useSearchParams();
@@ -27,44 +27,23 @@ export function LoginForm() {
     letterSpacing: "0",
   };
 
-  function safeRedirectTarget(target: string | null | undefined) {
-    if (!target) return callbackUrl;
-    try {
-      const url = new URL(target, window.location.origin);
-      if (url.origin !== window.location.origin) return callbackUrl;
-      if (url.pathname.startsWith("/api/")) return callbackUrl;
-      if (/\.[a-z0-9]+$/i.test(url.pathname)) return callbackUrl;
-      if (url.searchParams.has("error")) return null;
-      return `${url.pathname}${url.search}${url.hash}`;
-    } catch {
-      return callbackUrl;
-    }
-  }
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      const userAgent = navigator.userAgent;
-      // IP resolution is done server-side; pass UA from client
-      const res = await signIn("credentials", {
-        email,
-        password,
-        userAgent,
-        redirectTo: callbackUrl,
-        redirect: false,
-      });
-      const error = typeof res === "object" ? res?.error : null;
-      const ok = typeof res === "object" ? res?.ok : true;
-      const returnedUrl = typeof res === "string" ? res : res?.url;
-      const redirectTarget = safeRedirectTarget(returnedUrl);
+      const formData = new FormData();
+      formData.set("email", email);
+      formData.set("password", password);
+      formData.set("callbackUrl", callbackUrl);
+      formData.set("userAgent", navigator.userAgent);
 
-      if (error || ok === false || redirectTarget === null) {
-        setErr("Invalid email or password. Please try again.");
+      const res = await loginWithCredentials(formData);
+      if (!res.ok) {
+        setErr(res.message);
         return;
       }
-      window.location.assign(redirectTarget);
+      window.location.assign(res.redirectTo);
     } catch {
       setErr("Sign in failed. Please try again.");
     } finally {
