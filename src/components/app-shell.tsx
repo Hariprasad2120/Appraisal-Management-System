@@ -89,7 +89,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar sticky top-0 z-40 shadow-sm">
           <Link href={ROLE_HOME[role]} className="flex items-center gap-2.5">
             <div className="size-8 rounded-[10px] overflow-hidden bg-muted shadow-sm flex items-center justify-center">
-              <Image src="/Logo.png" alt="Adarsh Shipping" width={32} height={32} className="object-contain" priority />
+              <Image src="/Logo.png" alt="Adarsh Shipping" width={32} height={32} className="object-contain" unoptimized />
             </div>
             <div>
               <div className="font-bold text-foreground text-sm leading-tight">Adarsh Shipping</div>

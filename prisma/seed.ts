@@ -286,16 +286,33 @@ async function main() {
   });
 
   console.log("Seeding increment slabs...");
-  const slabs = [
-    { label: "Exceptional", minRating: 4.5, maxRating: 5.0, hikePercent: 15 },
-    { label: "Excellent", minRating: 4.0, maxRating: 4.49, hikePercent: 10 },
-    { label: "Good", minRating: 3.0, maxRating: 3.99, hikePercent: 7 },
-    { label: "Average", minRating: 2.0, maxRating: 2.99, hikePercent: 3 },
-    { label: "Below Par", minRating: 0, maxRating: 1.99, hikePercent: 0 },
+  const gradeBands = [
+    { grade: "A+", label: "Outstanding", minRating: 91, maxRating: 100, hikes: [50, 30, 25] },
+    { grade: "A", label: "Excellent", minRating: 81, maxRating: 90, hikes: [40, 25, 20] },
+    { grade: "B+", label: "Good", minRating: 71, maxRating: 80, hikes: [25, 20, 15] },
+    { grade: "B", label: "Satisfactory", minRating: 66, maxRating: 70, hikes: [20, 15, 5] },
+    { grade: "C+", label: "Average", minRating: 61, maxRating: 65, hikes: [10, 5, 0] },
+    { grade: "C", label: "Below Average", minRating: 51, maxRating: 60, hikes: [5, 0, 0] },
+    { grade: "D", label: "Poor", minRating: 0, maxRating: 50, hikes: [0, 0, 0] },
   ];
-  for (const s of slabs) {
-    const existing = await prisma.incrementSlab.findFirst({ where: { label: s.label } });
-    if (!existing) await prisma.incrementSlab.create({ data: s });
+  const salaryTiers = [
+    { id: "UPTO_15K", label: "Up to INR 15,000/mo" },
+    { id: "BTW_15K_30K", label: "INR 15,001-30,000/mo" },
+    { id: "ABOVE_30K", label: "Above INR 30,000/mo" },
+  ];
+  for (const band of gradeBands) {
+    for (const [index, tier] of salaryTiers.entries()) {
+      await prisma.incrementSlab.create({
+        data: {
+          label: `Grade ${band.grade} (${tier.label})`,
+          grade: band.grade,
+          minRating: band.minRating,
+          maxRating: band.maxRating,
+          salaryTier: tier.id,
+          hikePercent: band.hikes[index],
+        },
+      });
+    }
   }
 
   console.log(`Seed complete. ${EMPLOYEES.length} users. Default password: password123`);

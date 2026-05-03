@@ -13,6 +13,7 @@ import { CRITERIA_CATEGORIES, getCriteriaForRole, getSalaryTier } from "@/lib/cr
 import { auth } from "@/lib/auth";
 import { ClaimPanel } from "./claim-panel";
 import { getRatingDeadline, isManagementReviewOpen } from "@/lib/workflow";
+import { isDateReached } from "@/lib/business-days";
 
 function addBusinessDays(from: Date, days: number): Date {
   let count = 0;
@@ -217,8 +218,8 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
 
             {/* MOM — available once meeting date has passed */}
             {cycle.scheduledDate && (() => {
-              const meetingPassed = now >= cycle.scheduledDate;
-              return meetingPassed ? (
+              const meetingReached = isDateReached(cycle.scheduledDate, now);
+              return meetingReached ? (
                 <Card className="border-0 shadow-sm border-l-4 border-l-purple-400">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2 text-purple-600">
@@ -238,7 +239,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <p className="text-amber-600 text-xs">Meeting date has passed. Record MOM to finalize salary.</p>
+                        <p className="text-amber-600 text-xs">Meeting date has arrived. Record MOM to finalize salary.</p>
                         <Link
                           href={`/management/mom/${cycleId}`}
                           className="inline-flex items-center gap-1.5 text-xs font-medium bg-purple-600 text-white rounded-lg px-3 py-1.5 hover:bg-purple-700 transition-colors"
@@ -252,7 +253,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
               ) : (
                 <Card className="border-0 shadow-sm border-l-4 border-l-slate-300">
                   <CardContent className="p-3 text-xs text-slate-400">
-                    MOM will be available once the meeting date has passed.
+                    MOM will be available on the meeting date.
                   </CardContent>
                 </Card>
               );
@@ -292,7 +293,7 @@ export default async function DecidePage({ params }: { params: Promise<{ cycleId
               </Card>
             )}
 
-            {!managementReviewOpen ? null : claimedByOther ? (
+            {!managementReviewOpen || !cycle.claimedById ? null : claimedByOther ? (
               <Card className="border border-border shadow-sm bg-card">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-foreground">Locked</CardTitle>

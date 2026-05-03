@@ -1,9 +1,9 @@
-import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn } from "@/components/motion-div";
 import { SlabForm } from "./slab-form";
 import { deleteSlabAction, seedSlabsAction } from "./actions";
 import { GRADE_BANDS } from "@/lib/criteria";
+import { getSlabs } from "@/lib/slabs";
 
 const TIER_LABELS: Record<string, string> = {
   UPTO_15K: "≤ ₹15k/mo",
@@ -25,9 +25,7 @@ const gradeColors: Record<string, string> = {
 };
 
 export default async function SlabsPage() {
-  const slabs = await prisma.incrementSlab.findMany({
-    orderBy: [{ minRating: "desc" }, { salaryTier: "asc" }],
-  });
+  const slabs = await getSlabs();
 
   // Group slabs by grade for the matrix view
   const gradeOrder = GRADE_BANDS.map((b) => b.grade);

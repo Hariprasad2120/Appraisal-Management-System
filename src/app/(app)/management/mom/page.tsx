@@ -6,6 +6,7 @@ import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { ClipboardList, ChevronRight, Clock, CheckCircle } from "lucide-react";
 import { getSystemDate } from "@/lib/system-date";
+import { isDateReached } from "@/lib/business-days";
 
 export default async function ManagementMomListPage() {
   const session = await auth();
@@ -31,10 +32,10 @@ export default async function ManagementMomListPage() {
   });
 
   const meetingPassed = scheduledCycles.filter(
-    (c) => c.scheduledDate && now >= c.scheduledDate
+    (c) => c.scheduledDate && isDateReached(c.scheduledDate, now)
   );
   const upcoming = scheduledCycles.filter(
-    (c) => c.scheduledDate && now < c.scheduledDate
+    (c) => c.scheduledDate && !isDateReached(c.scheduledDate, now)
   );
 
   return (

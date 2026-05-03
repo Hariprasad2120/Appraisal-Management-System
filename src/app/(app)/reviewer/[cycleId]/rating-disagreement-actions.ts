@@ -42,8 +42,9 @@ export async function submitRatingDisagreementAction(input: z.infer<typeof schem
   const grossAnnum = rating.cycle.user.salary ? Number(rating.cycle.user.salary.grossAnnum) : 0;
 
   // Fetch suggested slab for the current rating
+  const flooredRating = Math.floor(rating.averageScore);
   const slab = await prisma.incrementSlab.findFirst({
-    where: { minRating: { lte: rating.averageScore }, maxRating: { gte: rating.averageScore } },
+    where: { minRating: { lte: flooredRating }, maxRating: { gte: flooredRating } },
   });
   const baseHike = slab?.hikePercent ?? 0;
   const baseAmount = Math.round(grossAnnum * baseHike / 100);

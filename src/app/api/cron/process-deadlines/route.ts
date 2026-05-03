@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { addBusinessDays } from "@/lib/business-days";
 import { syncCycleStatus } from "@/lib/workflow";
+import { appraisalDueEmail, sendEmail } from "@/lib/email";
+import { getAppraisalEligibility } from "@/lib/appraisal-eligibility";
 
 /**
  * Called to process deadline events:
@@ -13,6 +15,63 @@ import { syncCycleStatus } from "@/lib/workflow";
  */
 export async function POST() {
   const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  // --- 0. Appraisal month arrived — notify appraisees until admin assigns reviewers ---
+  const appraisalUsers = await prisma.user.findMany({
+    where: { role: { notIn: ["MANAGEMENT", "PARTNER", "ADMIN"] }, active: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      joiningDate: true,
+      cyclesAsEmployee: {
+        where: {
+          OR: [
+            { status: { notIn: ["CLOSED", "DECIDED"] } },
+            {
+              status: { in: ["CLOSED", "DECIDED"] },
+              startDate: { gte: monthStart, lt: nextMonthStart },
+            },
+          ],
+        },
+        select: { id: true, status: true },
+      },
+    },
+  });
+
+  let dueNotified = 0;
+  for (const user of appraisalUsers) {
+    const eligibility = getAppraisalEligibility(user.joiningDate, now);
+    if (!eligibility.eligible) continue;
+    if (user.cyclesAsEmployee.length > 0) continue;
+
+    const existing = await prisma.notification.findFirst({
+      where: {
+        userId: user.id,
+        type: "APPRAISAL_MONTH_DUE",
+        createdAt: { gte: monthStart, lt: nextMonthStart },
+      },
+      select: { id: true },
+    });
+    if (existing) continue;
+
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: "APPRAISAL_MONTH_DUE",
+        message: `Your ${eligibility.cycleType.toLowerCase()} appraisal month has arrived. Admin will assign reviewers soon.`,
+        link: "/employee",
+        persistent: true,
+        critical: true,
+      },
+    });
+    const loginUrl = `${process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/login`;
+    const mail = appraisalDueEmail({ employeeName: user.name, cycleType: eligibility.cycleType, loginUrl });
+    await sendEmail({ to: user.email, ...mail }).catch(() => {});
+    dueNotified++;
+  }
 
   // --- 1. Edit window closed — notify reviewers ---
   // Find cycles where self was submitted, edit window just passed, reviewers not yet notified
@@ -118,5 +177,5 @@ export async function POST() {
     }
   }
 
-  return NextResponse.json({ ok: true, processed: { selfExpired: expiredSelfCycles.length, ratingExpired: ratingExpiredCycles.length } });
+  return NextResponse.json({ ok: true, processed: { dueNotified, selfExpired: expiredSelfCycles.length, ratingExpired: ratingExpiredCycles.length } });
 }

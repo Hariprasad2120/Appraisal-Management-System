@@ -462,7 +462,7 @@ export default async function RatePage({
         </div>
 
         {/* ── RIGHT: Rating form or submitted read-only view ── */}
-        <div className="xl:sticky xl:top-6">
+        <div>
           <FadeIn delay={0.06}>
             {existing && submittedScores ? (
               <div className="space-y-4">
@@ -569,7 +569,7 @@ export default async function RatePage({
                 {submittedCategoryScores.length > 0 && (
                   <Card className="border-0 shadow-sm">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Revise Or Evaluate</CardTitle>
+                    <CardTitle className="text-sm">Post-Submission Actions</CardTitle>
                       <p className="text-xs text-slate-500">
                         These notes stay attached to this submitted rating. Your original score remains unchanged.
                       </p>

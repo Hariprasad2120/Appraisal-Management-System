@@ -10,11 +10,12 @@ export default function LoginPage() {
           <section className="hidden lg:block space-y-8">
             <div>
               <Image
-                src="/api/logo"
+                src="/Logo.png"
                 alt="Adarsh Shipping logo"
                 width={430}
                 height={143}
                 className="h-auto w-[260px] object-contain opacity-90"
+                unoptimized
               />
             </div>
 
@@ -65,11 +66,12 @@ export default function LoginPage() {
           <section className="w-full">
             <div className="flex flex-col items-center mb-8 lg:hidden">
               <Image
-                src="/api/logo"
+                src="/Logo.png"
                 alt="Adarsh Shipping logo"
                 width={320}
                 height={107}
                 className="h-auto w-[180px] object-contain opacity-90"
+                unoptimized
               />
               <p className="mt-3 text-xs font-medium text-primary">
                 Appraisal Portal

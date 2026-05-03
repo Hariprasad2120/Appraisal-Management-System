@@ -28,7 +28,7 @@ export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
   const initial = name?.charAt(0)?.toUpperCase() ?? "?";
 
   return (
-    <div className="group/sidebar sticky top-0 hidden h-screen w-16 shrink-0 overflow-visible transition-[width] duration-300 ease-out will-change-[width] hover:w-[220px] md:block">
+    <div className="group/sidebar sticky top-0 hidden h-screen w-16 shrink-0 overflow-visible transition-[width] duration-300 ease-out will-change-[width] hover:w-[244px] md:block">
       <aside
         className="flex h-full w-full flex-col overflow-hidden"
         style={{
@@ -47,21 +47,21 @@ export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
             title="Adarsh Shipping"
           >
             <Image
-              src="/api/logo"
+              src="/Logo.png"
               alt="Adarsh Shipping"
               width={160}
               height={54}
               className="absolute left-0 h-9 w-auto max-w-[40px] object-contain opacity-100 transition-opacity duration-150 ease-out group-hover/sidebar:opacity-0"
-              priority
+              unoptimized
             />
             <Image
-              src="/api/logo"
+              src="/Logo.png"
               alt=""
               width={160}
               height={54}
               aria-hidden="true"
               className="absolute left-0 h-10 w-auto max-w-[170px] object-contain opacity-0 transition-opacity duration-200 ease-out group-hover/sidebar:opacity-100"
-              priority
+              unoptimized
             />
           </Link>
         </div>
@@ -71,7 +71,7 @@ export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
 
         {/* User footer */}
         <div
-          className="grid grid-cols-[40px_1fr_auto_auto] items-center gap-2 px-3 py-3 overflow-hidden"
+          className="grid grid-cols-[36px_minmax(0,1fr)_28px_28px] items-center gap-2 px-3 py-3 overflow-hidden"
           style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
         >
           <div className="contents">
@@ -80,7 +80,10 @@ export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
             </div>
             <div className="min-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-opacity duration-200 ease-out group-hover/sidebar:opacity-100">
               <div className="truncate text-xs font-semibold text-white/90">{name}</div>
-              <div className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${roleColors[role]}`}>
+              <div
+                title={role}
+                className={`mt-0.5 block w-fit max-w-full truncate rounded px-1.5 py-0.5 text-[9px] font-medium leading-none ${roleColors[role]}`}
+              >
                 {role}
               </div>
             </div>

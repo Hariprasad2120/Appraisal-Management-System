@@ -236,6 +236,13 @@ export default async function ManagementDashboard() {
               Salary Calculator
             </Link>
             <Link
+              href="/management/arrears"
+              className="flex items-center gap-2 border border-border text-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <IndianRupee className="size-4" />
+              Arrear Approvals
+            </Link>
+            <Link
               href="/history"
               className="flex items-center gap-2 border border-border text-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
             >
@@ -452,12 +459,22 @@ export default async function ManagementDashboard() {
                         </td>
                         <td className="px-4">
                           {tieredSlab ? (
-                            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded-full">
+                            <span
+                              title={`${tieredSlab.label} (${tieredSlab.hikePercent}%)`}
+                              className="inline-flex max-w-[210px] items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs leading-5 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                            >
+                              <span className="truncate">
                               {tieredSlab.label} ({tieredSlab.hikePercent}%)
+                              </span>
                             </span>
                           ) : c.decision?.slab ? (
-                            <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                            <span
+                              title={c.decision.slab.label}
+                              className="inline-flex max-w-[210px] items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs leading-5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            >
+                              <span className="truncate">
                               {c.decision.slab.label}
+                              </span>
                             </span>
                           ) : (
                             "—"

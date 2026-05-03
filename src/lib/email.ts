@@ -5,6 +5,9 @@ type SendArgs = {
 };
 
 export async function sendEmail({ to, subject, html }: SendArgs) {
+  if (process.env.NODE_ENV !== "production" && process.env.EMAIL_ENABLED !== "true") {
+    return { skipped: true };
+  }
   console.log("[email]", { to, subject });
   console.log(html);
   return { stubbed: true };
@@ -39,6 +42,23 @@ export function cycleStartedEmail(params: {
     html: `
       <p>Hi ${employeeName},</p>
       <p>Best wishes! Your appraisal cycle has begun. Please login and complete your self-assessment.</p>
+      <p><a href="${loginUrl}">${loginUrl}</a></p>
+    `,
+  };
+}
+
+export function appraisalDueEmail(params: {
+  employeeName: string;
+  cycleType: string;
+  loginUrl: string;
+}) {
+  const { employeeName, cycleType, loginUrl } = params;
+  return {
+    subject: `${cycleType} appraisal month has arrived`,
+    html: `
+      <p>Hi ${employeeName},</p>
+      <p>Your ${cycleType.toLowerCase()} appraisal month has arrived. Admin will assign reviewers soon.</p>
+      <p>You can track the appraisal from your dashboard:</p>
       <p><a href="${loginUrl}">${loginUrl}</a></p>
     `,
   };

@@ -26,3 +26,13 @@ export function daysUntilAnniversary(joiningDate: Date, ref: Date): number {
   if (next < ref) next.setFullYear(next.getFullYear() + 1);
   return Math.ceil((next.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
 }
+
+export function startOfLocalDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export function isDateReached(date: Date, ref: Date = new Date()): boolean {
+  return startOfLocalDay(ref) >= startOfLocalDay(date);
+}

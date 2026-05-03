@@ -10,6 +10,14 @@ import { cn } from "@/lib/utils";
 import { ROLE_HOME } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   LayoutDashboard,
   Users,
   History,
@@ -90,6 +98,11 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         href: "/management/salary",
         label: "Salary Calculator",
         icon: <BarChart3 className="size-4" />,
+      },
+      {
+        href: "/management/arrears",
+        label: "Arrear Approvals",
+        icon: <TrendingUp className="size-4" />,
       },
       {
         href: "/admin/employees",
@@ -204,8 +217,24 @@ export function MobileNav({
   roleColorClass,
 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const pathname = usePathname();
   const items = navFor(role, secondaryRole);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await fetch("/api/session/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "LOGGED_OUT" }),
+      });
+    } catch {
+      /* silent */
+    }
+    await signOut({ callbackUrl: "/login" });
+  }
 
   return (
     <>
@@ -310,28 +339,46 @@ export function MobileNav({
               {/* Sign out */}
               <div className="p-4 border-t border-border">
                 <button
-                  onClick={async () => {
-                    try {
-                      await fetch("/api/session/end", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ reason: "LOGGED_OUT" }),
-                      });
-                    } catch {
-                      /* silent */
-                    }
-                    await signOut({ callbackUrl: "/login" });
-                  }}
+                  onClick={() => setSignOutOpen(true)}
+                  disabled={signingOut}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <LogOut className="size-3.5" />
-                  Sign out
+                  {signingOut ? "Signing out..." : "Sign out"}
                 </button>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <DialogContent showCloseButton={!signingOut}>
+          <DialogHeader>
+            <DialogTitle>Sign Out?</DialogTitle>
+            <DialogDescription>
+              You will return to the login page and this session will be ended.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setSignOutOpen(false)}
+              disabled={signingOut}
+              className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+            >
+              {signingOut ? "Signing out..." : "Sign out"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

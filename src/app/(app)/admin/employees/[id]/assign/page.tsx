@@ -11,6 +11,7 @@ import {
   autoCycleType,
 } from "@/lib/appraisal-eligibility";
 import { canBeAppraised } from "@/lib/rbac";
+import { isDateReached } from "@/lib/business-days";
 import {
   Calendar,
   User,
@@ -118,7 +119,7 @@ export default async function AssignPage({
   const hasScheduledDate = !!existingCycle?.scheduledDate;
   const hasMom = (existingCycle?.moms.length ?? 0) > 0;
   const meetingPassed = existingCycle?.scheduledDate
-    ? new Date() >= new Date(existingCycle.scheduledDate)
+    ? isDateReached(existingCycle.scheduledDate)
     : false;
 
   return (

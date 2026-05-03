@@ -223,6 +223,12 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         <Layers className={sz} />,
         C.amber,
       ),
+      mkItem(
+        "/management/arrears",
+        "Arrear Approvals",
+        <TrendingUp className={sz} />,
+        C.orange,
+      ),
       mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
       mkItem("/history", "History", <History className={sz} />, C.slate),
       mkItem(
@@ -380,7 +386,7 @@ export function SidebarNav({
 
               {/* Label */}
               <span
-                className="z-10 w-[150px] min-w-0 -translate-x-1 truncate whitespace-nowrap text-[12px] font-medium opacity-0 transition-[opacity,transform] duration-200 ease-out group-hover/sidebar:translate-x-0 group-hover/sidebar:opacity-100"
+                className="z-10 w-[174px] min-w-0 -translate-x-1 truncate whitespace-nowrap text-[12px] font-medium opacity-0 transition-[opacity,transform] duration-200 ease-out group-hover/sidebar:translate-x-0 group-hover/sidebar:opacity-100"
                 style={
                   isActive
                     ? { color: item.activeLabel }

@@ -276,51 +276,45 @@ export default async function ReviewerCycleView({
                     Rating locked · these don&apos;t change the score
                   </span>
                 </div>
-                <div className="p-4">
+                <div className="space-y-4 p-4">
                   <PostCommentForm
                     ratingId={myRating.id}
                     existingComment={myRating.postComment ?? null}
                   />
+                  {myCategoryScores.length > 0 && (
+                    <RatingReviewForm
+                      ratingId={myRating.id}
+                      cycleId={cycleId}
+                      categoryScores={myCategoryScores}
+                      existingReviews={existingReviews.map((r) => ({
+                        criteriaName: r.criteriaName,
+                        revisedScore: r.revisedScore,
+                        justification: r.justification,
+                        updatedAt: r.updatedAt.toISOString(),
+                      }))}
+                    />
+                  )}
+                  {myCategoryScores.length > 0 && (
+                    <RatingDisagreementForm
+                      ratingId={myRating.id}
+                      cycleId={cycleId}
+                      categoryScores={myCategoryScores}
+                      existing={
+                        existingDisagreement
+                          ? {
+                              evaluation: existingDisagreement.evaluation as "ACCURATE" | "OVERRATED" | "UNDERRATED",
+                              comment: existingDisagreement.comment,
+                              revisedScores: existingDisagreement.revisedScores as Record<string, number> | null,
+                              ceilingMin: existingDisagreement.ceilingMin ? Number(existingDisagreement.ceilingMin) : null,
+                              ceilingMax: existingDisagreement.ceilingMax ? Number(existingDisagreement.ceilingMax) : null,
+                            }
+                          : null
+                      }
+                    />
+                  )}
                 </div>
               </div>
             </FadeIn>
-
-            {myCategoryScores.length > 0 && (
-              <FadeIn delay={0.18}>
-                <RatingReviewForm
-                  ratingId={myRating.id}
-                  cycleId={cycleId}
-                  categoryScores={myCategoryScores}
-                  existingReviews={existingReviews.map((r) => ({
-                    criteriaName: r.criteriaName,
-                    revisedScore: r.revisedScore,
-                    justification: r.justification,
-                    updatedAt: r.updatedAt.toISOString(),
-                  }))}
-                />
-              </FadeIn>
-            )}
-
-            {myCategoryScores.length > 0 && (
-              <FadeIn delay={0.22}>
-                <RatingDisagreementForm
-                  ratingId={myRating.id}
-                  cycleId={cycleId}
-                  categoryScores={myCategoryScores}
-                  existing={
-                    existingDisagreement
-                      ? {
-                          evaluation: existingDisagreement.evaluation as "ACCURATE" | "OVERRATED" | "UNDERRATED",
-                          comment: existingDisagreement.comment,
-                          revisedScores: existingDisagreement.revisedScores as Record<string, number> | null,
-                          ceilingMin: existingDisagreement.ceilingMin ? Number(existingDisagreement.ceilingMin) : null,
-                          ceilingMax: existingDisagreement.ceilingMax ? Number(existingDisagreement.ceilingMax) : null,
-                        }
-                      : null
-                  }
-                />
-              </FadeIn>
-            )}
           </div>
         )}
       </div>

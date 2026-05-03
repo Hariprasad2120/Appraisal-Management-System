@@ -6,6 +6,13 @@ import { prisma } from "@/lib/db";
 import type { Role } from "@/generated/prisma/enums";
 import { randomBytes } from "crypto";
 
+if (process.env.NODE_ENV === "production") {
+  for (const key of ["NEXTAUTH_URL", "AUTH_URL"] as const) {
+    const value = process.env[key];
+    if (value?.includes("localhost")) delete process.env[key];
+  }
+}
+
 declare module "next-auth" {
   interface Session {
     user: {

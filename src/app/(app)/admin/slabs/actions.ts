@@ -2,9 +2,9 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { GRADE_BANDS, HIKE_TABLE } from "@/lib/criteria";
+import { prisma } from "@/lib/db";
+import { buildDefaultIncrementSlabs } from "@/lib/slabs";
 
 const createSchema = z.object({
   label: z.string().min(1),
@@ -19,7 +19,9 @@ type Result = { ok: true } | { ok: false; error: string };
 
 export async function createSlabAction(fd: FormData): Promise<Result> {
   const session = await auth();
-  if (!session?.user || (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN")) return { ok: false, error: "Forbidden" };
+  if (!session?.user || (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN")) {
+    return { ok: false, error: "Forbidden" };
+  }
 
   const parsed = createSchema.safeParse({
     label: fd.get("label"),
@@ -47,35 +49,16 @@ export async function deleteSlabAction(fd: FormData): Promise<void> {
   revalidatePath("/admin/slabs");
 }
 
-/** Wipe all slabs and re-seed from the official grade/tier table */
+/** Wipe all slabs and re-seed from the official grade/tier table. */
 export async function seedSlabsAction(): Promise<Result> {
   const session = await auth();
-  if (!session?.user || (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN")) return { ok: false, error: "Forbidden" };
-
-  const tiers: { key: "upto15k" | "upto30k" | "above30k"; label: string; id: string }[] = [
-    { key: "upto15k",  label: "≤ ₹15,000/mo",        id: "UPTO_15K" },
-    { key: "upto30k",  label: "₹15,001–30,000/mo",   id: "BTW_15K_30K" },
-    { key: "above30k", label: "> ₹30,000/mo",         id: "ABOVE_30K" },
-  ];
-
-  const slabs = [];
-  for (const band of GRADE_BANDS) {
-    const hikeRow = HIKE_TABLE[band.grade];
-    for (const tier of tiers) {
-      slabs.push({
-        label: `Grade ${band.grade} (${tier.label})`,
-        grade: band.grade,
-        minRating: band.minNormalized,
-        maxRating: band.maxNormalized,
-        salaryTier: tier.id,
-        hikePercent: hikeRow[tier.key],
-      });
-    }
+  if (!session?.user || (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN")) {
+    return { ok: false, error: "Forbidden" };
   }
 
   await prisma.$transaction([
     prisma.incrementSlab.deleteMany(),
-    prisma.incrementSlab.createMany({ data: slabs }),
+    prisma.incrementSlab.createMany({ data: buildDefaultIncrementSlabs() }),
   ]);
 
   revalidateTag("slabs", "max");

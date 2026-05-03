@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   getVisibleAverageForReviewer,
+  getRatingDeadline,
   isRatingOpen,
   computeCycleStatus,
 } from "@/lib/workflow";
@@ -800,6 +801,7 @@ type AssignmentWithCycle = {
     scheduledDate: Date | null;
     tentativeDate1: Date | null;
     tentativeDate2: Date | null;
+    ratingDeadline: Date | null;
     self: {
       editableUntil: Date;
       submittedAt: Date | null;
@@ -889,6 +891,14 @@ function ReviewRow({
     actionStyle = "bg-green-600 text-white hover:bg-green-700";
   }
 
+  const meetingActionHref =
+    assignment.role === "HR" &&
+    !assignment.cycle.scheduledDate &&
+    (assignment.cycle.tentativeDate1 || assignment.cycle.tentativeDate2)
+      ? `/reviewer/${assignment.cycle.id}/schedule`
+      : actionHref;
+  const deadline = getRatingDeadline(assignment.cycle);
+
   const employeeName = toTitleCase(assignment.cycle.user.name);
   const employeeMeta =
     [assignment.cycle.user.department, assignment.cycle.user.designation]
@@ -965,18 +975,18 @@ function ReviewRow({
       </RowLinkCell>
 
       <RowLinkCell href={actionHref}>
-        {assignment.cycle.self ? (
+        {deadline ? (
           <div>
             <div className="text-[11px] text-foreground whitespace-nowrap">
-              {assignment.cycle.self.editableUntil.toLocaleDateString("en-IN", {
+              {deadline.toLocaleDateString("en-IN", {
                 day: "numeric",
                 month: "short",
                 year: "numeric",
               })}
             </div>
-            {now > assignment.cycle.self.editableUntil && (
+            {now > deadline && (
               <div className="text-[10px] text-red-500 font-medium mt-0.5">
-                Passed
+                Rating deadline passed
               </div>
             )}
           </div>
@@ -985,7 +995,7 @@ function ReviewRow({
         )}
       </RowLinkCell>
 
-      <RowLinkCell href={actionHref}>
+      <RowLinkCell href={meetingActionHref}>
         {assignment.cycle.scheduledDate ? (
           <span className="inline-flex flex-col text-[11px] leading-tight text-foreground transition-colors hover:text-primary hover:underline">
             <span>

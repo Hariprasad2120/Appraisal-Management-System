@@ -10,6 +10,8 @@ import { AppraisalsMonthFilter } from "./appraisals-month-filter";
 
 export default async function AppraisalsPage() {
   const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const [allUsers, activeCycles] = await Promise.all([
     prisma.user.findMany({
@@ -18,8 +20,16 @@ export default async function AppraisalsPage() {
       include: {
         salary: { select: { grossAnnum: true } },
         cyclesAsEmployee: {
+          where: {
+            OR: [
+              { status: { notIn: ["CLOSED", "DECIDED"] } },
+              {
+                status: { in: ["CLOSED", "DECIDED"] },
+                startDate: { gte: monthStart, lt: nextMonthStart },
+              },
+            ],
+          },
           orderBy: { createdAt: "desc" },
-          take: 1,
           select: { id: true, type: true, status: true, startDate: true },
         },
       },
@@ -32,15 +42,20 @@ export default async function AppraisalsPage() {
   ]);
 
   const dueThisMonth = allUsers.filter((u) => {
-    const hasActive = u.cyclesAsEmployee.length > 0;
+    const hasActive = u.cyclesAsEmployee.some((cycle) => !["CLOSED", "DECIDED"].includes(cycle.status));
+    const completedThisMonth = u.cyclesAsEmployee.some((cycle) => ["CLOSED", "DECIDED"].includes(cycle.status));
     const eligibility = getAppraisalEligibility(u.joiningDate, now);
-    return eligibility.eligible && !hasActive;
+    return eligibility.eligible && !hasActive && !completedThisMonth;
   });
 
-  const activeWithCycles = allUsers.filter((u) => u.cyclesAsEmployee.length > 0);
+  const activeWithCycles = allUsers.filter((u) =>
+    u.cyclesAsEmployee.some((cycle) => !["CLOSED", "DECIDED"].includes(cycle.status)),
+  );
 
   const noCycleYet = allUsers.filter(
-    (u) => u.cyclesAsEmployee.length === 0 && !getAppraisalEligibility(u.joiningDate, now).eligible,
+    (u) =>
+      !u.cyclesAsEmployee.some((cycle) => !["CLOSED", "DECIDED"].includes(cycle.status)) &&
+      !dueThisMonth.some((due) => due.id === u.id),
   );
 
   const calendarCycles = activeCycles.map((c) => ({
@@ -60,14 +75,17 @@ export default async function AppraisalsPage() {
     department: u.department,
     joiningDate: u.joiningDate.toISOString(),
     grossAnnum: u.salary ? Number(u.salary.grossAnnum) : null,
-    cycle: u.cyclesAsEmployee[0]
+    cycle: (() => {
+      const activeCycle = u.cyclesAsEmployee.find((cycle) => !["CLOSED", "DECIDED"].includes(cycle.status));
+      return activeCycle
       ? {
-          id: u.cyclesAsEmployee[0].id,
-          type: u.cyclesAsEmployee[0].type,
-          status: u.cyclesAsEmployee[0].status,
-          startDate: u.cyclesAsEmployee[0].startDate.toISOString(),
+          id: activeCycle.id,
+          type: activeCycle.type,
+          status: activeCycle.status,
+          startDate: activeCycle.startDate.toISOString(),
         }
-      : null,
+      : null;
+    })(),
     eligible: getAppraisalEligibility(u.joiningDate, now).eligible,
     cycleType: autoCycleType(u.joiningDate, now),
   }));
@@ -256,7 +274,7 @@ function AppraisalRow({
   now: Date;
   showDue?: boolean;
 }) {
-  const cycle = u.cyclesAsEmployee[0];
+  const cycle = u.cyclesAsEmployee.find((c) => !["CLOSED", "DECIDED"].includes(c.status));
   const cycleType = autoCycleType(u.joiningDate, now);
   const gross = u.salary ? Number(u.salary.grossAnnum) : null;
   const href = `/admin/employees/${u.id}/assign`;

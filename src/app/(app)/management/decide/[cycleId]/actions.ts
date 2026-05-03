@@ -336,7 +336,13 @@ export async function finalizeDecisionAction(input: z.infer<typeof schema>): Pro
 
   if (
     session.user.role !== "ADMIN" &&
-    cycle.claimedById &&
+    !cycle.claimedById
+  ) {
+    return { ok: false, error: "Claim this appraisal before entering management ratings" };
+  }
+
+  if (
+    session.user.role !== "ADMIN" &&
     cycle.claimedById !== session.user.id
   ) {
     return { ok: false, error: "This appraisal is claimed by another management user" };

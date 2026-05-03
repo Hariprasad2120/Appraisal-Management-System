@@ -27,6 +27,8 @@ function ArrowUpRight() {
 export default async function AdminDashboard() {
   const session = await auth();
   const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const [allEmployees, activeCycles, pendingAssignments, pendingExtensions, decidedCyclesRaw, recentNotifs] =
     await Promise.all([
@@ -35,8 +37,15 @@ export default async function AdminDashboard() {
         orderBy: { name: "asc" },
         include: {
           cyclesAsEmployee: {
-            where: { status: { notIn: ["CLOSED", "DECIDED"] } },
-            take: 1,
+            where: {
+              OR: [
+                { status: { notIn: ["CLOSED", "DECIDED"] } },
+                {
+                  status: { in: ["CLOSED", "DECIDED"] },
+                  startDate: { gte: monthStart, lt: nextMonthStart },
+                },
+              ],
+            },
             select: { id: true, type: true, status: true },
           },
         },
@@ -94,10 +103,11 @@ export default async function AdminDashboard() {
   }[] = [];
 
   for (const emp of allEmployees) {
-    const hasActive = emp.cyclesAsEmployee.length > 0;
+    const hasActive = emp.cyclesAsEmployee.some((cycle) => !["CLOSED", "DECIDED"].includes(cycle.status));
+    const completedThisMonth = emp.cyclesAsEmployee.some((cycle) => ["CLOSED", "DECIDED"].includes(cycle.status));
     const eligibility = getAppraisalEligibility(emp.joiningDate, now);
     const alert = getMilestoneAlert(emp.joiningDate, now);
-    if (eligibility.eligible && !hasActive) dueForAppraisal.push(emp);
+    if (eligibility.eligible && !hasActive && !completedThisMonth) dueForAppraisal.push(emp);
     if (alert && alert.type === "EPF_ESI") milestoneAlerts.push({ employee: emp, alert });
   }
 

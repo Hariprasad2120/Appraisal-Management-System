@@ -223,7 +223,7 @@ export function DecisionForm({
       toast.success("Final decision recorded", {
         description: "HR has been notified to confirm the meeting date.",
       });
-      router.push("/management");
+      router.push(`/management/decide/${cycleId}`);
       router.refresh();
     });
   }
@@ -239,6 +239,7 @@ export function DecisionForm({
     TL: "border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
     MANAGER: "border-teal-300 bg-teal-50 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400",
   };
+  const canSubmit = allMgmtFilled && Boolean(tentDate1) && Boolean(tentDate2) && tentDate1 !== tentDate2;
 
   return (
     <div className="space-y-6">
@@ -496,7 +497,9 @@ export function DecisionForm({
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3">
-                  <p className="text-xs text-amber-700 dark:text-amber-400">No slab matched for score {compositeScore.toFixed(2)}. Hike will use suggested value.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    No slab matched for score {compositeScore.toFixed(2)} and salary tier {salaryTierKey.replace(/_/g, " ")}. Check Increment Slabs.
+                  </p>
                 </div>
               )}
 
@@ -614,7 +617,7 @@ export function DecisionForm({
                 </div>
               </div>
 
-              <Button onClick={submit} disabled={pending} className="w-full h-11">
+              <Button onClick={submit} disabled={pending || !canSubmit} className="w-full h-11">
                 {pending ? "Recording..." : "Finalize Decision & Notify HR"}
               </Button>
             </CardContent>
