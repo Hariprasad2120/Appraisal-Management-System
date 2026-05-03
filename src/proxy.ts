@@ -11,6 +11,9 @@ function isPublicAsset(pathname: string) {
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isHttps =
+    request.nextUrl.protocol === "https:" ||
+    request.headers.get("x-forwarded-proto") === "https";
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || isPublicAsset(pathname)) {
     return NextResponse.next();
@@ -28,6 +31,7 @@ export default async function proxy(request: NextRequest) {
     token = await getToken({
       req: request,
       secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+      secureCookie: isHttps,
     });
   } catch {
     const url = request.nextUrl.clone();
