@@ -12,7 +12,10 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const rawCallbackUrl = params.get("callbackUrl") ?? "/";
-  const callbackUrl = rawCallbackUrl.startsWith("/") && !rawCallbackUrl.startsWith("//")
+  const callbackUrl = rawCallbackUrl.startsWith("/") &&
+    !rawCallbackUrl.startsWith("//") &&
+    !rawCallbackUrl.startsWith("/api/") &&
+    !/\.[a-z0-9]+(?:$|\?)/i.test(rawCallbackUrl)
     ? rawCallbackUrl
     : "/";
   const [email, setEmail] = useState("");
@@ -29,16 +32,27 @@ export function LoginForm() {
     e.preventDefault();
     setErr(null);
     setLoading(true);
-    const userAgent = navigator.userAgent;
-    // IP resolution is done server-side; pass UA from client
-    const res = await signIn("credentials", { email, password, userAgent, redirect: false });
-    setLoading(false);
-    if (res?.error) {
-      setErr("Invalid email or password. Please try again.");
-      return;
+    try {
+      const userAgent = navigator.userAgent;
+      // IP resolution is done server-side; pass UA from client
+      const res = await signIn("credentials", {
+        email,
+        password,
+        userAgent,
+        callbackUrl,
+        redirect: false,
+      });
+      if (res?.error || res?.ok === false) {
+        setErr("Invalid email or password. Please try again.");
+        return;
+      }
+      router.push(callbackUrl);
+      router.refresh();
+    } catch {
+      setErr("Sign in failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    router.push(callbackUrl);
-    router.refresh();
   }
 
   return (

@@ -3,12 +3,16 @@ import { getToken } from "next-auth/jwt";
 import type { Role } from "@/generated/prisma/enums";
 import { canAccessPath, ROLE_HOME } from "@/lib/rbac";
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/logo"];
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/logo", "/Logo.png"];
+
+function isPublicAsset(pathname: string) {
+  return /\.(?:png|jpg|jpeg|gif|webp|svg|ico|txt|xml|webmanifest)$/i.test(pathname);
+}
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || isPublicAsset(pathname)) {
     return NextResponse.next();
   }
 
