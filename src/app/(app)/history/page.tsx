@@ -5,6 +5,8 @@ import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
 import Link from "next/link";
 import { HistoryFilters } from "./history-filters";
+import { computeCycleStatus } from "@/lib/workflow";
+import { getSystemDate } from "@/lib/system-date";
 
 const STATUS_COLORS: Record<string, string> = {
   DECIDED:
@@ -40,6 +42,7 @@ export default async function HistoryPage({
   const sp = await searchParams;
   const session = await auth();
   if (!session?.user) return null;
+  const now = await getSystemDate();
 
   const role = session.user.role;
   const secondaryRole = session.user.secondaryRole;
@@ -84,8 +87,11 @@ export default async function HistoryPage({
       decision: { include: { slab: true } },
       ratings: { select: { averageScore: true, role: true, reviewerId: true } },
       assignments: {
-        select: { reviewerId: true, reviewer: { select: { name: true } } },
+        select: { reviewerId: true, availability: true, reviewer: { select: { name: true } } },
       },
+      self: { select: { editableUntil: true, submittedAt: true, locked: true } },
+      moms: { select: { role: true } },
+      arrear: { select: { status: true } },
     },
     orderBy: { startDate: "desc" },
     take: 200,
@@ -168,6 +174,7 @@ export default async function HistoryPage({
                     </tr>
                   )}
                   {filtered.map((c) => {
+                    const displayStatus = computeCycleStatus(c, now);
                     const avg =
                       c.ratings.length > 0
                         ? c.ratings.reduce((s, r) => s + r.averageScore, 0) /
@@ -210,11 +217,11 @@ export default async function HistoryPage({
                         <td className="px-4">
                           <span
                             className={`text-xs rounded-full px-2 py-0.5 font-medium ${
-                              STATUS_COLORS[c.status] ??
+                              STATUS_COLORS[displayStatus] ??
                               "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {c.status.replace(/_/g, " ")}
+                            {displayStatus.replace(/_/g, " ")}
                           </span>
                         </td>
                         <td className="px-4 font-medium text-foreground">

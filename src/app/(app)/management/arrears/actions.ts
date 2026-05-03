@@ -134,6 +134,11 @@ export async function rejectArrearAction(input: z.infer<typeof rejectSchema>): P
       },
     });
 
+    await tx.appraisalCycle.update({
+      where: { id: cycleId },
+      data: { status: "CLOSED" },
+    });
+
     await tx.auditLog.create({
       data: {
         cycleId,
@@ -158,6 +163,9 @@ export async function rejectArrearAction(input: z.infer<typeof rejectSchema>): P
 
   revalidatePath("/management/arrears");
   revalidatePath("/admin/arrears");
+  revalidatePath("/employee");
+  revalidatePath("/reviewer");
+  revalidatePath("/assignments");
   return { ok: true };
 }
 
@@ -189,6 +197,11 @@ export async function markArrearPaidAction(input: z.infer<typeof markPaidSchema>
       data: { status: "PAID" },
     });
 
+    await tx.appraisalCycle.update({
+      where: { id: cycleId },
+      data: { status: "CLOSED" },
+    });
+
     await tx.auditLog.create({
       data: {
         cycleId,
@@ -214,5 +227,7 @@ export async function markArrearPaidAction(input: z.infer<typeof markPaidSchema>
   revalidatePath("/management/arrears");
   revalidatePath("/admin/arrears");
   revalidatePath("/employee");
+  revalidatePath("/reviewer");
+  revalidatePath("/assignments");
   return { ok: true };
 }

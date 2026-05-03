@@ -5,6 +5,8 @@ import Link from "next/link";
 import { FadeIn } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import type { CycleStatus } from "@/generated/prisma/enums";
+import { computeCycleStatus } from "@/lib/workflow";
+import { getSystemDate } from "@/lib/system-date";
 
 const STATUS_COLORS: Record<CycleStatus, string> = {
   PENDING_SELF: "bg-slate-100 text-slate-600",
@@ -25,6 +27,7 @@ export default async function AdminCyclesPage({
   searchParams: Promise<{ status?: string; q?: string }>;
 }) {
   const sp = await searchParams;
+  const now = await getSystemDate();
 
   const where: Record<string, unknown> = {};
   if (sp.status) where.status = sp.status;
@@ -42,8 +45,11 @@ export default async function AdminCyclesPage({
     include: {
       user: true,
       assignments: { include: { reviewer: { select: { id: true, name: true, role: true } } } },
-      ratings: { select: { averageScore: true, role: true } },
+      ratings: { select: { averageScore: true, role: true, reviewerId: true } },
       decision: { include: { slab: true } },
+      self: { select: { editableUntil: true, submittedAt: true, locked: true } },
+      moms: { select: { role: true } },
+      arrear: { select: { status: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -128,6 +134,7 @@ export default async function AdminCyclesPage({
                     </tr>
                   )}
                   {cycles.map((c) => {
+                    const displayStatus = computeCycleStatus(c, now);
                     const avg =
                       c.ratings.length > 0
                         ? (c.ratings.reduce((s, r) => s + r.averageScore, 0) / c.ratings.length).toFixed(2)
@@ -146,8 +153,8 @@ export default async function AdminCyclesPage({
                           </span>
                         </td>
                         <td className="px-4">
-                          <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[c.status]}`}>
-                            {c.status.replace(/_/g, " ")}
+                          <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${STATUS_COLORS[displayStatus]}`}>
+                            {displayStatus.replace(/_/g, " ")}
                           </span>
                         </td>
                         <td className="px-4 text-slate-500 text-xs">

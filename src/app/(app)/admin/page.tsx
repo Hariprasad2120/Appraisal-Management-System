@@ -6,6 +6,7 @@ import { toTitleCase } from "@/lib/utils";
 import { Users, Clock, AlertCircle, Calendar, ChevronRight, Bell } from "lucide-react";
 import { getAppraisalEligibility, getMilestoneAlert, autoCycleType } from "@/lib/appraisal-eligibility";
 import { ManagementCharts } from "../management/management-charts";
+import { computeCycleStatus } from "@/lib/workflow";
 
 function ArrowUpRight() {
   return (
@@ -30,7 +31,7 @@ export default async function AdminDashboard() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const [allEmployees, activeCycles, pendingAssignments, pendingExtensions, decidedCyclesRaw, recentNotifs] =
+  const [allEmployees, cyclesForAdminStats, pendingAssignments, pendingExtensions, decidedCyclesRaw, recentNotifs] =
     await Promise.all([
       prisma.user.findMany({
         where: { role: { notIn: ["MANAGEMENT", "PARTNER"] }, active: true },
@@ -50,7 +51,17 @@ export default async function AdminDashboard() {
           },
         },
       }),
-      prisma.appraisalCycle.count({ where: { status: { notIn: ["CLOSED", "DECIDED"] } } }),
+      prisma.appraisalCycle.findMany({
+        select: {
+          status: true,
+          ratingDeadline: true,
+          self: { select: { editableUntil: true, submittedAt: true, locked: true } },
+          assignments: { select: { availability: true } },
+          ratings: { select: { reviewerId: true, averageScore: true } },
+          moms: { select: { role: true } },
+          arrear: { select: { status: true } },
+        },
+      }),
       prisma.cycleAssignment.count({ where: { availability: "PENDING" } }),
       prisma.extensionRequest.count({ where: { status: "PENDING" } }),
       prisma.appraisalCycle.findMany({
@@ -85,12 +96,10 @@ export default async function AdminDashboard() {
       };
     });
 
-  const allCyclesForStatus = await prisma.appraisalCycle.findMany({
-    select: { status: true },
-  });
   const statusMap = new Map<string, number>();
-  for (const c of allCyclesForStatus) {
-    statusMap.set(c.status, (statusMap.get(c.status) ?? 0) + 1);
+  for (const c of cyclesForAdminStats) {
+    const displayStatus = computeCycleStatus({ id: "", ...c }, now);
+    statusMap.set(displayStatus, (statusMap.get(displayStatus) ?? 0) + 1);
   }
   const statusCounts = [...statusMap.entries()]
     .filter(([, count]) => count > 0)
@@ -124,7 +133,10 @@ export default async function AdminDashboard() {
     },
     {
       label: "Active Cycles",
-      value: activeCycles,
+      value: cyclesForAdminStats.filter((c) => {
+        const status = computeCycleStatus({ id: "", ...c }, now);
+        return !["CLOSED", "DECIDED"].includes(status);
+      }).length,
       href: "/admin/cycles",
       icon: Clock,
       accent: "stat-amber",

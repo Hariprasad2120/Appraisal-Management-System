@@ -148,8 +148,6 @@ export async function saveMomManagementAction(input: z.infer<typeof schema>): Pr
       }
     }
 
-    await tx.appraisalCycle.update({ where: { id: cycleId }, data: { status: "CLOSED" } });
-
     const finalAmount = negotiatedAmount && negotiatedAmount > 0
       ? negotiatedAmount
       : cycle.decision ? Number(cycle.decision.finalAmount) : 0;
@@ -224,6 +222,11 @@ export async function saveMomManagementAction(input: z.infer<typeof schema>): Pr
       }
     }
 
+    await tx.appraisalCycle.update({
+      where: { id: cycleId },
+      data: { status: arrearCreated ? "SCHEDULED" : "CLOSED" },
+    });
+
     await tx.notification.create({
       data: {
         userId: cycle.userId,
@@ -251,5 +254,7 @@ export async function saveMomManagementAction(input: z.infer<typeof schema>): Pr
   revalidatePath(`/admin/mom/${cycleId}`);
   revalidatePath(`/admin/mom`);
   revalidatePath(`/employee`);
+  revalidatePath(`/reviewer`);
+  revalidatePath(`/assignments`);
   return { ok: true };
 }

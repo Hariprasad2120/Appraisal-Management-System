@@ -10,8 +10,20 @@ type Result = { ok: true } | { ok: false; error: string };
 async function assertAdmin(): Promise<{ id: string } | null> {
   const session = await auth();
   if (!session?.user) return null;
-  if (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN") return null;
-  return { id: session.user.id };
+
+  const user = await prisma.user.findFirst({
+    where: {
+      active: true,
+      OR: [
+        { id: session.user.id },
+        ...(session.user.email ? [{ email: session.user.email }] : []),
+      ],
+    },
+    select: { id: true, role: true, secondaryRole: true },
+  });
+
+  if (!user || (user.role !== "ADMIN" && user.secondaryRole !== "ADMIN")) return null;
+  return { id: user.id };
 }
 
 /** Shift all active cycle deadlines by N days (positive = forward, negative = backward). */

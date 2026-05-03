@@ -2,9 +2,6 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
-const prisma = new PrismaClient({ adapter });
-
 // Parse "YYYY-MM" string to first day of that month as UTC Date
 function ym(s: string): Date {
   const [y, m] = s.split("-").map(Number);
@@ -176,7 +173,7 @@ function calcRevisionPct(ctc: number, revised: number): number {
   return Math.round(((revised - ctc) / ctc) * 10000) / 100;
 }
 
-async function main() {
+export async function seedSalaryRevisions(prisma: PrismaClient) {
   // Get all users with employeeNumber
   const users = await prisma.user.findMany({
     where: { employeeNumber: { not: null } },
@@ -220,6 +217,23 @@ async function main() {
   console.log(`Done. Inserted: ${inserted}, Skipped: ${skipped}`);
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL not set");
+
+  const adapter = new PrismaPg({ connectionString });
+  const prisma = new PrismaClient({ adapter });
+
+  try {
+    await seedSalaryRevisions(prisma);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+if (process.argv[1]?.replace(/\\/g, "/").endsWith("prisma/seed-salary-revisions.ts")) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

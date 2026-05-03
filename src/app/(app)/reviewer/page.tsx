@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db";
 import {
   getVisibleAverageForReviewer,
   getRatingDeadline,
-  isRatingOpen,
   computeCycleStatus,
+  getCycleStageInfo,
 } from "@/lib/workflow";
 import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
@@ -56,6 +56,9 @@ export default async function ReviewerDashboard() {
               },
               assignments: { select: { availability: true } },
               ratings: { select: { reviewerId: true, averageScore: true } },
+              decision: { select: { id: true } },
+              moms: { select: { role: true } },
+              arrear: { select: { status: true } },
             },
           },
         },
@@ -135,14 +138,16 @@ export default async function ReviewerDashboard() {
     ]);
 
   const completed = assignments.filter((a) =>
-    a.cycle.ratings.some((r) => r.reviewerId === session.user.id),
+    getCycleStageInfo(a.cycle, session.user.id, a, now).kind === "completed",
   );
   const pendingAction = assignments.filter((a) => a.availability === "PENDING");
   const pendingReview = assignments.filter(
     (a) =>
-      a.availability === "AVAILABLE" &&
-      isRatingOpen(a.cycle, now) &&
-      !a.cycle.ratings.some((r) => r.reviewerId === session.user.id),
+      getCycleStageInfo(a.cycle, session.user.id, a, now).kind === "active" &&
+      a.availability === "AVAILABLE",
+  );
+  const postReview = assignments.filter(
+    (a) => getCycleStageInfo(a.cycle, session.user.id, a, now).kind === "post_review",
   );
   const isHrReviewer =
     session.user.role === "HR" || session.user.secondaryRole === "HR";
@@ -170,7 +175,10 @@ export default async function ReviewerDashboard() {
   const ownStatus = myOwnCycle ? computeCycleStatus(myOwnCycle, now) : null;
 
   const salaryRevisions = reviewer?.salaryRevisions ?? [];
-  const latestAssignments = assignments.slice(0, 5);
+  const latestActiveAssignments = assignments
+    .filter((a) => getCycleStageInfo(a.cycle, session.user.id, a, now).kind !== "completed")
+    .slice(0, 5);
+  const latestCompletedAssignments = completed.slice(0, 5);
   return (
     <div className="flex h-full max-h-full w-full max-w-7xl min-w-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overflow-x-hidden">
@@ -199,7 +207,7 @@ export default async function ReviewerDashboard() {
 
         {/* Stat widgets */}
         <FadeIn delay={0.05}>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
             <StatWidget
               label="Total Assigned"
               value={assignments.length}
@@ -220,6 +228,13 @@ export default async function ReviewerDashboard() {
               accent="#ff8333"
               iconBg="rgba(255,131,51,0.1)"
               icon={<ClipboardList className="size-4 text-orange-500" />}
+            />
+            <StatWidget
+              label="Post Review"
+              value={postReview.length}
+              accent="#3b82f6"
+              iconBg="rgba(59,130,246,0.1)"
+              icon={<CalendarDays className="size-4 text-blue-500" />}
             />
             <StatWidget
               label="Completed"
@@ -285,12 +300,13 @@ export default async function ReviewerDashboard() {
             {/* Assignments table */}
             <FadeIn delay={0.12}>
               <SectionCard
-                title="Latest Assigned Appraisals"
+                title="Active & Post-Review Appraisals"
                 icon={<Users className="size-3.5" />}
                 headerExtra={
                   <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
                     <Legend dot="bg-amber-400" label="Action Required" />
                     <Legend dot="bg-[#0e8a95]" label="Rating Open" />
+                    <Legend dot="bg-blue-500" label="Post Review" />
                     <Legend dot="bg-green-500" label="Completed" />
                     <Legend
                       dot="bg-slate-300 dark:bg-slate-600"
@@ -307,10 +323,9 @@ export default async function ReviewerDashboard() {
                   </Link>
                 }
               >
-                {latestAssignments.length === 0 ? (
+                {latestActiveAssignments.length === 0 ? (
                   <div className="py-10 text-center text-muted-foreground text-sm">
-                    No assignments yet. Admin will assign you when a cycle
-                    opens.
+                    No active reviewer actions or post-review cycles right now.
                   </div>
                 ) : (
                   <div className="w-full overflow-x-auto">
@@ -339,7 +354,7 @@ export default async function ReviewerDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {latestAssignments.map((a, idx) => (
+                        {latestActiveAssignments.map((a, idx) => (
                           <ReviewRow
                             key={a.id}
                             idx={idx + 1}
@@ -354,6 +369,63 @@ export default async function ReviewerDashboard() {
                 )}
               </SectionCard>
             </FadeIn>
+
+            {latestCompletedAssignments.length > 0 && (
+              <FadeIn delay={0.14}>
+                <SectionCard
+                  title="Completed Appraisal History"
+                  icon={<CheckCircle className="size-3.5" />}
+                  accent="#22c55e"
+                  action={
+                    <Link
+                      href="/history"
+                      className="text-[11px] text-[#0e8a95] hover:underline"
+                    >
+                      View history
+                    </Link>
+                  }
+                >
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full min-w-[900px] text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-left">
+                          {[
+                            "#",
+                            "Employee",
+                            "Cycle",
+                            "Role",
+                            "Status",
+                            "Progress",
+                            "Score",
+                            "Deadline",
+                            "Meeting",
+                            "Action",
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              className="px-2 py-2.5 ds-label whitespace-nowrap"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {latestCompletedAssignments.map((a, idx) => (
+                          <ReviewRow
+                            key={a.id}
+                            idx={idx + 1}
+                            assignment={a}
+                            sessionUserId={session.user.id}
+                            now={now}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </SectionCard>
+              </FadeIn>
+            )}
 
             {/* Own appraisal */}
             {myOwnCycle && (
@@ -787,7 +859,7 @@ function RowLinkCell({
 type AssignmentWithCycle = {
   id: string;
   role: string;
-  availability: string;
+  availability: "PENDING" | "AVAILABLE" | "NOT_AVAILABLE";
   assignedAt: Date;
   cycle: {
     id: string;
@@ -802,6 +874,7 @@ type AssignmentWithCycle = {
     tentativeDate1: Date | null;
     tentativeDate2: Date | null;
     ratingDeadline: Date | null;
+    status: "PENDING_SELF" | "SELF_SUBMITTED" | "AWAITING_AVAILABILITY" | "RATING_IN_PROGRESS" | "RATINGS_COMPLETE" | "MANAGEMENT_REVIEW" | "DATE_VOTING" | "SCHEDULED" | "DECIDED" | "CLOSED";
     self: {
       editableUntil: Date;
       submittedAt: Date | null;
@@ -809,6 +882,9 @@ type AssignmentWithCycle = {
     } | null;
     assignments: { availability: "PENDING" | "AVAILABLE" | "NOT_AVAILABLE" }[];
     ratings: { reviewerId: string; averageScore: number }[];
+    decision?: { id: string } | null;
+    moms?: { role: string }[];
+    arrear?: { status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "PAID" } | null;
   };
 };
 
@@ -823,7 +899,7 @@ function ReviewRow({
   sessionUserId: string;
   now: Date;
 }) {
-  const ratingOpen = isRatingOpen(assignment.cycle, now);
+  const stage = getCycleStageInfo(assignment.cycle, sessionUserId, assignment, now);
   const iRated = assignment.cycle.ratings.some(
     (r) => r.reviewerId === sessionUserId,
   );
@@ -835,11 +911,12 @@ function ReviewRow({
   const totalReviewers = assignment.cycle.assignments.length;
   const doneReviewers = assignment.cycle.ratings.length;
 
-  let rowStatus: "action" | "rate" | "completed" | "waiting" | "unavailable";
+  let rowStatus: "action" | "rate" | "completed" | "waiting" | "unavailable" | "post_review";
   if (assignment.availability === "NOT_AVAILABLE") rowStatus = "unavailable";
   else if (assignment.availability === "PENDING") rowStatus = "action";
-  else if (iRated) rowStatus = "completed";
-  else if (ratingOpen) rowStatus = "rate";
+  else if (stage.kind === "completed") rowStatus = "completed";
+  else if (stage.kind === "post_review") rowStatus = "post_review";
+  else if (stage.actionLabel === "Rate Now") rowStatus = "rate";
   else rowStatus = "waiting";
 
   const statusConfig = {
@@ -855,10 +932,20 @@ function ReviewRow({
       badge: "bg-[#0e8a95]/10 text-[#0e8a95] border-[#0e8a95]/20",
     },
     completed: {
-      label: "Completed",
+      label: stage.label,
       dot: "bg-green-500",
       badge:
         "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-800",
+    },
+    post_review: {
+      label: stage.label,
+      dot: stage.tone === "amber" ? "bg-amber-400" : stage.tone === "purple" ? "bg-purple-500" : "bg-blue-500",
+      badge:
+        stage.tone === "amber"
+          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+          : stage.tone === "purple"
+            ? "bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border-purple-200 dark:border-purple-800"
+            : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
     },
     waiting: {
       label: "Waiting",
@@ -872,8 +959,8 @@ function ReviewRow({
     },
   }[rowStatus];
 
-  let actionHref = `/reviewer/${assignment.cycle.id}`;
-  let actionLabel = "View Details";
+  let actionHref = stage.actionHref;
+  let actionLabel = stage.actionLabel;
   let actionStyle =
     "bg-muted text-muted-foreground hover:bg-muted/80 border border-border";
 
@@ -886,9 +973,12 @@ function ReviewRow({
     actionLabel = "Rate Now";
     actionStyle = "bg-[#0e8a95] text-white hover:bg-[#0ea5b0]";
   } else if (rowStatus === "completed") {
-    actionHref = `/reviewer/${assignment.cycle.id}/rate`;
-    actionLabel = "View Form";
     actionStyle = "bg-green-600 text-white hover:bg-green-700";
+  } else if (rowStatus === "post_review") {
+    actionStyle =
+      stage.tone === "amber"
+        ? "bg-amber-500 text-white hover:bg-amber-600"
+        : "bg-blue-600 text-white hover:bg-blue-700";
   }
 
   const meetingActionHref =

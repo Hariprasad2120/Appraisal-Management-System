@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import { seedSalaryRevisions } from "./seed-salary-revisions";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL not set");
@@ -267,6 +268,9 @@ async function main() {
       },
     });
   }
+
+  console.log("Seeding salary revision history...");
+  await seedSalaryRevisions(prisma);
 
   // Site admin account — hr@adarshshipping.in is the admin login, not linked to any employee
   console.log("Creating site admin account...");

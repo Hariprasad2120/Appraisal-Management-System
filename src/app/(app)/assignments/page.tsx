@@ -11,53 +11,46 @@ import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { getSystemDate } from "@/lib/system-date";
-import { isRatingOpen } from "@/lib/workflow";
+import { getCycleStageInfo } from "@/lib/workflow";
 
 function assignmentRoute(
   assignment: {
-    availability: string;
+    availability: "PENDING" | "AVAILABLE" | "NOT_AVAILABLE";
     cycle: {
       id: string;
-      ratings: { reviewerId: string }[];
+      status: "PENDING_SELF" | "SELF_SUBMITTED" | "AWAITING_AVAILABILITY" | "RATING_IN_PROGRESS" | "RATINGS_COMPLETE" | "MANAGEMENT_REVIEW" | "DATE_VOTING" | "SCHEDULED" | "DECIDED" | "CLOSED";
+      ratingDeadline: Date | null;
+      scheduledDate: Date | null;
+      tentativeDate1: Date | null;
+      tentativeDate2: Date | null;
+      self: { editableUntil: Date; submittedAt: Date | null; locked: boolean } | null;
+      assignments: { availability: "PENDING" | "AVAILABLE" | "NOT_AVAILABLE" }[];
+      ratings: { reviewerId: string; averageScore: number }[];
+      decision?: { id: string } | null;
+      moms?: { role: string }[];
+      arrear?: { status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "PAID" } | null;
     };
   },
   reviewerId: string,
-  ratingOpen: boolean,
+  now: Date,
 ) {
-  const rated = assignment.cycle.ratings.some(
-    (r) => r.reviewerId === reviewerId,
-  );
-
-  if (assignment.availability === "PENDING") {
-    return {
-      href: `/reviewer/${assignment.cycle.id}/availability`,
-      label: "Set Availability",
-      className:
-        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400",
-    };
-  }
-
-  if (rated) {
-    return {
-      href: `/reviewer/${assignment.cycle.id}/rate`,
-      label: "View Form",
-      className:
-        "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400",
-    };
-  }
-
-  if (assignment.availability === "AVAILABLE" && ratingOpen) {
-    return {
-      href: `/reviewer/${assignment.cycle.id}/rate`,
-      label: "Rate Now",
-      className: "border-primary/25 bg-primary/10 text-primary",
-    };
-  }
+  const stage = getCycleStageInfo(assignment.cycle, reviewerId, assignment, now);
 
   return {
-    href: `/reviewer/${assignment.cycle.id}`,
-    label: "View Details",
-    className: "border-border bg-muted text-muted-foreground",
+    href: stage.actionHref,
+    label: stage.actionLabel,
+    className:
+      stage.tone === "amber"
+        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+        : stage.tone === "primary"
+          ? "border-primary/25 bg-primary/10 text-primary"
+          : stage.tone === "green"
+            ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400"
+            : stage.tone === "blue"
+              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400"
+              : stage.tone === "purple"
+                ? "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/30 dark:text-purple-400"
+                : "border-border bg-muted text-muted-foreground",
   };
 }
 
@@ -91,6 +84,9 @@ export default async function AssignmentsPage() {
           },
           assignments: { select: { availability: true } },
           ratings: { select: { reviewerId: true, averageScore: true } },
+          decision: { select: { id: true } },
+          moms: { select: { role: true } },
+          arrear: { select: { status: true } },
         },
       },
     },
@@ -100,13 +96,15 @@ export default async function AssignmentsPage() {
     (a) => a.availability === "PENDING",
   ).length;
   const completed = assignments.filter((a) =>
-    a.cycle.ratings.some((r) => r.reviewerId === session.user.id),
+    getCycleStageInfo(a.cycle, session.user.id, a, now).kind === "completed",
   ).length;
   const pendingRating = assignments.filter(
     (a) =>
-      a.availability === "AVAILABLE" &&
-      isRatingOpen(a.cycle, now) &&
-      !a.cycle.ratings.some((r) => r.reviewerId === session.user.id),
+      getCycleStageInfo(a.cycle, session.user.id, a, now).kind === "active" &&
+      getCycleStageInfo(a.cycle, session.user.id, a, now).actionLabel === "Rate Now",
+  ).length;
+  const postReview = assignments.filter(
+    (a) => getCycleStageInfo(a.cycle, session.user.id, a, now).kind === "post_review",
   ).length;
 
   return (
@@ -121,7 +119,7 @@ export default async function AssignmentsPage() {
       </FadeIn>
 
       <FadeIn delay={0.05}>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <SummaryCard
             label="Total Assigned"
             value={assignments.length}
@@ -133,6 +131,12 @@ export default async function AssignmentsPage() {
             value={pendingAvailability + pendingRating}
             icon={<AlertCircle className="size-4 text-amber-500" />}
             accent="stat-amber"
+          />
+          <SummaryCard
+            label="Post Review"
+            value={postReview}
+            icon={<CheckCircle className="size-4 text-green-500" />}
+            accent="stat-green"
           />
           <SummaryCard
             label="Completed"
@@ -183,11 +187,10 @@ export default async function AssignmentsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {assignments.map((assignment, idx) => {
-                    const ratingOpen = isRatingOpen(assignment.cycle, now);
                     const route = assignmentRoute(
                       assignment,
                       session.user.id,
-                      ratingOpen,
+                      now,
                     );
                     const doneReviewers = assignment.cycle.ratings.length;
                     const totalReviewers = assignment.cycle.assignments.length;

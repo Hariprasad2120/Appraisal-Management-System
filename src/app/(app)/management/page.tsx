@@ -80,6 +80,8 @@ export default async function ManagementDashboard() {
             slab: { select: { label: true, hikePercent: true } },
           },
         },
+        moms: { select: { role: true } },
+        arrear: { select: { status: true } },
         assignments: {
           select: {
             reviewer: { select: { name: true } },
@@ -130,15 +132,15 @@ export default async function ManagementDashboard() {
   const actionableCycles = cycles.filter((c) =>
     ["RATINGS_COMPLETE", "MANAGEMENT_REVIEW", "DATE_VOTING", "SCHEDULED", "DECIDED"].includes(getDisplayStatus(c))
   );
-  const totalDecided = cycles.filter((c) => c.status === "DECIDED").length;
+  const totalDecided = cycles.filter((c) => getDisplayStatus(c) === "DECIDED").length;
   const totalPending = cycles.filter((c) => {
     const status = getDisplayStatus(c);
     return status === "MANAGEMENT_REVIEW" || status === "RATINGS_COMPLETE";
   }).length;
-  const totalClosed = cycles.filter((c) => c.status === "CLOSED").length;
+  const totalClosed = cycles.filter((c) => getDisplayStatus(c) === "CLOSED").length;
 
   const decidedCycles = cycles
-    .filter((c) => c.status === "DECIDED" && c.ratings.length > 0)
+    .filter((c) => getDisplayStatus(c) === "DECIDED" && c.ratings.length > 0)
     .slice(0, 20)
     .reverse();
 

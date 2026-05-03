@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { addBusinessDays } from "@/lib/business-days";
-import type { CycleStatus, ReviewerAvailability } from "@/generated/prisma/enums";
+import type { ArrearStatus, CycleStatus, ReviewerAvailability } from "@/generated/prisma/enums";
 
 type WorkflowAssignment = {
   availability: ReviewerAvailability;
@@ -10,6 +10,16 @@ type WorkflowRating = {
   averageScore: number;
   reviewerId: string;
 };
+
+type WorkflowMom = {
+  role: string;
+};
+
+type WorkflowArrear = {
+  status: ArrearStatus;
+} | null;
+
+type WorkflowDecision = object | null;
 
 type WorkflowSelf = {
   editableUntil: Date;
@@ -24,6 +34,20 @@ type WorkflowCycle = {
   self: WorkflowSelf;
   assignments: WorkflowAssignment[];
   ratings: WorkflowRating[];
+  decision?: WorkflowDecision;
+  moms?: WorkflowMom[];
+  arrear?: WorkflowArrear;
+};
+
+export type CycleStageKind = "active" | "post_review" | "completed";
+
+export type CycleStageInfo = {
+  kind: CycleStageKind;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  actionHref: string;
+  tone: "amber" | "primary" | "green" | "slate" | "blue" | "purple";
 };
 
 export function isSelfAssessmentSubmitted(self: WorkflowSelf): boolean {
@@ -96,6 +120,10 @@ export function getVisibleAverageForReviewer(
 }
 
 export function computeCycleStatus(cycle: WorkflowCycle, now = new Date()): CycleStatus {
+  if (isCycleOperationallyClosed(cycle)) {
+    return "CLOSED";
+  }
+
   if (
     cycle.status === "DECIDED" ||
     cycle.status === "CLOSED" ||
@@ -124,6 +152,170 @@ export function computeCycleStatus(cycle: WorkflowCycle, now = new Date()): Cycl
   return "AWAITING_AVAILABILITY";
 }
 
+export function isCycleOperationallyClosed(
+  cycle: Pick<WorkflowCycle, "status"> & Partial<Pick<WorkflowCycle, "moms" | "arrear">>,
+): boolean {
+  if (cycle.status === "CLOSED") return true;
+
+  const meetingRecorded = cycle.moms?.some((mom) => mom.role === "MANAGEMENT") ?? false;
+  if (!meetingRecorded) return false;
+
+  if (!("arrear" in cycle) || !cycle.arrear) return true;
+  return cycle.arrear.status === "PAID" || cycle.arrear.status === "REJECTED";
+}
+
+export function getCycleStageInfo(
+  cycle: Pick<
+    WorkflowCycle,
+    "id" | "status" | "self" | "assignments" | "ratings" | "ratingDeadline"
+  > &
+    Partial<Pick<WorkflowCycle, "decision" | "moms" | "arrear">> & {
+      scheduledDate?: Date | null;
+      tentativeDate1?: Date | null;
+      tentativeDate2?: Date | null;
+    },
+  reviewerId: string,
+  assignment?: WorkflowAssignment & { role?: string },
+  now = new Date(),
+): CycleStageInfo {
+  const status = computeCycleStatus(cycle as WorkflowCycle, now);
+  const reviewerRated = cycle.ratings.some((rating) => rating.reviewerId === reviewerId);
+  const ratingOpen = isRatingOpen(cycle, now);
+  const managementMomRecorded = cycle.moms?.some((mom) => mom.role === "MANAGEMENT") ?? false;
+  const hrMomRecorded = cycle.moms?.some((mom) => mom.role === "HR") ?? false;
+  const isHrAssignment = assignment?.role === "HR";
+
+  if (status === "CLOSED") {
+    return {
+      kind: "completed",
+      label: "Cycle Closed",
+      detail: cycle.arrear?.status === "PAID" ? "Meeting recorded and arrear completed" : "Meeting recorded",
+      actionLabel: "View History",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "green",
+    };
+  }
+
+  if (assignment?.availability === "PENDING") {
+    return {
+      kind: "active",
+      label: "Set Availability",
+      detail: "Reviewer action required",
+      actionLabel: "Set Availability",
+      actionHref: `/reviewer/${cycle.id}/availability`,
+      tone: "amber",
+    };
+  }
+
+  if (assignment?.availability === "NOT_AVAILABLE") {
+    return {
+      kind: "completed",
+      label: "Not Available",
+      detail: "No reviewer action needed",
+      actionLabel: "View Details",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "slate",
+    };
+  }
+
+  if (assignment?.availability === "AVAILABLE" && ratingOpen && !reviewerRated) {
+    return {
+      kind: "active",
+      label: "Rating Open",
+      detail: "Reviewer rating pending",
+      actionLabel: "Rate Now",
+      actionHref: `/reviewer/${cycle.id}/rate`,
+      tone: "primary",
+    };
+  }
+
+  if (cycle.arrear?.status === "PENDING_APPROVAL") {
+    return {
+      kind: "post_review",
+      label: "Arrear Pending",
+      detail: "Meeting recorded; arrear approval pending",
+      actionLabel: "View Status",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "amber",
+    };
+  }
+
+  if (cycle.arrear?.status === "APPROVED") {
+    return {
+      kind: "post_review",
+      label: "Arrear Approved",
+      detail: "Awaiting arrear payout completion",
+      actionLabel: "View Status",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "blue",
+    };
+  }
+
+  if (managementMomRecorded) {
+    return {
+      kind: "post_review",
+      label: "Meeting Recorded",
+      detail: "Post-meeting records available",
+      actionLabel: "View Status",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "green",
+    };
+  }
+
+  if (cycle.scheduledDate) {
+    return {
+      kind: "post_review",
+      label: hrMomRecorded ? "HR MoM Recorded" : "Meeting Scheduled",
+      detail: hrMomRecorded ? "Awaiting management MoM" : "Awaiting meeting record",
+      actionLabel: isHrAssignment && !hrMomRecorded ? "Record MoM" : "Meeting Status",
+      actionHref: isHrAssignment && !hrMomRecorded ? `/reviewer/mom/${cycle.id}` : `/reviewer/${cycle.id}`,
+      tone: "purple",
+    };
+  }
+
+  if (isHrAssignment && (cycle.tentativeDate1 || cycle.tentativeDate2)) {
+    return {
+      kind: "post_review",
+      label: "Confirm Meeting",
+      detail: "Management proposed meeting dates",
+      actionLabel: "Confirm Date",
+      actionHref: `/reviewer/${cycle.id}/schedule`,
+      tone: "primary",
+    };
+  }
+
+  if (cycle.decision || status === "DECIDED" || status === "DATE_VOTING") {
+    return {
+      kind: "post_review",
+      label: status === "DATE_VOTING" ? "Scheduling Meeting" : "Salary Discussion",
+      detail: "Rating completed; meeting flow in progress",
+      actionLabel: "View Status",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "blue",
+    };
+  }
+
+  if (reviewerRated) {
+    return {
+      kind: "post_review",
+      label: "Rating Submitted",
+      detail: "Waiting for cycle to move forward",
+      actionLabel: "View Status",
+      actionHref: `/reviewer/${cycle.id}`,
+      tone: "green",
+    };
+  }
+
+  return {
+    kind: "active",
+    label: "Waiting",
+    detail: "No reviewer action right now",
+    actionLabel: "View Details",
+    actionHref: `/reviewer/${cycle.id}`,
+    tone: "slate",
+  };
+}
+
 export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | null> {
   const cycle = await prisma.appraisalCycle.findUnique({
     where: { id: cycleId },
@@ -147,6 +339,9 @@ export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | nu
           reviewerId: true,
         },
       },
+      decision: { select: { id: true } },
+      moms: { select: { role: true } },
+      arrear: { select: { status: true } },
       user: { select: { name: true } },
     },
   });
@@ -165,8 +360,6 @@ export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | nu
     if (nextStatus === "PENDING_SELF") {
       const adminUsers = await prisma.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } });
       const empName = cycle.user?.name ?? "an employee";
-      const adminIds = new Set(adminUsers.map((u) => u.id));
-
       // Appraisee: actionable — self-assessment is now open
       await prisma.notification.create({
         data: {
