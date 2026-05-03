@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Loader2, AlertCircle, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const rawCallbackUrl = params.get("callbackUrl") ?? "/";
   const callbackUrl = rawCallbackUrl.startsWith("/") &&
@@ -28,6 +27,20 @@ export function LoginForm() {
     letterSpacing: "0",
   };
 
+  function safeRedirectTarget(target: string | null | undefined) {
+    if (!target) return callbackUrl;
+    try {
+      const url = new URL(target, window.location.origin);
+      if (url.origin !== window.location.origin) return callbackUrl;
+      if (url.pathname.startsWith("/api/")) return callbackUrl;
+      if (/\.[a-z0-9]+$/i.test(url.pathname)) return callbackUrl;
+      if (url.searchParams.has("error")) return null;
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return callbackUrl;
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -39,15 +52,19 @@ export function LoginForm() {
         email,
         password,
         userAgent,
-        callbackUrl,
+        redirectTo: callbackUrl,
         redirect: false,
       });
-      if (res?.error || res?.ok === false) {
+      const error = typeof res === "object" ? res?.error : null;
+      const ok = typeof res === "object" ? res?.ok : true;
+      const returnedUrl = typeof res === "string" ? res : res?.url;
+      const redirectTarget = safeRedirectTarget(returnedUrl);
+
+      if (error || ok === false || redirectTarget === null) {
         setErr("Invalid email or password. Please try again.");
         return;
       }
-      router.push(callbackUrl);
-      router.refresh();
+      window.location.assign(redirectTarget);
     } catch {
       setErr("Sign in failed. Please try again.");
     } finally {

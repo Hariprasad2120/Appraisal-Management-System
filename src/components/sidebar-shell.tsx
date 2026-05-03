@@ -17,6 +17,8 @@ const roleColors: Record<Role, string> = {
   PARTNER: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
 };
 
+const LOGO_SRC = "/api/logo?v=2";
+
 type Props = {
   role: Role;
   secondaryRole?: Role | null;
@@ -47,7 +49,7 @@ export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
             title="Adarsh Shipping"
           >
             <Image
-              src="/Logo.png"
+              src={LOGO_SRC}
               alt="Adarsh Shipping"
               width={160}
               height={54}
@@ -55,7 +57,7 @@ export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
               unoptimized
             />
             <Image
-              src="/Logo.png"
+              src={LOGO_SRC}
               alt=""
               width={160}
               height={54}

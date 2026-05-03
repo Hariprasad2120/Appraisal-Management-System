@@ -2,6 +2,8 @@ import Image from "next/image";
 import { Suspense } from "react";
 import { LoginForm } from "./login-form";
 
+const LOGO_SRC = "/api/logo?v=2";
+
 export default function LoginPage() {
   return (
     <div className="relative min-h-screen bg-background overflow-hidden flex items-center justify-center px-4 py-10">
@@ -10,7 +12,7 @@ export default function LoginPage() {
           <section className="hidden lg:block space-y-8">
             <div>
               <Image
-                src="/Logo.png"
+                src={LOGO_SRC}
                 alt="Adarsh Shipping logo"
                 width={430}
                 height={143}
@@ -66,7 +68,7 @@ export default function LoginPage() {
           <section className="w-full">
             <div className="flex flex-col items-center mb-8 lg:hidden">
               <Image
-                src="/Logo.png"
+                src={LOGO_SRC}
                 alt="Adarsh Shipping logo"
                 width={320}
                 height={107}
