@@ -9,7 +9,7 @@ import { Suspense } from "react";
 import { NavigationProgress } from "@/components/navigation-progress";
 
 const fontSans = localFont({
-  src: "../../Adarsh Shipping Design System/fonts/Kiona-Regular.ttf",
+  src: "./fonts/Kiona-Regular.ttf",
   variable: "--font-sans",
   display: "swap",
 });

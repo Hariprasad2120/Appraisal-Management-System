@@ -25,12 +25,16 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
   const timedOutRef = useRef(false);
 
   const resetActivity = useCallback(() => {
+    if (warningShownRef.current) return;
     lastActivityRef.current = Date.now();
-    if (warningShownRef.current) {
-      warningShownRef.current = false;
-      setShowWarning(false);
-      toast.dismiss(TIMEOUT_WARNING_TOAST_ID);
-    }
+  }, []);
+
+  const renewActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    warningShownRef.current = false;
+    timedOutRef.current = false;
+    setShowWarning(false);
+    toast.dismiss(TIMEOUT_WARNING_TOAST_ID);
   }, []);
 
   const doTimeout = useCallback(async () => {
@@ -45,14 +49,15 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
     } catch {
       // silent
     }
-    await signOut({ redirectTo: "/login?reason=timeout" });
+    await signOut({ callbackUrl: "/login?reason=timeout" });
+    window.location.assign("/login?reason=timeout");
   }, []);
 
   const stayLoggedIn = useCallback(() => {
-    resetActivity();
+    renewActivity();
     // Refresh heartbeat
     fetch("/api/session/heartbeat", { method: "POST" }).catch(() => {});
-  }, [resetActivity]);
+  }, [renewActivity]);
 
   const sendTimeoutWarning = useCallback((remainingMs: number) => {
     const remainingSeconds = Math.ceil(remainingMs / 1000);
@@ -86,6 +91,7 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
   // Heartbeat every minute
   useEffect(() => {
     const interval = setInterval(() => {
+      if (warningShownRef.current || timedOutRef.current) return;
       fetch("/api/session/heartbeat", { method: "POST" }).catch(() => {});
     }, HEARTBEAT_INTERVAL_MS);
     return () => clearInterval(interval);
@@ -112,7 +118,7 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
       if (showWarning && remaining <= WARNING_BEFORE_MS) {
         setSecondsLeft(Math.ceil(remaining / 1000));
       }
-    }, 5_000);
+    }, 1_000);
     return () => clearInterval(interval);
   }, [timeoutMs, doTimeout, sendTimeoutWarning, showWarning]);
 

@@ -84,7 +84,7 @@ export function BasicForm({
   managers: Manager[];
   submitLabel: string;
 }) {
-  const roles = ["ADMIN", "MANAGEMENT", "MANAGER", "HR", "TL", "EMPLOYEE", "PARTNER"];
+  const roles = ["ADMIN", "MANAGEMENT", "MANAGER", "HR", "TL", "EMPLOYEE", "REVIEWER", "PARTNER"];
   return (
     <form action={action} className="space-y-6">
       <section className="space-y-3">

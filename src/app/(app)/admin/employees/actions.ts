@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import type { Role } from "@/generated/prisma/enums";
 
-const ROLES: Role[] = ["ADMIN", "MANAGEMENT", "MANAGER", "HR", "TL", "EMPLOYEE", "PARTNER"];
+const ROLES: Role[] = ["ADMIN", "MANAGEMENT", "MANAGER", "HR", "TL", "EMPLOYEE", "REVIEWER", "PARTNER"];
 
 function optStr() {
   return z
@@ -33,7 +33,7 @@ function optDate() {
 }
 
 const basicSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform((v) => v.toLowerCase().trim()),
   name: z.string().min(1),
   role: z.enum(ROLES as [Role, ...Role[]]),
   department: optStr(),

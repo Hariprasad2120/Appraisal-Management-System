@@ -148,9 +148,11 @@ export async function hrSelectScheduledDateAction(
       tx.user.findMany({ where: { role: "ADMIN", active: true }, select: { id: true } }),
       tx.user.findMany({ where: { role: "MANAGEMENT", active: true }, select: { id: true } }),
     ]);
+    const reviewerIds = cycle.assignments.map((a) => a.reviewerId);
     const notifyIds = new Set<string>([
       ...adminUsers.map((u) => u.id),
       ...managementUsers.map((u) => u.id),
+      ...reviewerIds,
       cycle.userId, // appraisee
     ]);
 
@@ -161,7 +163,11 @@ export async function hrSelectScheduledDateAction(
             userId,
             type: "APPRAISAL_SCHEDULED",
             message: notificationMessage,
-            link: userId === cycle.userId ? "/employee" : `/management/decide/${cycleId}`,
+            link: userId === cycle.userId
+              ? "/employee"
+              : reviewerIds.includes(userId)
+              ? `/reviewer/${cycleId}`
+              : `/management/decide/${cycleId}`,
             persistent: true,
             critical: true,
           },

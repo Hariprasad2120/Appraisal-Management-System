@@ -23,6 +23,8 @@ import {
   Bell,
   MonitorCheck,
   Star,
+  ShieldCheck,
+  Database,
 } from "lucide-react";
 
 type NavItem = {
@@ -188,6 +190,18 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         C.amber,
       ),
       mkItem(
+        "/admin/passkeys",
+        "Passkey Resets",
+        <ShieldCheck className={sz} />,
+        C.purple,
+      ),
+      mkItem(
+        "/admin/data-tools",
+        "Data Tools",
+        <Database className={sz} />,
+        C.blue,
+      ),
+      mkItem(
         "/admin/sessions",
         "Session Monitor",
         <MonitorCheck className={sz} />,
@@ -240,7 +254,7 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
       mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
     ];
   }
-  if (role === "HR" || role === "TL" || role === "MANAGER") {
+  if (role === "HR" || role === "TL" || role === "MANAGER" || role === "REVIEWER") {
     return [
       mkItem(
         "/reviewer",

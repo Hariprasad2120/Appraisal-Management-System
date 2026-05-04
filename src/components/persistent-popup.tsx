@@ -50,6 +50,7 @@ export function PersistentPopup({ initialNotifications }: Props) {
           const existingIds = new Set(prev.map((n) => n.id));
           const incoming = data.filter((n) => !existingIds.has(n.id));
           if (incoming.length === 0) return prev;
+          window.dispatchEvent(new Event("ams:realtime-hint"));
           // Urgent ones bubble to front
           const merged = [...prev, ...incoming];
           merged.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
@@ -161,6 +162,13 @@ function NotificationToast({
 }) {
   const isUrgent = n.urgent;
   const isBusy = busy === n.id;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      onDismiss(n.id);
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [n.id, onDismiss]);
 
   return (
     <motion.div

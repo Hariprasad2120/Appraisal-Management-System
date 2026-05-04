@@ -16,18 +16,38 @@ export async function POST(req: NextRequest) {
   if (!original) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Create a new urgent copy for the target user
-  const urgent = await prisma.notification.create({
-    data: {
-      userId: original.userId,
-      type: original.type,
-      message: `[URGENT] ${original.message}`,
-      link: original.link,
-      persistent: true,
-      critical: true,
-      important: true,
-      urgent: true,
-      retriggeredFromId: original.id,
-    },
+  const urgent = await prisma.$transaction(async (tx) => {
+    const notification = await tx.notification.create({
+      data: {
+        userId: original.userId,
+        type: original.type,
+        message: `[URGENT] ${original.message}`,
+        link: original.link,
+        persistent: true,
+        critical: true,
+        important: true,
+        urgent: true,
+        retriggeredFromId: original.id,
+      },
+    });
+    await tx.messageRetriggerLog.create({
+      data: {
+        actorId: session.user.id,
+        recipientId: original.userId,
+        notificationId: notification.id,
+        messageType: original.type,
+        channel: "IN_APP",
+        metadata: { originalNotificationId: original.id },
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId: session.user.id,
+        action: "MESSAGE_RETRIGGERED",
+        after: { notificationId: notification.id, originalNotificationId: original.id, recipientId: original.userId, type: original.type },
+      },
+    });
+    return notification;
   });
 
   return NextResponse.json({ ok: true, id: urgent.id });

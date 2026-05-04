@@ -12,6 +12,7 @@ import { MobileNav } from "@/components/mobile-nav";
 import { ContextualTips } from "@/components/contextual-tips";
 import { InactivityGuard } from "@/components/inactivity-guard";
 import { AppHeader } from "@/components/app-header";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 
 const getSimulationActive = unstable_cache(
   async () => {
@@ -42,6 +43,7 @@ const roleColors: Record<string, string> = {
   MANAGER: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
   HR: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   TL: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  REVIEWER: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
   EMPLOYEE: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   PARTNER: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
 };
@@ -146,6 +148,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Inactivity timeout guard */}
       <InactivityGuard timeoutMinutes={timeoutMinutes} />
+      <RealtimeRefresh />
     </div>
   );
 }

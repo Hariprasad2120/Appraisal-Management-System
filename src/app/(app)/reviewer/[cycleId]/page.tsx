@@ -7,6 +7,7 @@ import {
   getVisibleAverageForReviewer,
   isRatingOpen,
   isReviewWindowOpen,
+  getRatingDeadline,
 } from "@/lib/workflow";
 import { toTitleCase } from "@/lib/utils";
 import { FadeIn } from "@/components/motion-div";
@@ -64,6 +65,7 @@ export default async function ReviewerCycleView({
   const reviewOpen = isReviewWindowOpen(cycle, now);
   const ratingOpen = isRatingOpen(cycle, now);
   const displayStatus = computeCycleStatus(cycle, now);
+  const reviewerDeadline = getRatingDeadline(cycle);
   const myRating = cycle.ratings.find((r) => r.reviewerId === session.user.id);
 
   const [existingReviews, existingDisagreement] = await Promise.all([
@@ -237,13 +239,13 @@ export default async function ReviewerCycleView({
             </div>
           </FadeIn>
 
-          {cycle.self && (
+          {reviewerDeadline && (
             <FadeIn delay={0.1}>
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 border border-border rounded-xl px-4 py-3">
                 <CalendarDays className="size-3.5 shrink-0" />
-                Self-assessment deadline:{" "}
+                Reviewer deadline:{" "}
                 <span className="text-foreground font-medium">
-                  {cycle.self.editableUntil.toLocaleString("en-IN")}
+                  {reviewerDeadline.toLocaleString("en-IN")}
                 </span>
               </div>
             </FadeIn>

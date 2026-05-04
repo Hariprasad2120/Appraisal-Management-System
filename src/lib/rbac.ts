@@ -6,11 +6,12 @@ export const ROLE_HOME: Record<Role, string> = {
   MANAGER: "/reviewer",
   HR: "/reviewer",
   TL: "/reviewer",
+  REVIEWER: "/reviewer",
   EMPLOYEE: "/employee",
   PARTNER: "/partner",
 };
 
-export const REVIEWER_ROLES: Role[] = ["HR", "TL", "MANAGER"];
+export const REVIEWER_ROLES: Role[] = ["HR", "TL", "MANAGER", "REVIEWER"];
 
 /** Roles that can receive an appraisal cycle. MANAGEMENT and PARTNER are excluded. */
 export const NON_APPRAISABLE_ROLES: Role[] = ["MANAGEMENT", "PARTNER"];

@@ -14,6 +14,7 @@ enum Role {
   HR
   TL
   EMPLOYEE
+  REVIEWER
   PARTNER
 }
 
@@ -98,6 +99,9 @@ model User {
   id            String   @id @default(cuid())
   email         String   @unique
   passwordHash  String
+  passkeyHash   String?
+  passkeySetupRequired Boolean @default(true)
+  googleLoginAllowed   Boolean @default(false)
   name          String
   role          Role
   secondaryRole Role?
@@ -167,6 +171,12 @@ model User {
   arrearApprovals    Arrear[]           @relation("ArrearApprover")
   reschedulesCreated MeetingReschedule[] @relation("RescheduledBy")
   reschedulesConfirmed MeetingReschedule[] @relation("RescheduleConfirmer")
+  passwordResetTokens PasswordResetToken[]
+  passkeyResetRequests PasskeyResetRequest[] @relation("PasskeyResetUser")
+  passkeyResetDecisions PasskeyResetRequest[] @relation("PasskeyResetDecider")
+  loginChallenges LoginChallenge[]
+  messageRetriggers MessageRetriggerLog[] @relation("MessageRetriggerActor")
+  messageRetriggerRecipients MessageRetriggerLog[] @relation("MessageRetriggerRecipient")
 
   @@index([role, active])
 }
@@ -395,10 +405,69 @@ model Notification {
   /// Id of the original notification this was re-triggered from
   retriggeredFromId String?
   createdAt      DateTime  @default(now())
+  retriggerLogs  MessageRetriggerLog[]
 
   @@index([userId, read])
   @@index([userId, dismissed])
   @@index([userId, critical, dismissed])
+}
+
+model LoginChallenge {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider  String   @default("credentials")
+  redirectTo String  @default("/")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PasskeyResetRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("PasskeyResetUser", fields: [userId], references: [id], onDelete: Cascade)
+  status      String   @default("PENDING")
+  requestedAt DateTime @default(now())
+  decidedAt   DateTime?
+  decidedById String?
+  decidedBy   User?    @relation("PasskeyResetDecider", fields: [decidedById], references: [id])
+  reason      String?
+
+  @@index([status, requestedAt])
+  @@index([userId, status])
+}
+
+model MessageRetriggerLog {
+  id             String   @id @default(cuid())
+  actorId        String
+  actor          User     @relation("MessageRetriggerActor", fields: [actorId], references: [id])
+  recipientId    String
+  recipient      User     @relation("MessageRetriggerRecipient", fields: [recipientId], references: [id])
+  notificationId String?
+  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  messageType    String
+  channel        String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([recipientId, createdAt])
 }
 
 model AuditLog {

@@ -1,10 +1,11 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import type { Role } from "@/generated/prisma/enums";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 
 if (process.env.NODE_ENV === "production") {
   for (const key of ["NEXTAUTH_URL", "AUTH_URL"] as const) {
@@ -34,13 +35,12 @@ declare module "@auth/core/jwt" {
 }
 
 const credsSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  challengeToken: z.string().min(32),
+  passkey: z.string().regex(/^\d{4}$|^\d{6}$/),
 });
 
-function normalizeAttemptEmail(credentials: Partial<Record<string, unknown>> | undefined): string | null {
-  const email = credentials?.email;
-  return typeof email === "string" ? email.toLowerCase().trim() : null;
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 function getClientIp(req: Request): string | null {
@@ -93,18 +93,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        challengeToken: { label: "Challenge", type: "text" },
+        passkey: { label: "Passkey", type: "password" },
       },
       authorize: async (credentials, req) => {
         const request = req as unknown as Request;
         const ipAddress = getClientIp(request) ?? null;
         const userAgent = request.headers?.get?.("user-agent") ?? null;
-        const attemptedEmail = normalizeAttemptEmail(credentials);
         const parsed = credsSchema.safeParse(credentials);
         if (!parsed.success) {
           await recordLoginAttempt({
-            email: attemptedEmail,
+            email: null,
             outcome: "FAILED",
             reason: "INVALID_CREDENTIAL_FORMAT",
             ipAddress,
@@ -112,13 +111,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           return null;
         }
-        const { email, password } = parsed.data;
-        const user = await prisma.user.findUnique({ where: { email } });
+        const { challengeToken, passkey } = parsed.data;
+        const challenge = await prisma.loginChallenge.findUnique({
+          where: { tokenHash: hashToken(challengeToken) },
+          include: { user: true },
+        });
+        const email = challenge?.user.email ?? null;
+        if (!challenge || challenge.usedAt || challenge.expiresAt < new Date()) {
+          await recordLoginAttempt({
+            email,
+            outcome: "FAILED",
+            reason: "INVALID_OR_EXPIRED_CHALLENGE",
+            ipAddress,
+            userAgent,
+          });
+          return null;
+        }
+
+        const user = challenge.user;
         if (!user) {
           await recordLoginAttempt({
             email,
             outcome: "FAILED",
             reason: "USER_NOT_FOUND",
+            ipAddress,
+            userAgent,
+          });
+          return null;
+        }
+        if (!user.passkeyHash || user.passkeySetupRequired) {
+          await recordLoginAttempt({
+            userId: user.id,
+            email,
+            outcome: "FAILED",
+            reason: "PASSKEY_SETUP_REQUIRED",
             ipAddress,
             userAgent,
           });
@@ -135,13 +161,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           return null;
         }
-        const ok = await bcrypt.compare(password, user.passwordHash);
+        const ok = await bcrypt.compare(passkey, user.passkeyHash);
         if (!ok) {
           await recordLoginAttempt({
             userId: user.id,
             email,
             outcome: "FAILED",
-            reason: "INVALID_PASSWORD",
+            reason: "INVALID_PASSKEY",
             ipAddress,
             userAgent,
           });
@@ -154,6 +180,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const staleSessions = await prisma.userSession.updateMany({
           where: { userId: user.id, status: "ACTIVE" },
           data: { status: "LOGGED_OUT", logoutAt: new Date() },
+        });
+
+        await prisma.loginChallenge.update({
+          where: { id: challenge.id },
+          data: { usedAt: new Date() },
         });
 
         await prisma.userSession.create({
@@ -227,8 +258,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            allowDangerousEmailAccountLinking: false,
+          }),
+        ]
+      : []),
   ],
   callbacks: {
+    signIn: async ({ user, account, profile }) => {
+      if (account?.provider !== "google") return true;
+      const email = user.email?.toLowerCase().trim();
+      const verified = (profile as { email_verified?: boolean } | undefined)?.email_verified === true;
+      if (!email || !verified) return false;
+      const approved = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, active: true, googleLoginAllowed: true },
+      });
+      if (!approved?.active || !approved.googleLoginAllowed) return false;
+      const challengeToken = randomBytes(32).toString("hex");
+      await prisma.loginChallenge.create({
+        data: {
+          userId: approved.id,
+          provider: "google",
+          tokenHash: hashToken(challengeToken),
+          redirectTo: "/",
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+      return `/login?challenge=${challengeToken}&provider=google`;
+    },
     jwt: async ({ token, user }) => {
       if (user) {
         token.id = (user as { id: string }).id;
