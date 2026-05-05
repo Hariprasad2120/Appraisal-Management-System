@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Loader2, AlertCircle, ArrowRight, Eye, EyeOff, KeyRound } from "lucide-react";
@@ -41,6 +41,7 @@ export function LoginForm() {
     params.get("provider") === "google" ? "Google verified. Enter your passkey to continue." : null,
   );
   const [loading, setLoading] = useState(false);
+  const autoSubmitRef = useRef("");
   const caseSensitiveInputStyle = {
     fontFamily: "Arial, Helvetica, sans-serif",
     letterSpacing: "0",
@@ -76,6 +77,10 @@ export function LoginForm() {
 
   async function onPasskeySubmit(e: React.FormEvent) {
     e.preventDefault();
+    await verifyPasskey();
+  }
+
+  const verifyPasskey = useCallback(async () => {
     setErr(null);
     setLoading(true);
     try {
@@ -92,10 +97,14 @@ export function LoginForm() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [callbackUrl, challengeToken, passkey]);
 
   async function onSetupSubmit(e: React.FormEvent) {
     e.preventDefault();
+    await setupPasskey();
+  }
+
+  const setupPasskey = useCallback(async () => {
     setErr(null);
     setLoading(true);
     try {
@@ -113,7 +122,7 @@ export function LoginForm() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [callbackUrl, challengeToken, confirmPasskey, passkey]);
 
   async function onRequest(kind: "password" | "passkey") {
     setErr(null);
@@ -166,6 +175,26 @@ export function LoginForm() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeSetupField, passkeyLength, step]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (step === "passkey" && passkey.length === passkeyLength) {
+      const key = `verify:${passkeyLength}:${passkey}`;
+      if (autoSubmitRef.current === key) return;
+      autoSubmitRef.current = key;
+      void verifyPasskey();
+    }
+    if (
+      step === "setup" &&
+      passkey.length === passkeyLength &&
+      confirmPasskey.length === passkeyLength
+    ) {
+      const key = `setup:${passkeyLength}:${passkey}:${confirmPasskey}`;
+      if (autoSubmitRef.current === key) return;
+      autoSubmitRef.current = key;
+      void setupPasskey();
+    }
+  }, [confirmPasskey, loading, passkey, passkeyLength, setupPasskey, step, verifyPasskey]);
 
   return (
     <div className="bg-card border border-border rounded-2xl shadow-md p-7 w-full">

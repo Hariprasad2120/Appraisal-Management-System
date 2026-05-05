@@ -9,8 +9,11 @@ import {
   isSelfAssessmentSubmitted,
 } from "@/lib/workflow";
 import { getSystemDate } from "@/lib/system-date";
+import { monthStart } from "@/lib/kpi";
+import { updateEmployeeKpiTaskStatusAction } from "./kpi-actions";
 import { Eye, Pencil } from "lucide-react";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
+import { Button } from "@/components/ui/button";
 import {
   Calendar,
   Star,
@@ -22,6 +25,7 @@ import {
   Clock,
   Users,
   Bell,
+  BarChart3,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -46,7 +50,8 @@ export default async function EmployeeDashboard() {
   });
   if (!user) return null;
 
-  const [recentNotifs, salaryRevisions] = await Promise.all([
+  const currentMonth = monthStart(new Date());
+  const [recentNotifs, salaryRevisions, monthlyKpis] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id, read: false },
       orderBy: { createdAt: "desc" },
@@ -63,6 +68,15 @@ export default async function EmployeeDashboard() {
         revisionPercentage: true,
         effectiveFrom: true,
         status: true,
+      },
+    }),
+    prisma.kpiReview.findMany({
+      where: { userId: user.id },
+      orderBy: { month: "desc" },
+      take: 6,
+      include: {
+        department: { select: { name: true } },
+        items: { orderBy: { sortOrder: "asc" } },
       },
     }),
   ]);
@@ -169,6 +183,114 @@ export default async function EmployeeDashboard() {
             </div>
           </StaggerItem>
         </StaggerList>
+
+        <FadeIn delay={0.16}>
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <BarChart3 className="size-3.5" /> My KPI
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Finalized monthly records
+              </span>
+            </div>
+            {monthlyKpis.length === 0 ? (
+              <div className="flex min-h-[82px] items-center justify-center px-5 py-6 text-center text-xs text-muted-foreground">
+                No KPI records yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {monthlyKpis.map((review) => {
+                  const criteria = review.items.filter(
+                    (item) =>
+                      item.itemKind === "CRITERION" &&
+                      review.items.some((task) => task.parentItemId === item.id && task.itemKind === "TASK" && task.assignedToEmployee),
+                  );
+                  const isCurrentMonth = review.month.getTime() === currentMonth.getTime();
+                  const assignedWeight = review.items
+                    .filter((item) => item.itemKind === "TASK" && item.assignedToEmployee)
+                    .reduce((sum, item) => sum + item.weightage, 0);
+                  return (
+                    <div key={review.id}>
+                      <div className="flex items-center justify-between gap-3 px-5 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {review.month.toLocaleDateString("en-IN", {
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {review.department.name} - {review.status} - {review.performanceCategory}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">
+                          {review.monthlyPointScore.toLocaleString("en-IN")}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {review.totalAchievementPercent.toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-3 border-t border-border bg-muted/20 px-5 py-4">
+                      {criteria.map((criterion) => {
+                        const tasks = review.items.filter((item) => item.parentItemId === criterion.id && item.itemKind === "TASK" && item.assignedToEmployee);
+                        return (
+                          <div key={criterion.id} className="overflow-hidden rounded-lg border border-border bg-card">
+                            <div className="border-b border-border px-4 py-3">
+                              <p className="text-sm font-semibold text-foreground">{criterion.name}</p>
+                              {criterion.description && <p className="mt-1 text-xs text-muted-foreground">{criterion.description}</p>}
+                            </div>
+                      <table className="w-full min-w-[720px] text-xs">
+                        <thead className="text-left text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-2 font-medium">Task</th>
+                            <th className="px-3 font-medium">Status</th>
+                            <th className="px-3 font-medium">Rating</th>
+                            <th className="px-3 font-medium">Score</th>
+                            <th className="px-3 font-medium">Approval</th>
+                            <th className="px-3 font-medium">Remarks</th>
+                            <th className="px-3 font-medium">Update</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {tasks.map((item) => (
+                            <tr key={item.id}>
+                              <td className="px-4 py-2">
+                                <p className="font-medium text-foreground">{item.name}</p>
+                                <p className="text-[11px] text-muted-foreground">{item.description || item.target || item.measurement}</p>
+                              </td>
+                              <td className="px-3">{item.completionStatus.replaceAll("_", " ")}</td>
+                              <td className="px-3">{item.rating?.toFixed(2) ?? "-"}</td>
+                              <td className="px-3">{item.weightedAchievement > 0 && assignedWeight > 0 ? Math.round((20000 * item.weightedAchievement) / assignedWeight).toLocaleString("en-IN") : "-"}</td>
+                              <td className="px-3">{item.approvalStatus}</td>
+                              <td className="px-3 text-muted-foreground">{item.remarks ?? "-"}</td>
+                              <td className="px-3">
+                                <form action={updateEmployeeKpiTaskStatusAction} className="flex items-center gap-2">
+                                  <input type="hidden" name="itemId" value={item.id} />
+                                  <select name="completionStatus" defaultValue={item.completionStatus} disabled={!isCurrentMonth} className="h-8 rounded-md border border-border bg-background px-2 text-xs disabled:opacity-60">
+                                    <option value="NOT_COMPLETED">Not Completed</option>
+                                    <option value="PARTIALLY_COMPLETED">Partially Completed</option>
+                                    <option value="FULLY_COMPLETED">Fully Completed</option>
+                                  </select>
+                                  <Button type="submit" size="sm" variant="outline" disabled={!isCurrentMonth}>Save</Button>
+                                </form>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );})}
+              </div>
+            )}
+          </div>
+        </FadeIn>
 
         {/* Notifications */}
         <FadeIn delay={0.18}>

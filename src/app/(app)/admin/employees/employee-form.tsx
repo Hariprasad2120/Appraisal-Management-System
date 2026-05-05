@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Manager = { id: string; name: string };
+type Manager = { id: string; name: string; role: string; employeeNumber?: number | null };
 
 export type BasicDefaults = {
   email?: string;
@@ -85,6 +85,8 @@ export function BasicForm({
   submitLabel: string;
 }) {
   const roles = ["ADMIN", "MANAGEMENT", "MANAGER", "HR", "TL", "EMPLOYEE", "REVIEWER", "PARTNER"];
+  const tlManagers = managers.filter((manager) => manager.role === "TL");
+  const otherManagers = managers.filter((manager) => manager.role !== "TL");
   return (
     <form action={action} className="space-y-6">
       <section className="space-y-3">
@@ -144,7 +146,7 @@ export function BasicForm({
           <Field label="Location" name="location" defaultValue={defaults.location ?? ""} />
           <Field label="Joining Date" name="joiningDate" type="date" defaultValue={iso(defaults.joiningDate)} required />
           <div className="space-y-1">
-            <Label htmlFor="reportingManagerId">Reporting Manager</Label>
+            <Label htmlFor="reportingManagerId">Reporting TL / Manager</Label>
             <select
               id="reportingManagerId"
               name="reportingManagerId"
@@ -152,11 +154,24 @@ export function BasicForm({
               className="flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm"
             >
               <option value="">-</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
+              {tlManagers.length > 0 && (
+                <optgroup label="Team Leads">
+                  {tlManagers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.employeeNumber ? `${m.employeeNumber} - ` : ""}{m.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {otherManagers.length > 0 && (
+                <optgroup label="Other Managers">
+                  {otherManagers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.employeeNumber ? `${m.employeeNumber} - ` : ""}{m.name} ({m.role})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
           <div className="flex items-end gap-2">

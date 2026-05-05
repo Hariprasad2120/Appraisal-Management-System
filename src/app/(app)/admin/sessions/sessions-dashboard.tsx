@@ -199,7 +199,7 @@ export function SessionsDashboard({ initialActive, history, securityEvents, rend
             {savingTimeout ? "Saving…" : timeoutSaved ? "Saved ✓" : "Save"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Warning shown 1 minute before expiry. Changes apply to new sessions.
+            Warning appears during the final 20% of idle time, capped at 2 minutes. Changes apply after the next page load.
           </p>
         </div>
       </div>

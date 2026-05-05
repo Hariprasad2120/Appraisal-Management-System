@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 const HEARTBEAT_INTERVAL_MS = 60_000; // 1 min
-const WARNING_BEFORE_MS = 60_000;     // warn 1 min before timeout
 const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 const TIMEOUT_WARNING_TOAST_ID = "session-timeout-warning";
 
@@ -17,10 +16,17 @@ type Props = {
 };
 
 export function InactivityGuard({ timeoutMinutes }: Props) {
-  const timeoutMs = timeoutMinutes * 60 * 1000;
+  const safeTimeoutMinutes = Number.isFinite(timeoutMinutes)
+    ? Math.min(480, Math.max(1, timeoutMinutes))
+    : 10;
+  const timeoutMs = safeTimeoutMinutes * 60 * 1000;
+  const warningBeforeMs = Math.min(
+    2 * 60 * 1000,
+    Math.max(30 * 1000, Math.floor(timeoutMs * 0.2)),
+  );
   const lastActivityRef = useRef<number>(0);
   const [showWarning, setShowWarning] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(60);
+  const [secondsLeft, setSecondsLeft] = useState(Math.ceil(warningBeforeMs / 1000));
   const warningShownRef = useRef(false);
   const timedOutRef = useRef(false);
 
@@ -64,7 +70,7 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
 
     toast.warning("Session expiring soon", {
       id: TIMEOUT_WARNING_TOAST_ID,
-      description: `You will be signed out in about ${remainingSeconds} seconds due to inactivity.`,
+      description: `Inactive for ${safeTimeoutMinutes} minutes total. Sign out in ${formatRemaining(remainingSeconds)} unless you stay logged in.`,
       duration: Infinity,
       action: {
         label: "Stay logged in",
@@ -77,7 +83,7 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ secondsLeft: remainingSeconds }),
     }).catch(() => {});
-  }, [stayLoggedIn]);
+  }, [safeTimeoutMinutes, stayLoggedIn]);
 
   // Listen for user activity
   useEffect(() => {
@@ -108,19 +114,19 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
         return;
       }
 
-      if (remaining <= WARNING_BEFORE_MS && !warningShownRef.current) {
+      if (remaining <= warningBeforeMs && !warningShownRef.current) {
         warningShownRef.current = true;
         setShowWarning(true);
         setSecondsLeft(Math.ceil(remaining / 1000));
         sendTimeoutWarning(remaining);
       }
 
-      if (showWarning && remaining <= WARNING_BEFORE_MS) {
+      if (showWarning && remaining <= warningBeforeMs) {
         setSecondsLeft(Math.ceil(remaining / 1000));
       }
     }, 1_000);
     return () => clearInterval(interval);
-  }, [timeoutMs, doTimeout, sendTimeoutWarning, showWarning]);
+  }, [doTimeout, sendTimeoutWarning, showWarning, timeoutMs, warningBeforeMs]);
 
   return (
     <AnimatePresence>
@@ -143,15 +149,18 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
               <div>
                 <h3 className="text-sm font-bold text-white">Session Expiring Soon</h3>
                 <p className="text-xs text-white/50 mt-0.5">Your session is about to expire due to inactivity</p>
+                <p className="text-[10px] text-white/35 mt-0.5">
+                  Timeout is set to {safeTimeoutMinutes} minute{safeTimeoutMinutes === 1 ? "" : "s"}
+                </p>
               </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 py-4 mb-5 bg-amber-500/10 rounded-xl border border-amber-500/20">
               <Clock className="size-4 text-amber-400" />
               <span className="text-2xl font-bold text-amber-400 tabular-nums">
-                {secondsLeft}s
+                {formatRemaining(secondsLeft)}
               </span>
-              <span className="text-xs text-white/40">remaining</span>
+              <span className="text-xs text-white/40">left</span>
             </div>
 
             <div className="flex gap-3">
@@ -174,4 +183,12 @@ export function InactivityGuard({ timeoutMinutes }: Props) {
       )}
     </AnimatePresence>
   );
+}
+
+function formatRemaining(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.ceil(totalSeconds));
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const rem = seconds % 60;
+  return rem === 0 ? `${mins}m` : `${mins}m ${rem}s`;
 }

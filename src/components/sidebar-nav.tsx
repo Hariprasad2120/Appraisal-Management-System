@@ -166,6 +166,12 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         C.orange,
       ),
       mkItem(
+        "/admin/kpi",
+        "Department KPI",
+        <BarChart3 className={sz} />,
+        C.green,
+      ),
+      mkItem(
         "/admin/tickets",
         "Support Tickets",
         <Ticket className={sz} />,
@@ -243,6 +249,12 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         <TrendingUp className={sz} />,
         C.orange,
       ),
+      mkItem(
+        "/management/kpi",
+        "KPI Reports",
+        <BarChart3 className={sz} />,
+        C.green,
+      ),
       mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
       mkItem("/history", "History", <History className={sz} />, C.slate),
       mkItem(
@@ -278,6 +290,16 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         <ClipboardList className={sz} />,
         C.blue,
       ),
+      ...(role === "TL"
+        ? [
+            mkItem(
+              "/reviewer/kpi",
+              "Team KPI",
+              <BarChart3 className={sz} />,
+              C.green,
+            ),
+          ]
+        : []),
       mkItem("/employee", "My Appraisal", <Star className={sz} />, C.purple),
       mkItem(
         "/history",

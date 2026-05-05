@@ -7,8 +7,8 @@ import { createEmployeeAction } from "../actions";
 export default async function NewEmployeePage() {
   const managers = await prisma.user.findMany({
     where: { active: true },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
+    select: { id: true, name: true, role: true, employeeNumber: true },
+    orderBy: [{ role: "desc" }, { name: "asc" }],
   });
 
   return (

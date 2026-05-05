@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WorkbookImportForm } from "./workbook-import-form";
 
 export default function AdminDataToolsPage() {
   return (
@@ -29,6 +30,10 @@ npm run db:reset:keep-admin`}
         <Link href="/fresh-data-import-format.md" className="mt-4 inline-flex text-sm font-medium text-primary hover:underline">
           Open spreadsheet format
         </Link>
+        <Link href="/appraisal-import-template.xlsx" className="ml-4 mt-4 inline-flex text-sm font-medium text-primary hover:underline">
+          Download Excel template
+        </Link>
+        <WorkbookImportForm />
       </section>
     </div>
   );

@@ -3,6 +3,16 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { seedSalaryRevisions } from "./seed-salary-revisions";
+import {
+  DEFAULT_KPI_ANNUAL_TARGET,
+  DEFAULT_KPI_MONTHLY_TARGET,
+  DEFAULT_KPI_RATING_SCALE,
+  KPI_ANNUAL_TARGET_SETTING,
+  KPI_MONTHLY_TARGET_SETTING,
+  KPI_RATING_SCALE_SETTING,
+  KPI_SEED_DEPARTMENTS,
+  type KpiSeedItem,
+} from "../src/lib/kpi";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL not set");
@@ -169,6 +179,11 @@ async function main() {
   await prisma.notification.deleteMany({});
   await prisma.ticketComment.deleteMany({});
   await prisma.ticket.deleteMany({});
+  await prisma.kpiReviewItem.deleteMany({});
+  await prisma.kpiReview.deleteMany({});
+  await prisma.kpiTemplateItem.deleteMany({});
+  await prisma.kpiTemplate.deleteMany({});
+  await prisma.kpiDepartment.deleteMany({});
   await prisma.criteriaOverride.deleteMany({});
   await prisma.ratingReview.deleteMany({});
   await prisma.ratingDisagreement.deleteMany({});
@@ -317,6 +332,84 @@ async function main() {
         },
       });
     }
+  }
+
+  console.log("Seeding KPI departments and templates...");
+  await prisma.systemSetting.upsert({
+    where: { key: KPI_MONTHLY_TARGET_SETTING },
+    create: { key: KPI_MONTHLY_TARGET_SETTING, value: String(DEFAULT_KPI_MONTHLY_TARGET) },
+    update: { value: String(DEFAULT_KPI_MONTHLY_TARGET) },
+  });
+  await prisma.systemSetting.upsert({
+    where: { key: KPI_ANNUAL_TARGET_SETTING },
+    create: { key: KPI_ANNUAL_TARGET_SETTING, value: String(DEFAULT_KPI_ANNUAL_TARGET) },
+    update: { value: String(DEFAULT_KPI_ANNUAL_TARGET) },
+  });
+  await prisma.systemSetting.upsert({
+    where: { key: KPI_RATING_SCALE_SETTING },
+    create: { key: KPI_RATING_SCALE_SETTING, value: JSON.stringify(DEFAULT_KPI_RATING_SCALE) },
+    update: { value: JSON.stringify(DEFAULT_KPI_RATING_SCALE) },
+  });
+
+  async function createTemplate(departmentId: string, departmentName: string, items: KpiSeedItem[]) {
+    const template = await prisma.kpiTemplate.create({
+      data: { departmentId, name: `${departmentName} KPI Template`, version: 1, active: true },
+    });
+    for (const [index, item] of items.entries()) {
+      await prisma.kpiTemplateItem.create({
+        data: {
+          templateId: template.id,
+          name: item.name,
+          weightage: item.weightage,
+          measurement: item.measurement,
+          target: item.target,
+          sortOrder: index + 1,
+        },
+      });
+    }
+  }
+
+  for (const [rootIndex, root] of KPI_SEED_DEPARTMENTS.entries()) {
+    const rootDepartment = await prisma.kpiDepartment.create({
+      data: { name: root.name, sortOrder: rootIndex + 1 },
+    });
+    if (root.items) await createTemplate(rootDepartment.id, root.name, root.items);
+    for (const [childIndex, child] of (root.children ?? []).entries()) {
+      const childDepartment = await prisma.kpiDepartment.create({
+        data: {
+          name: child.name,
+          parentId: rootDepartment.id,
+          sortOrder: childIndex + 1,
+        },
+      });
+      await createTemplate(childDepartment.id, child.name, child.items);
+    }
+  }
+
+  const kpiDepartments = await prisma.kpiDepartment.findMany();
+  const kpiByName = new Map(kpiDepartments.map((d) => [d.name, d.id]));
+  const assignRules: { match: string; department: string }[] = [
+    { match: "Human Resource", department: "HR" },
+    { match: "Head of HR", department: "HR" },
+    { match: "HR", department: "HR" },
+    { match: "Accounts", department: "Accounts" },
+    { match: "Freight Forwarding", department: "Freight Forwarding" },
+    { match: "Custom Broker", department: "Custom Clearance" },
+    { match: "Customs Broker", department: "Custom Clearance" },
+    { match: "CFS Operations", department: "Custom Clearance" },
+    { match: "Delivery Order", department: "Custom Clearance" },
+    { match: "Administration", department: "Administration" },
+  ];
+  for (const rule of assignRules) {
+    const kpiDepartmentId = kpiByName.get(rule.department);
+    if (!kpiDepartmentId) continue;
+    await prisma.user.updateMany({
+      where: {
+        role: { notIn: ["ADMIN", "MANAGEMENT", "PARTNER"] },
+        department: { contains: rule.match, mode: "insensitive" },
+      },
+      data: { kpiDepartmentId },
+    });
   }
 
   console.log(`Seed complete. ${EMPLOYEES.length} users. Default password: password123`);

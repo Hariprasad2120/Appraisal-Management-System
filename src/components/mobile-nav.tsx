@@ -133,6 +133,15 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         label: "Assignments",
         icon: <ClipboardList className="size-4" />,
       },
+      ...(role === "TL"
+        ? [
+            {
+              href: "/reviewer/kpi",
+              label: "Team KPI",
+              icon: <BarChart3 className="size-4" />,
+            },
+          ]
+        : []),
       {
         href: "/employee",
         label: "My Appraisal",

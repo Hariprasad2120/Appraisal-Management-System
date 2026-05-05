@@ -251,7 +251,7 @@ export default async function EmployeeDetailPage({
                 <InfoRow label="Source of Hire" value={user.sourceOfHire} />
                 <InfoRow label="Zoho Role" value={user.zohoRole} />
                 <InfoRow
-                  label="Reporting Manager"
+                  label="Reporting TL / Manager"
                   value={
                     user.reportingManager
                       ? `${toTitleCase(user.reportingManager.name)} (#${user.reportingManager.employeeNumber ?? "—"})`

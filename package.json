@@ -12,7 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "db:reset:keep-admin": "tsx prisma/reset-keep-admin.ts",
-    "db:import:fresh": "tsx prisma/import-fresh-data.ts"
+    "db:import:fresh": "tsx prisma/import-fresh-data.ts",
+    "db:seed:kpi": "tsx prisma/seed-kpi.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

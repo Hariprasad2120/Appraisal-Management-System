@@ -34,7 +34,7 @@ const getTimeoutMinutes = unstable_cache(
     return setting ? parseInt(setting.value, 10) : 10;
   },
   ["session-timeout-minutes"],
-  { revalidate: 60 }
+  { revalidate: 5 }
 );
 
 const roleColors: Record<string, string> = {

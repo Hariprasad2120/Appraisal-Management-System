@@ -24,8 +24,8 @@ export default async function EditEmployeePage({
 
   const managers = await prisma.user.findMany({
     where: { active: true, id: { not: id } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
+    select: { id: true, name: true, role: true, employeeNumber: true },
+    orderBy: [{ role: "desc" }, { name: "asc" }],
   });
 
   const updateBasic = updateEmployeeAction.bind(null, id);
