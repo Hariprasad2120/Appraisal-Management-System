@@ -67,6 +67,12 @@ export function canAccessPath(
   if (pathname.startsWith("/admin/mom")) return isAdmin(role, secondaryRole);
   if (pathname.startsWith("/admin/sessions"))
     return isAdmin(role, secondaryRole);
+  if (pathname.startsWith("/admin/ot"))
+    return (
+      isAdmin(role, secondaryRole) ||
+      role === "HR" ||
+      secondaryRole === "HR"
+    );
   if (pathname.startsWith("/admin")) return isAdmin(role, secondaryRole);
   if (pathname.startsWith("/management/slabs"))
     return role === "MANAGEMENT" || secondaryRole === "MANAGEMENT";

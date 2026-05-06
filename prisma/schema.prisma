@@ -260,6 +260,10 @@ model User {
   kpiTasksAssigned KpiTask[] @relation("KpiTaskAssignedBy")
   kpiTaskEvents KpiTaskEvent[] @relation("KpiTaskEventActor")
   workingCalendarUpdates WorkingCalendar[]
+  attendanceLogs         AttendanceLog[]  @relation("AttendanceLogs")
+  employeeOtRecords      EmployeeOt[]     @relation("EmployeeOtRecords")
+  otApprovals            EmployeeOt[]     @relation("OtApprovedBy")
+  employeeLopRecords     EmployeeLop[]    @relation("EmployeeLopRecords")
 
   @@index([role, active])
   @@index([kpiDepartmentId])
@@ -996,4 +1000,115 @@ model WorkingCalendar {
   updatedAt     DateTime @updatedAt
   updatedById   String?
   updatedBy     User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OT & COMP-OFF MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum OtApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum HolidayType {
+  NATIONAL
+  COMPANY
+  RESTRICTED
+  WEEKEND
+}
+
+enum OtDayType {
+  WORKING_DAY
+  HOLIDAY
+  WEEKEND
+}
+
+/// Singleton config for OT module (id = "default").
+/// Stores standard hours/day, OT rate per hour, and comp-off slab breakpoints.
+model OtSettings {
+  id                 String   @id @default("default")
+  standardHoursPerDay Decimal @default(8) @db.Decimal(4, 2)
+  otRatePerHour      Decimal  @default(100) @db.Decimal(10, 2)
+  /// JSON: [{minHours: number, compOffDays: number}] sorted ascending
+  compOffSlabs       Json
+  updatedAt          DateTime @updatedAt
+  updatedById        String?
+}
+
+/// Company + public holiday calendar used for OT/comp-off eligibility checks.
+model Holiday {
+  id          String      @id @default(cuid())
+  holidayDate DateTime    @db.Date
+  holidayName String
+  holidayType HolidayType
+  createdAt   DateTime    @default(now())
+
+  @@unique([holidayDate, holidayType])
+  @@index([holidayDate])
+}
+
+/// Raw biometric attendance import record per employee per date.
+model AttendanceLog {
+  id                   String   @id @default(cuid())
+  employeeId           String
+  employee             User     @relation("AttendanceLogs", fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceDate       DateTime @db.Date
+  checkIn              DateTime?
+  checkOut             DateTime?
+  totalHours           Decimal? @db.Decimal(5, 2)
+  regularizationStatus String?
+  approvalStatus       String   @default("Approved")
+  remarks              String?
+  createdAt            DateTime @default(now())
+
+  ot EmployeeOt?
+
+  @@unique([employeeId, attendanceDate])
+  @@index([attendanceDate])
+  @@index([employeeId, attendanceDate])
+}
+
+/// Calculated OT / Comp-Off record per employee per attendance date.
+model EmployeeOt {
+  id               String          @id @default(cuid())
+  attendanceLogId  String          @unique
+  attendanceLog    AttendanceLog   @relation(fields: [attendanceLogId], references: [id], onDelete: Cascade)
+  employeeId       String
+  employee         User            @relation("EmployeeOtRecords", fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceDate   DateTime        @db.Date
+  dayType          OtDayType       @default(WORKING_DAY)
+  hoursWorked      Decimal         @db.Decimal(5, 2)
+  otHours          Decimal         @default(0) @db.Decimal(5, 2)
+  otRatePerHour    Decimal         @default(0) @db.Decimal(10, 2)
+  otAmount         Decimal         @default(0) @db.Decimal(10, 2)
+  compOffDays      Decimal         @default(0) @db.Decimal(4, 2)
+  approvalStatus   OtApprovalStatus @default(PENDING)
+  approvedById     String?
+  approvedBy       User?           @relation("OtApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt       DateTime?
+  rejectionRemarks String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([employeeId, attendanceDate])
+  @@index([approvalStatus])
+  @@index([attendanceDate])
+}
+
+/// LOP (Loss of Pay) days per employee per payroll month.
+model EmployeeLop {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     User     @relation("EmployeeLopRecords", fields: [employeeId], references: [id], onDelete: Cascade)
+  payrollMonth DateTime @db.Date  // first day of month
+  lopDays      Decimal  @db.Decimal(5, 2)
+  remarks      String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([employeeId, payrollMonth])
+  @@index([payrollMonth])
 }

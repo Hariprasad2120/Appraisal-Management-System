@@ -25,6 +25,7 @@ import {
   Star,
   ShieldCheck,
   Database,
+  Clock,
 } from "lucide-react";
 
 type NavItem = {
@@ -191,6 +192,12 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
         C.green,
       ),
       mkItem(
+        "/admin/ot",
+        "OT Management",
+        <Clock className={sz} />,
+        C.amber,
+      ),
+      mkItem(
         "/admin/notifications",
         "Notification Center",
         <Bell className={sz} />,
@@ -282,6 +289,12 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
               "Minutes of Meeting",
               <Building2 className={sz} />,
               C.slate,
+            ),
+            mkItem(
+              "/admin/ot",
+              "OT Management",
+              <Clock className={sz} />,
+              C.orange,
             ),
           ]
         : []),
