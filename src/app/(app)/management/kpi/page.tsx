@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { Button } from "@/components/ui/button";
+import { KpiTaskTimeline } from "@/components/kpi-task-timeline";
 import { toTitleCase } from "@/lib/utils";
 import { Trophy } from "lucide-react";
 import { Fragment } from "react";
@@ -25,6 +26,17 @@ export default async function ManagementKpiPage({
       user: { select: { id: true, name: true, employeeNumber: true } },
       department: true,
       items: { orderBy: [{ parentItemId: "asc" }, { sortOrder: "asc" }] },
+      kpiTasks: {
+        orderBy: [{ assignedDate: "desc" }, { createdAt: "desc" }],
+        include: {
+          criterion: { select: { name: true, weightage: true, ruleType: true } },
+          assignedBy: { select: { name: true } },
+          events: {
+            orderBy: { timestamp: "desc" },
+            include: { actor: { select: { name: true } } },
+          },
+        },
+      },
     },
   });
 
@@ -95,6 +107,27 @@ export default async function ManagementKpiPage({
                         <tr className="bg-muted/20">
                           <td colSpan={6} className="px-4 py-3">
                             <div className="grid gap-2 md:grid-cols-2">
+                              {review.kpiTasks.map((task) => (
+                                <div key={task.id} className="rounded-lg border border-border bg-card p-3">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-xs font-semibold text-foreground">{task.name}</p>
+                                      <p className="mt-1 text-[11px] text-muted-foreground">
+                                        {task.criterion.name} - {task.status.replaceAll("_", " ")}
+                                      </p>
+                                    </div>
+                                    <span className="text-xs font-semibold text-primary">
+                                      {task.finalRating?.toFixed(2) ?? "-"}
+                                    </span>
+                                  </div>
+                                  {task.ratingExplanation && (
+                                    <p className="mt-2 text-[11px] text-muted-foreground">{task.ratingExplanation}</p>
+                                  )}
+                                  <div className="mt-3">
+                                    <KpiTaskTimeline events={task.events} compact />
+                                  </div>
+                                </div>
+                              ))}
                               {criteria.map((criterion) => {
                                 const tasks = review.items.filter((item) => item.parentItemId === criterion.id && item.itemKind === "TASK" && item.assignedToEmployee);
                                 return (
@@ -104,7 +137,7 @@ export default async function ManagementKpiPage({
                                       {tasks.map((task) => (
                                         <div key={task.id} className="flex items-center justify-between gap-2 text-[11px]">
                                           <span className="text-muted-foreground">{task.name}</span>
-                                          <span className="font-medium text-foreground">{task.rating?.toFixed(2) ?? "-"} / {task.weightedAchievement.toFixed(2)}%</span>
+                                          <span className="font-medium text-foreground">{task.rating?.toFixed(2) ?? "-"} / {Math.round(task.weightedAchievement).toLocaleString("en-IN")} pts</span>
                                         </div>
                                       ))}
                                     </div>

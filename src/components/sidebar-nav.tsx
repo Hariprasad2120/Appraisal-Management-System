@@ -129,6 +129,7 @@ function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
     return [
       dashboard,
       mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
+      mkItem("/admin/ownership", "Ownership", <UserCheck className={sz} />, C.cyan),
       mkItem(
         "/admin/appraisals",
         "Appraisals",

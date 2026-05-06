@@ -117,6 +117,55 @@ enum KpiTaskCompletionStatus {
   FULLY_COMPLETED
 }
 
+enum KpiRuleType {
+  TURNAROUND_TIME
+  DUE_DATE
+  RECURRING_WEEKLY_DUE_DATE
+  MANUAL
+  HYBRID
+}
+
+enum KpiCriterionStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum KpiTaskType {
+  ONE_TIME
+  DAILY
+  WEEKLY
+  MONTHLY
+  RECURRING
+  DUE_DATE_BASED
+}
+
+enum KpiTaskStatus {
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_REVIEW
+  PAUSED
+  PARTIALLY_COMPLETED
+  CLOSED
+  REOPENED
+}
+
+enum KpiTaskEventType {
+  ASSIGNED
+  STARTED
+  PAUSE_REQUESTED
+  PAUSE_APPROVED
+  PAUSE_REJECTED
+  PAUSED_BY_TL
+  RESUMED
+  SUBMITTED
+  REOPENED
+  PARTIALLY_COMPLETED
+  CLOSED_BY_TL
+  RATING_CALCULATED
+  POINTS_CALCULATED
+  ADMIN_OVERRIDE
+}
+
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
@@ -205,6 +254,12 @@ model User {
   kpiReviewsCreated KpiReview[] @relation("KpiReviewCreatedBy")
   kpiReviewsFinalized KpiReview[] @relation("KpiReviewFinalizedBy")
   kpiReviewItemsApproved KpiReviewItem[] @relation("KpiReviewItemApprovedBy")
+  kpiCriteriaCreated KpiCriterion[] @relation("KpiCriterionCreatedBy")
+  kpiCriteriaApproved KpiCriterion[] @relation("KpiCriterionApprovedBy")
+  kpiTasksReceived KpiTask[] @relation("KpiTaskAssignedTo")
+  kpiTasksAssigned KpiTask[] @relation("KpiTaskAssignedBy")
+  kpiTaskEvents KpiTaskEvent[] @relation("KpiTaskEventActor")
+  workingCalendarUpdates WorkingCalendar[]
 
   @@index([role, active])
   @@index([kpiDepartmentId])
@@ -224,6 +279,8 @@ model KpiDepartment {
   users     User[]        @relation("UserKpiDepartment")
   templates KpiTemplate[]
   reviews   KpiReview[]
+  criteria  KpiCriterion[]
+  criteriaAsDivision KpiCriterion[] @relation("KpiCriterionDivision")
 
   @@unique([parentId, name])
   @@index([parentId, active, sortOrder])
@@ -294,6 +351,7 @@ model KpiReview {
   updatedAt                DateTime        @updatedAt
 
   items KpiReviewItem[]
+  kpiTasks KpiTask[]
 
   @@unique([userId, month])
   @@index([month, status])
@@ -834,4 +892,108 @@ model RatingReview {
 
   @@unique([ratingId, criteriaName])
   @@index([cycleId])
+}
+
+/// Admin-created KPI criterion with a rule type and configurable rule parameters.
+/// TL approves criteria for their department before tasks can be created under them.
+model KpiCriterion {
+  id             String             @id @default(cuid())
+  name           String
+  description    String?
+  departmentId   String
+  department     KpiDepartment      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  divisionId     String?
+  division       KpiDepartment?     @relation("KpiCriterionDivision", fields: [divisionId], references: [id], onDelete: SetNull)
+  weightage      Float
+  ruleType       KpiRuleType
+  ruleConfig     Json
+  status         KpiCriterionStatus @default(ACTIVE)
+  approvalStatus KpiApprovalStatus  @default(PENDING)
+  createdById    String
+  createdBy      User               @relation("KpiCriterionCreatedBy", fields: [createdById], references: [id])
+  approvedById   String?
+  approvedBy     User?              @relation("KpiCriterionApprovedBy", fields: [approvedById], references: [id])
+  approvedAt     DateTime?
+  effectiveFrom  DateTime?
+  effectiveTo    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  tasks KpiTask[]
+
+  @@index([departmentId, status, approvalStatus])
+  @@index([divisionId])
+}
+
+/// TL-created task instance under an approved KpiCriterion for one employee in one monthly review.
+model KpiTask {
+  id                  String        @id @default(cuid())
+  name                String
+  description         String?
+  criterionId         String
+  criterion           KpiCriterion  @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+  reviewId            String
+  review              KpiReview     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  assignedToId        String
+  assignedTo          User          @relation("KpiTaskAssignedTo", fields: [assignedToId], references: [id])
+  assignedById        String
+  assignedBy          User          @relation("KpiTaskAssignedBy", fields: [assignedById], references: [id])
+  taskType            KpiTaskType   @default(ONE_TIME)
+  assignedDate        DateTime      @default(now())
+  dueDate             DateTime?
+  requiresFileUpload  Boolean       @default(false)
+  status              KpiTaskStatus @default(ASSIGNED)
+  isPartialCompletion Boolean       @default(false)
+  systemRating        Float?
+  finalRating         Float?
+  ratingExplanation   String?
+  fileUrl             String?
+  employeeRemarks     String?
+  tlRemarks           String?
+  timerElapsedMinutes Int           @default(0)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  events KpiTaskEvent[]
+
+  @@index([criterionId])
+  @@index([reviewId, status])
+  @@index([assignedToId, status])
+}
+
+/// Audit trail for every status change on a KpiTask.
+model KpiTaskEvent {
+  id        String           @id @default(cuid())
+  taskId    String
+  task      KpiTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User             @relation("KpiTaskEventActor", fields: [actorId], references: [id])
+  actorRole String
+  eventType KpiTaskEventType
+  oldStatus String?
+  newStatus String?
+  timestamp DateTime         @default(now())
+  reason    String?
+  metadata  Json?
+
+  @@index([taskId, timestamp])
+}
+
+/// Singleton record for admin-configured working hours, breaks, and holidays.
+/// id is always "default".
+model WorkingCalendar {
+  id            String   @id @default("default")
+  workStartTime String   @default("10:00")
+  workEndTime   String   @default("17:30")
+  timezone      String   @default("Asia/Kolkata")
+  graceMinutes  Int      @default(30)
+  /// int[] — day-of-week indices (0=Sun … 6=Sat); default Mon–Sat [1,2,3,4,5,6]
+  workingDays   Json
+  /// {start: string, end: string}[] — 24 h "HH:MM" pairs
+  breaks        Json
+  /// ISO date strings for public holidays
+  holidays      Json
+  updatedAt     DateTime @updatedAt
+  updatedById   String?
+  updatedBy     User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 }

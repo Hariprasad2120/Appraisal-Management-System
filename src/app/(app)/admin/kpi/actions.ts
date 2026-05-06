@@ -11,12 +11,13 @@ import {
   KPI_RATING_SCALE_SETTING,
   achievementForRating,
   calculateAverageRating,
-  calculateMonthlyPointScore,
-  calculateWeightedAchievement,
+  calculateCriterionPoints,
   getKpiPerformanceCategory,
   monthStart,
   parseKpiRatingScale,
 } from "@/lib/kpi";
+import { buildKpiPointsExplanation } from "@/lib/kpi-audit";
+import { calculateAssignedDayMonthlyRating } from "@/lib/kpi-rules";
 
 type KnownTemplateItem = {
   name: string;
@@ -91,10 +92,11 @@ async function kpiSettings() {
 async function recalculateReview(reviewId: string) {
   const { monthlyTarget } = await kpiSettings();
   const items = await prisma.kpiReviewItem.findMany({ where: { reviewId, itemKind: "TASK", assignedToEmployee: true } });
-  const totalWeightage = items.reduce((sum, item) => sum + item.weightage, 0);
-  const rawWeightedAchievement = items.reduce((sum, item) => sum + item.weightedAchievement, 0);
-  const totalAchievementPercent = totalWeightage > 0 ? (rawWeightedAchievement * 100) / totalWeightage : 0;
-  const monthlyPointScore = calculateMonthlyPointScore(totalAchievementPercent, monthlyTarget);
+  // weightedAchievement now stores per-task criterion points (not weighted achievement %)
+  const totalPoints = items.reduce((sum, item) => sum + item.weightedAchievement, 0);
+  const monthlyPointScore = Math.round(totalPoints);
+  // totalAchievementPercent: rating 4 = 100%, rating 5 = 110%
+  const totalAchievementPercent = monthlyTarget > 0 ? (totalPoints / monthlyTarget) * 100 : 0;
   const averageRating = calculateAverageRating(items.map((item) => item.rating));
   await prisma.kpiReview.update({
     where: { id: reviewId },
@@ -102,6 +104,42 @@ async function recalculateReview(reviewId: string) {
       totalAchievementPercent,
       monthlyPointScore,
       averageRating,
+      performanceCategory: getKpiPerformanceCategory(monthlyPointScore),
+    },
+  });
+}
+
+async function recalculateTaskReview(reviewId: string) {
+  const { monthlyTarget } = await kpiSettings();
+  const [workingCalendar, tasks] = await Promise.all([
+    prisma.workingCalendar.findUnique({ where: { id: "default" } }),
+    prisma.kpiTask.findMany({
+      where: { reviewId, status: "CLOSED", finalRating: { not: null } },
+      include: { criterion: { select: { weightage: true } } },
+    }),
+  ]);
+  const timezone = workingCalendar?.timezone ?? "Asia/Kolkata";
+  const byCriterion = new Map<string, { weightage: number; tasks: Array<{ assignedDate: Date; finalRating: number | null }> }>();
+  for (const task of tasks) {
+    if (task.finalRating === null) continue;
+    const row = byCriterion.get(task.criterionId) ?? { weightage: task.criterion.weightage, tasks: [] };
+    row.tasks.push({ assignedDate: task.assignedDate, finalRating: task.finalRating });
+    byCriterion.set(task.criterionId, row);
+  }
+  let totalPoints = 0;
+  const criterionRatings: number[] = [];
+  for (const row of byCriterion.values()) {
+    const rating = calculateAssignedDayMonthlyRating(row.tasks, timezone) ?? 0;
+    criterionRatings.push(rating);
+    totalPoints += calculateCriterionPoints(row.weightage, rating, monthlyTarget);
+  }
+  const monthlyPointScore = Math.round(totalPoints);
+  await prisma.kpiReview.update({
+    where: { id: reviewId },
+    data: {
+      totalAchievementPercent: monthlyTarget > 0 ? (totalPoints / monthlyTarget) * 100 : 0,
+      monthlyPointScore,
+      averageRating: calculateAverageRating(criterionRatings),
       performanceCategory: getKpiPerformanceCategory(monthlyPointScore),
     },
   });
@@ -115,19 +153,21 @@ async function persistDraftScores(reviewId: string, formData: FormData) {
   if (!review) throw new Error("Review not found");
   if (review.status === "FINALIZED") throw new Error("Reopen the finalized review before editing");
 
-  const { ratingScale } = await kpiSettings();
+  const { ratingScale, monthlyTarget } = await kpiSettings();
   await prisma.$transaction(
     review.items.filter((item) => item.itemKind === "TASK" && item.assignedToEmployee).map((item) => {
       const ratingRaw = text(formData, `rating:${item.id}`);
       const rating = ratingRaw ? Number(ratingRaw) : null;
       const achievementRaw = text(formData, `achievement:${item.id}`);
       const achievementPercent = achievementRaw ? Number(achievementRaw) : achievementForRating(rating, ratingScale);
+      // weightedAchievement stores criterion points (not weighted achievement %)
+      const criterionPoints = rating ? calculateCriterionPoints(item.weightage, rating, monthlyTarget) : 0;
       return prisma.kpiReviewItem.update({
         where: { id: item.id },
         data: {
           rating,
           achievementPercent,
-          weightedAchievement: calculateWeightedAchievement(item.weightage, achievementPercent),
+          weightedAchievement: criterionPoints,
           actualAchievement: nullableText(formData, `actual:${item.id}`),
           remarks: nullableText(formData, `remarks:${item.id}`),
         },
@@ -696,5 +736,63 @@ export async function reopenKpiReviewAction(formData: FormData): Promise<void> {
     where: { id: reviewId },
     data: { status: "DRAFT", finalizedById: null, finalizedAt: null },
   });
+  refreshKpiPaths();
+}
+
+export async function adminOverrideKpiTaskRatingAction(formData: FormData): Promise<void> {
+  const session = await requireAdmin();
+  const taskId = text(formData, "taskId");
+  const rating = Number(text(formData, "rating"));
+  const reason = text(formData, "reason");
+  if (!taskId) throw new Error("Missing task");
+  if (!Number.isFinite(rating) || rating < 0 || rating > 5) throw new Error("Rating must be between 0 and 5");
+  if (!reason) throw new Error("Admin override reason is required");
+
+  const task = await prisma.kpiTask.findUnique({
+    where: { id: taskId },
+    include: {
+      criterion: { select: { weightage: true } },
+      review: { select: { id: true } },
+    },
+  });
+  if (!task) throw new Error("Task not found");
+
+  const { monthlyTarget } = await kpiSettings();
+  const points = calculateCriterionPoints(task.criterion.weightage, rating, monthlyTarget);
+  const pointsExplanation = buildKpiPointsExplanation(task.criterion.weightage, rating, monthlyTarget);
+  const ratingExplanation = `Final rating manually overridden to ${rating.toFixed(2)} by Admin. Reason: ${reason}`;
+
+  await prisma.kpiTask.update({
+    where: { id: taskId },
+    data: {
+      status: "CLOSED",
+      finalRating: rating,
+      ratingExplanation,
+      tlRemarks: reason,
+    },
+  });
+  await prisma.kpiTaskEvent.create({
+    data: {
+      taskId,
+      actorId: session.user.id,
+      actorRole: "ADMIN",
+      eventType: "ADMIN_OVERRIDE",
+      oldStatus: task.status,
+      newStatus: "CLOSED",
+      reason,
+      metadata: { finalRating: rating },
+    },
+  });
+  await prisma.kpiTaskEvent.create({
+    data: {
+      taskId,
+      actorId: session.user.id,
+      actorRole: "SYSTEM",
+      eventType: "POINTS_CALCULATED",
+      reason: pointsExplanation,
+      metadata: { points, weightage: task.criterion.weightage, finalRating: rating, monthlyTarget },
+    },
+  });
+  await recalculateTaskReview(task.review.id);
   refreshKpiPaths();
 }

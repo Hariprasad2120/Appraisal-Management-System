@@ -114,6 +114,35 @@ export const KPI_SEED_DEPARTMENTS: KpiSeedDepartment[] = [
   },
 ];
 
+/**
+ * Maps a rating (1–5) to a multiplier.
+ * rating <= 4: multiplier = rating / 4  (so rating 4 = 1.0, rating 1 = 0.25)
+ * rating >  4: multiplier = 1 + (rating - 4) * 0.1  (so rating 5 = 1.10)
+ */
+export function calculateRatingMultiplier(rating: number): number {
+  const bounded = Math.min(5, Math.max(1, rating));
+  if (bounded <= 4) return bounded / 4;
+  return 1 + (bounded - 4) * 0.1;
+}
+
+/**
+ * Points earned for a single criterion/task.
+ * criterionPoints = monthlyBasePoints × (weightagePercent / 100) × ratingMultiplier
+ *
+ * Examples at monthlyBasePoints=20000:
+ *   100% weight, rating 1 → 5000
+ *   100% weight, rating 4 → 20000
+ *   100% weight, rating 5 → 22000
+ */
+export function calculateCriterionPoints(
+  weightagePercent: number,
+  rating: number,
+  monthlyBasePoints = DEFAULT_KPI_MONTHLY_TARGET,
+): number {
+  if (!rating || !Number.isFinite(rating)) return 0;
+  return monthlyBasePoints * (weightagePercent / 100) * calculateRatingMultiplier(rating);
+}
+
 export function monthStart(value: Date | string): Date {
   const date = typeof value === "string" ? new Date(`${value}-01T00:00:00`) : value;
   return new Date(date.getFullYear(), date.getMonth(), 1);

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: #9aa0ad; font-family: var(--font-sans); display: flex; gap: 20px; }
+
+  .sidebar {
+    width: 248px; background: #181b22;
+    overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+    display: flex; flex-direction: column; border-radius: 0;
+    user-select: none;
+  }
+
+  /* ── Logo ── */
+  .logo-area {
+    padding: 16px 14px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-img { height: 28px; width: auto; object-fit: contain; object-position: left; }
+  .portal-label {
+    font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #4b5563; font-weight: 500; margin-top: 1px;
+  }
+
+  /* ── Sections ── */
+  .section { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .section:last-of-type { flex: 1; border-bottom: none; }
+  .section-title {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.14em; color: #3f4655; padding: 4px 14px 6px;
+  }
+
+  /* ── Nav item ── */
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 10px; height: 36px; margin: 1px 6px;
+    border-radius: 4px; cursor: pointer;
+    transition: background 0.13s;
+    position: relative;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.06); }
+  .nav-item.active { background: rgba(255,255,255,0.09); }
+
+  /* Left accent bar on active */
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
+    width: 3px; border-radius: 0 2px 2px 0;
+  }
+
+  /* Icon container with unique bg tint */
+  .nav-icon {
+    width: 26px; height: 26px; border-radius: 4px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-icon svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  .nav-label { font-size: 12px; flex: 1; transition: color 0.13s; }
+  .nav-item:not(.active) .nav-label { color: #6b7280; }
+  .nav-item.active .nav-label { font-weight: 500; }
+
+  .nav-count {
+    font-size: 10px; font-family: var(--font-mono);
+    padding: 1px 6px; border-radius: 3px; flex-shrink: 0;
+  }
+  .nav-badge {
+    font-size: 9px; font-weight: 700; padding: 2px 6px;
+    border-radius: 3px; flex-shrink: 0;
+    background: rgba(14,137,149,0.2); color: #2dd4bf; letter-spacing: 0.05em;
+  }
+
+  /* ── Per-item color definitions ── */
+  /* Dashboard — teal */
+  .ic-dashboard { background: rgba(14,137,149,0.18); color: #2dd4bf; }
+  .nav-item.ic-dashboard-item.active { background: rgba(14,137,149,0.12); }
+  .nav-item.ic-dashboard-item.active::before { background: #0e8a95; }
+  .nav-item.ic-dashboard-item.active .nav-label { color: #2dd4bf; }
+  .nav-item.ic-dashboard-item .nav-count { background: rgba(14,137,149,0.15); color: #2dd4bf; }
+
+  /* Employees — blue */
+  .ic-employees { background: rgba(59,130,246,0.18); color: #60a5fa; }
+  .nav-item.ic-employees-item.active { background: rgba(59,130,246,0.1); }
+  .nav-item.ic-employees-item.active::before { background: #3b82f6; }
+  .nav-item.ic-employees-item.active .nav-label { color: #60a5fa; }
+  .nav-item.ic-employees-item .nav-count { background: rgba(59,130,246,0.15); color: #60a5fa; }
+
+  /* Appraisals — purple */
+  .ic-appraisals { background: rgba(124,58,237,0.18); color: #a78bfa; }
+  .nav-item.ic-appraisals-item.active { background: rgba(124,58,237,0.1); }
+  .nav-item.ic-appraisals-item.active::before { background: #7c3aed; }
+  .nav-item.ic-appraisals-item.active .nav-label { color: #a78bfa; }
+  .nav-item.ic-appraisals-item .nav-count { background: rgba(124,58,237,0.15); color: #a78bfa; }
+
+  /* Cycles — cyan */
+  .ic-cycles { background: rgba(0,206,196,0.15); color: #22d3ee; }
+  .nav-item.ic-cycles-item.active { background: rgba(0,206,196,0.09); }
+  .nav-item.ic-cycles-item.active::before { background: #00cec4; }
+  .nav-item.ic-cycles-item.active .nav-label { color: #22d3ee; }
+  .nav-item.ic-cycles-item .nav-count { background: rgba(0,206,196,0.12); color: #22d3ee; }
+
+  /* Salary — green */
+  .ic-salary { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .nav-item.ic-salary-item.active { background: rgba(34,197,94,0.09); }
+  .nav-item.ic-salary-item.active::before { background: #22c55e; }
+  .nav-item.ic-salary-item.active .nav-label { color: #4ade80; }
+  .nav-item.ic-salary-item .nav-count { background: rgba(34,197,94,0.12); color: #4ade80; }
+
+  /* Slabs — amber */
+  .ic-slabs { background: rgba(255,170,45,0.15); color: #fbbf24; }
+  .nav-item.ic-slabs-item.active { background: rgba(255,170,45,0.09); }
+  .nav-item.ic-slabs-item.active::before { background: #ffaa2d; }
+  .nav-item.ic-slabs-item.active .nav-label { color: #fbbf24; }
+
+  /* Criteria — orange */
+  .ic-criteria { background: rgba(255,131,51,0.15); color: #fb923c; }
+  .nav-item.ic-criteria-item.active { background: rgba(255,131,51,0.09); }
+  .nav-item.ic-criteria-item.active::before { background: #ff8333; }
+  .nav-item.ic-criteria-item.active .nav-label { color: #fb923c; }
+
+  /* Tickets — red */
+  .ic-tickets { background: rgba(239,68,68,0.15); color: #f87171; }
+  .nav-item.ic-tickets-item.active { background: rgba(239,68,68,0.09); }
+  .nav-item.ic-tickets-item.active::before { background: #ef4444; }
+  .nav-item.ic-tickets-item.active .nav-label { color: #f87171; }
+  .nav-item.ic-tickets-item .nav-count { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  /* History — slate */
+  .ic-history { background: rgba(100,116,139,0.2); color: #94a3b8; }
+  .nav-item.ic-history-item.active { background: rgba(100,116,139,0.1); }
+  .nav-item.ic-history-item.active::before { background: #64748b; }
+  .nav-item.ic-history-item.active .nav-label { color: #94a3b8; }
+
+  /* Simulation — pink */
+  .ic-sim { background: rgba(236,72,153,0.15); color: #f472b6; }
+  .nav-item.ic-sim-item.active { background: rgba(236,72,153,0.09); }
+  .nav-item.ic-sim-item.active::before { background: #ec4899; }
+  .nav-item.ic-sim-item.active .nav-label { color: #f472b6; }
+
+  /* ── User footer ── */
+  .user-footer {
+    padding: 10px 12px 12px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: center; gap: 9px;
+  }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg,#0e8a95,#00cec4);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; font-weight: 700;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 12px; font-weight: 600; color: #d1d5db; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-size: 10px; color: #2dd4bf; margin-top: 1px; }
+  .logout-btn {
+    width: 28px; height: 28px; border-radius: 4px; border: none;
+    background: rgba(255,255,255,0.06); cursor: pointer;
+    color: #6b7280; display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s; flex-shrink: 0;
+  }
+  .logout-btn:hover { background: rgba(239,68,68,0.15); color: #f87171; }
+  .logout-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+</style>
+</head>
+<body>
+<div class="sidebar">
+
+  <!-- Logo -->
+  <div class="logo-area">
+    <img src="../assets/Logo.png" alt="Adarsh Shipping" class="logo-img">
+  </div>
+
+  <!-- Main nav -->
+  <div class="section">
+    <div class="section-title">Main</div>
+
+    <div class="nav-item active ic-dashboard-item">
+      <div class="nav-icon ic-dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+      <span class="nav-label">Dashboard</span>
+      <span class="nav-count">—</span>
+    </div>
+
+    <div class="nav-item ic-employees-item">
+      <div class="nav-icon ic-employees"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <span class="nav-label">Employees</span>
+      <span class="nav-count">48</span>
+    </div>
+
+    <div class="nav-item ic-appraisals-item">
+      <div class="nav-icon ic-appraisals"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      <span class="nav-label">Appraisals</span>
+      <span class="nav-count">12</span>
+    </div>
+
+    <div class="nav-item ic-cycles-item">
+      <div class="nav-icon ic-cycles"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/></svg></div>
+      <span class="nav-label">All Cycles</span>
+      <span class="nav-count">5</span>
+    </div>
+  </div>
+
+  <!-- Finance -->
+  <div class="section">
+    <div class="section-title">Finance</div>
+
+    <div class="nav-item ic-salary-item">
+      <div class="nav-icon ic-salary"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <span class="nav-label">Salary Sheet</span>
+      <span class="nav-badge">NEW</span>
+    </div>
+
+    <div class="nav-item ic-slabs-item">
+      <div class="nav-icon ic-slabs"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+      <span class="nav-label">Increment Slabs</span>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div class="section">
+    <div class="section-title">Config</div>
+
+    <div class="nav-item ic-criteria-item">
+      <div class="nav-icon ic-criteria"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+      <span class="nav-label">Criteria Questions</span>
+    </div>
+
+    <div class="nav-item ic-tickets-item">
+      <div class="nav-icon ic-tickets"><svg viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/></svg></div>
+      <span class="nav-label">Support Tickets</span>
+      <span class="nav-count">3</span>
+    </div>
+
+    <div class="nav-item ic-history-item">
+      <div class="nav-icon ic-history"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.47"/></svg></div>
+      <span class="nav-label">History</span>
+    </div>
+
+    <div class="nav-item ic-sim-item">
+      <div class="nav-icon ic-sim"><svg viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 9l-4 9a2 2 0 0 0 1.8 2.8h8.4A2 2 0 0 0 18 18l-4-9"/><path d="M10 3v6"/><path d="M14 3v6"/></svg></div>
+      <span class="nav-label">Simulation</span>
+    </div>
+  </div>
+
+  <!-- User footer -->
+  <div class="user-footer">
+    <div class="avatar">H</div>
+    <div class="user-info">
+      <div class="user-name">Hariprasad K.</div>
+      <div class="user-role">ADMIN</div>
+    </div>
+    <button class="logout-btn"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+  </div>
+
+</div>
+</body>
+</html>

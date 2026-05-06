@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { daysUntilAnniversary } from "@/lib/business-days";
@@ -10,10 +11,16 @@ import {
 } from "@/lib/workflow";
 import { getSystemDate } from "@/lib/system-date";
 import { monthStart } from "@/lib/kpi";
-import { updateEmployeeKpiTaskStatusAction } from "./kpi-actions";
+import { calendarFromDb, countWorkingMinutes } from "@/lib/working-hours";
+import {
+  requestPauseKpiTaskAction,
+  startKpiTaskAction,
+  submitKpiTaskAction,
+} from "./kpi-actions";
 import { Eye, Pencil } from "lucide-react";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { Button } from "@/components/ui/button";
+import { KpiTaskTimeline } from "@/components/kpi-task-timeline";
 import {
   Calendar,
   Star,
@@ -26,6 +33,11 @@ import {
   Users,
   Bell,
   BarChart3,
+  AlertCircle,
+  PauseCircle,
+  RotateCcw,
+  Timer,
+  Upload,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -41,6 +53,43 @@ const STATUS_LABELS: Record<string, string> = {
   CLOSED: "Closed",
 };
 
+const KPI_TASK_STATUS_LABELS: Record<string, string> = {
+  ASSIGNED: "Assigned",
+  IN_PROGRESS: "In Progress",
+  WAITING_REVIEW: "Waiting for TL Review",
+  REOPENED: "Reopened",
+  PAUSED: "Paused",
+  PARTIALLY_COMPLETED: "Partially Completed",
+  CLOSED: "Closed",
+};
+
+function formatMinutes(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  if (hours === 0) return `${mins}m`;
+  return `${hours}h ${mins}m`;
+}
+
+function formatDateTime(date: Date | null) {
+  if (!date) return "-";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function latestEventReason(
+  events: Array<{ eventType: string; reason: string | null; timestamp: Date }>,
+  eventType: string,
+) {
+  return events
+    .filter((event) => event.eventType === eventType && event.reason)
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]?.reason ?? null;
+}
+
 export default async function EmployeeDashboard() {
   const session = await auth();
   if (!session?.user) return null;
@@ -51,7 +100,7 @@ export default async function EmployeeDashboard() {
   if (!user) return null;
 
   const currentMonth = monthStart(new Date());
-  const [recentNotifs, salaryRevisions, monthlyKpis] = await Promise.all([
+  const [recentNotifs, salaryRevisions, monthlyKpis, workingCalendar] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id, read: false },
       orderBy: { createdAt: "desc" },
@@ -77,8 +126,19 @@ export default async function EmployeeDashboard() {
       include: {
         department: { select: { name: true } },
         items: { orderBy: { sortOrder: "asc" } },
+        kpiTasks: {
+          orderBy: [{ assignedDate: "desc" }, { createdAt: "desc" }],
+          include: {
+            criterion: { select: { name: true, ruleType: true, ruleConfig: true } },
+            events: {
+              orderBy: { timestamp: "desc" },
+              include: { actor: { select: { name: true } } },
+            },
+          },
+        },
       },
     }),
+    prisma.workingCalendar.findUnique({ where: { id: "default" } }),
   ]);
 
   const cycles = await prisma.appraisalCycle.findMany({
@@ -125,6 +185,26 @@ export default async function EmployeeDashboard() {
   const totalReviewers = cycle?.assignments.length ?? 0;
   const ratedCount = cycle?.ratings.length ?? 0;
   const allRated = totalReviewers > 0 && ratedCount === totalReviewers;
+  const calendarConfig = calendarFromDb(workingCalendar);
+  const currentKpi = monthlyKpis.find((review) => review.month.getTime() === currentMonth.getTime()) ?? null;
+  const kpiTasks = currentKpi?.kpiTasks ?? [];
+  const taskElapsed = new Map<string, number>();
+  for (const task of kpiTasks) {
+    let elapsed = task.timerElapsedMinutes;
+    if (task.status === "IN_PROGRESS" || task.status === "REOPENED") {
+      const lastStart = task.events.find((event) => event.eventType === "STARTED" || event.eventType === "RESUMED");
+      if (lastStart) elapsed += countWorkingMinutes(lastStart.timestamp, now, calendarConfig);
+    }
+    taskElapsed.set(task.id, elapsed);
+  }
+  const kpiSummary = {
+    currentScore: currentKpi?.monthlyPointScore ?? 0,
+    averageRating: currentKpi?.averageRating ?? 0,
+    completedTasks: kpiTasks.filter((task) => task.status === "CLOSED").length,
+    pendingReview: kpiTasks.filter((task) => task.status === "WAITING_REVIEW").length,
+    reopenedTasks: kpiTasks.filter((task) => task.status === "REOPENED").length,
+    pausedTasks: kpiTasks.filter((task) => task.status === "PAUSED").length,
+  };
 
   return (
     <div className="flex h-full max-h-full w-full max-w-7xl min-w-0 flex-col overflow-hidden">
@@ -185,111 +265,208 @@ export default async function EmployeeDashboard() {
         </StaggerList>
 
         <FadeIn delay={0.16}>
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <BarChart3 className="size-3.5" /> My KPI
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                Finalized monthly records
-              </span>
-            </div>
-            {monthlyKpis.length === 0 ? (
-              <div className="flex min-h-[82px] items-center justify-center px-5 py-6 text-center text-xs text-muted-foreground">
-                No KPI records yet.
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <BarChart3 className="size-4 text-primary" /> My KPI Tasks
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {currentKpi
+                    ? `${currentKpi.department.name} - ${currentKpi.month.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}`
+                    : "Current month KPI tasks will appear here once assigned."}
+                </p>
               </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {monthlyKpis.map((review) => {
-                  const criteria = review.items.filter(
-                    (item) =>
-                      item.itemKind === "CRITERION" &&
-                      review.items.some((task) => task.parentItemId === item.id && task.itemKind === "TASK" && task.assignedToEmployee),
-                  );
-                  const isCurrentMonth = review.month.getTime() === currentMonth.getTime();
-                  const assignedWeight = review.items
-                    .filter((item) => item.itemKind === "TASK" && item.assignedToEmployee)
-                    .reduce((sum, item) => sum + item.weightage, 0);
-                  return (
-                    <div key={review.id}>
-                      <div className="flex items-center justify-between gap-3 px-5 py-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {review.month.toLocaleDateString("en-IN", {
-                            month: "long",
-                            year: "numeric",
-                          })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {review.department.name} - {review.status} - {review.performanceCategory}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-primary">
-                          {review.monthlyPointScore.toLocaleString("en-IN")}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {review.totalAchievementPercent.toFixed(1)}%
-                        </p>
-                      </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              {[
+                { label: "Current Month Score", value: kpiSummary.currentScore.toLocaleString("en-IN"), icon: BarChart3, tone: "stat-teal" },
+                { label: "Average Rating", value: kpiSummary.averageRating.toFixed(2), icon: Star, tone: "stat-amber" },
+                { label: "Completed Tasks", value: String(kpiSummary.completedTasks), icon: CheckCircle, tone: "stat-green" },
+                { label: "Pending TL Review", value: String(kpiSummary.pendingReview), icon: Clock, tone: "stat-cyan" },
+                { label: "Reopened Tasks", value: String(kpiSummary.reopenedTasks), icon: RotateCcw, tone: "stat-orange" },
+                { label: "Paused Tasks", value: String(kpiSummary.pausedTasks), icon: PauseCircle, tone: "stat-red" },
+              ].map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div key={card.label} className={`rounded-xl border border-border bg-card p-4 shadow-sm ${card.tone}`}>
+                    <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="size-4" />
                     </div>
-                    <div className="space-y-3 border-t border-border bg-muted/20 px-5 py-4">
-                      {criteria.map((criterion) => {
-                        const tasks = review.items.filter((item) => item.parentItemId === criterion.id && item.itemKind === "TASK" && item.assignedToEmployee);
+                    <p className="text-lg font-bold text-foreground">{card.value}</p>
+                    <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{card.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Timer className="size-4 text-primary" /> Active Tasks
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Ratings are calculated by the system and finalized by TL
+                </span>
+              </div>
+
+              {kpiTasks.length === 0 ? (
+                <div className="flex min-h-[110px] items-center justify-center px-5 py-8 text-center text-xs text-muted-foreground">
+                  No current month KPI tasks assigned.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1320px] text-xs">
+                    <thead className="border-b border-border bg-muted/40 text-left text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Task Name</th>
+                        <th className="px-3 font-medium">KPI Criterion</th>
+                        <th className="px-3 font-medium">Assigned Date</th>
+                        <th className="px-3 font-medium">Due Date</th>
+                        <th className="px-3 font-medium">Timer Status</th>
+                        <th className="px-3 font-medium">Elapsed</th>
+                        <th className="px-3 font-medium">Status</th>
+                        <th className="px-3 font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {kpiTasks.map((task) => {
+                        const statusLabel = KPI_TASK_STATUS_LABELS[task.status] ?? "Assigned";
+                        const reopenReason = latestEventReason(task.events, "REOPENED");
+                        const closed = task.status === "CLOSED";
+                        const timerStatus =
+                          task.status === "IN_PROGRESS" || task.status === "REOPENED"
+                            ? "Running"
+                            : task.status === "WAITING_REVIEW"
+                              ? "Frozen in TL Review"
+                              : task.status === "PAUSED"
+                                ? "Pause Requested"
+                                : task.status === "CLOSED"
+                                  ? "Stopped"
+                                  : "Not Started";
+
                         return (
-                          <div key={criterion.id} className="overflow-hidden rounded-lg border border-border bg-card">
-                            <div className="border-b border-border px-4 py-3">
-                              <p className="text-sm font-semibold text-foreground">{criterion.name}</p>
-                              {criterion.description && <p className="mt-1 text-xs text-muted-foreground">{criterion.description}</p>}
-                            </div>
-                      <table className="w-full min-w-[720px] text-xs">
-                        <thead className="text-left text-muted-foreground">
-                          <tr>
-                            <th className="px-4 py-2 font-medium">Task</th>
-                            <th className="px-3 font-medium">Status</th>
-                            <th className="px-3 font-medium">Rating</th>
-                            <th className="px-3 font-medium">Score</th>
-                            <th className="px-3 font-medium">Approval</th>
-                            <th className="px-3 font-medium">Remarks</th>
-                            <th className="px-3 font-medium">Update</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {tasks.map((item) => (
-                            <tr key={item.id}>
-                              <td className="px-4 py-2">
-                                <p className="font-medium text-foreground">{item.name}</p>
-                                <p className="text-[11px] text-muted-foreground">{item.description || item.target || item.measurement}</p>
+                          <Fragment key={task.id}>
+                            <tr className="align-top">
+                              <td className="px-4 py-4">
+                                <p className="font-semibold text-foreground">{task.name}</p>
+                                {task.description && <p className="mt-1 text-[11px] text-muted-foreground">{task.description}</p>}
+                                {reopenReason && (
+                                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
+                                    <span className="font-semibold">TL reopen reason:</span> {reopenReason}
+                                  </div>
+                                )}
                               </td>
-                              <td className="px-3">{item.completionStatus.replaceAll("_", " ")}</td>
-                              <td className="px-3">{item.rating?.toFixed(2) ?? "-"}</td>
-                              <td className="px-3">{item.weightedAchievement > 0 && assignedWeight > 0 ? Math.round((20000 * item.weightedAchievement) / assignedWeight).toLocaleString("en-IN") : "-"}</td>
-                              <td className="px-3">{item.approvalStatus}</td>
-                              <td className="px-3 text-muted-foreground">{item.remarks ?? "-"}</td>
-                              <td className="px-3">
-                                <form action={updateEmployeeKpiTaskStatusAction} className="flex items-center gap-2">
-                                  <input type="hidden" name="itemId" value={item.id} />
-                                  <select name="completionStatus" defaultValue={item.completionStatus} disabled={!isCurrentMonth} className="h-8 rounded-md border border-border bg-background px-2 text-xs disabled:opacity-60">
-                                    <option value="NOT_COMPLETED">Not Completed</option>
-                                    <option value="PARTIALLY_COMPLETED">Partially Completed</option>
-                                    <option value="FULLY_COMPLETED">Fully Completed</option>
-                                  </select>
-                                  <Button type="submit" size="sm" variant="outline" disabled={!isCurrentMonth}>Save</Button>
-                                </form>
+                              <td className="px-3 py-4">{task.criterion.name}</td>
+                              <td className="px-3 py-4">{formatDateTime(task.assignedDate)}</td>
+                              <td className="px-3 py-4">{formatDateTime(task.dueDate)}</td>
+                              <td className="px-3 py-4">{timerStatus}</td>
+                              <td className="px-3 py-4 font-semibold text-foreground">{formatMinutes(taskElapsed.get(task.id) ?? task.timerElapsedMinutes)}</td>
+                              <td className="px-3 py-4">
+                                <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                                  {statusLabel}
+                                </span>
+                              </td>
+                              <td className="px-3 py-4">
+                                {closed ? (
+                                  <div className="max-w-[260px] space-y-1.5">
+                                    <p className="text-xs font-semibold text-primary">
+                                      Final Rating: {task.finalRating?.toFixed(2) ?? "-"}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                      {task.ratingExplanation ?? "Rating explanation will appear after TL closes the task."}
+                                    </p>
+                                  </div>
+                                ) : task.status === "WAITING_REVIEW" ? (
+                                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                                    <Clock className="size-3.5" /> Waiting for TL review
+                                  </div>
+                                ) : task.status === "PAUSED" ? (
+                                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                                    <PauseCircle className="size-3.5" /> Pause request sent
+                                  </div>
+                                ) : task.status === "ASSIGNED" || task.status === "REOPENED" ? (
+                                  <form action={startKpiTaskAction}>
+                                    <input type="hidden" name="taskId" value={task.id} />
+                                    <Button type="submit" size="sm" variant="outline">
+                                      {task.status === "REOPENED" ? "Resume" : "Start"}
+                                    </Button>
+                                  </form>
+                                ) : (
+                                  <div className="space-y-2">
+                                  <form action={submitKpiTaskAction} className="grid gap-2">
+                                    <input type="hidden" name="taskId" value={task.id} />
+                                    <input type="hidden" name="isPartial" value="false" />
+                                    <div className="flex gap-2">
+                                      <input
+                                        name="fileUrl"
+                                        defaultValue={task.fileUrl ?? ""}
+                                        required={task.requiresFileUpload}
+                                        placeholder={task.requiresFileUpload ? "Proof file link required" : "Proof file link"}
+                                        className="h-8 w-44 rounded-md border border-border bg-background px-2 text-xs"
+                                      />
+                                      <input
+                                        name="remarks"
+                                        defaultValue={task.employeeRemarks ?? ""}
+                                        placeholder="Remarks"
+                                        className="h-8 w-36 rounded-md border border-border bg-background px-2 text-xs"
+                                      />
+                                      <Button type="submit" size="sm">
+                                        <Upload className="size-3.5" /> Completed
+                                      </Button>
+                                    </div>
+                                  </form>
+                                  <form action={submitKpiTaskAction} className="flex gap-2">
+                                    <input type="hidden" name="taskId" value={task.id} />
+                                    <input type="hidden" name="isPartial" value="true" />
+                                    <input
+                                      name="fileUrl"
+                                      defaultValue={task.fileUrl ?? ""}
+                                      required={task.requiresFileUpload}
+                                      placeholder={task.requiresFileUpload ? "Proof file link required" : "Proof file link"}
+                                      className="h-8 w-44 rounded-md border border-border bg-background px-2 text-xs"
+                                    />
+                                    <input
+                                      name="remarks"
+                                      required
+                                      placeholder="Partial reason required"
+                                      className="h-8 w-40 rounded-md border border-border bg-background px-2 text-xs"
+                                    />
+                                    <Button type="submit" size="sm" variant="outline">
+                                      Partially Completed
+                                    </Button>
+                                  </form>
+                                  <form action={requestPauseKpiTaskAction} className="flex gap-2">
+                                    <input type="hidden" name="taskId" value={task.id} />
+                                    <input
+                                      name="reason"
+                                      required
+                                      placeholder="Pause reason required"
+                                      className="h-8 w-56 rounded-md border border-border bg-background px-2 text-xs"
+                                    />
+                                    <Button type="submit" size="sm" variant="outline">
+                                      <AlertCircle className="size-3.5" /> Pause Request
+                                    </Button>
+                                  </form>
+                                  </div>
+                                )}
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                          </div>
+                            <tr className="bg-muted/10">
+                              <td colSpan={8} className="px-4 py-3">
+                                <KpiTaskTimeline events={task.events} compact />
+                              </td>
+                            </tr>
+                          </Fragment>
                         );
                       })}
-                    </div>
-                  </div>
-                );})}
-              </div>
-            )}
-          </div>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
         </FadeIn>
 
         {/* Notifications */}

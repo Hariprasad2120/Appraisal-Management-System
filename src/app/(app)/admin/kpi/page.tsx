@@ -3,9 +3,10 @@ import { Fragment } from "react";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { Button } from "@/components/ui/button";
+import { KpiTaskTimeline } from "@/components/kpi-task-timeline";
 import {
   assignEmployeeKpiDepartmentAction,
-  bulkAssignEmployeesToTlAction,
+  adminOverrideKpiTaskRatingAction,
   createKpiDepartmentAction,
   createKpiReviewDraftAction,
   createKpiTemplateItemAction,
@@ -27,6 +28,9 @@ import {
 import { toTitleCase } from "@/lib/utils";
 import { Building2, ChevronRight, ListChecks, Trophy, Users } from "lucide-react";
 import { TemplateDepartmentPicker } from "./template-department-picker";
+import { CriteriaFormToggle, CriteriaEditInline } from "./criteria-form";
+import { toggleKpiCriterionStatusAction } from "./criteria-actions";
+import { saveWorkingCalendarAction } from "./calendar-actions";
 
 type Search = {
   tab?: string;
@@ -66,6 +70,8 @@ async function loadData() {
     templates,
     reviews,
     settings,
+    criteria,
+    workingCalendar,
   ] = await Promise.all([
     prisma.kpiDepartment.findMany({
       where: { active: true },
@@ -101,13 +107,35 @@ async function loadData() {
         user: { select: { id: true, name: true, employeeNumber: true } },
         department: true,
         items: { orderBy: { sortOrder: "asc" } },
+        kpiTasks: {
+          orderBy: [{ assignedDate: "desc" }, { createdAt: "desc" }],
+          include: {
+            assignedTo: { select: { name: true, employeeNumber: true } },
+            assignedBy: { select: { name: true } },
+            criterion: { select: { name: true, weightage: true, ruleType: true } },
+            events: {
+              orderBy: { timestamp: "desc" },
+              include: { actor: { select: { name: true } } },
+            },
+          },
+        },
       },
     }),
     prisma.systemSetting.findMany({
       where: { key: { in: [KPI_MONTHLY_TARGET_SETTING, KPI_RATING_SCALE_SETTING] } },
     }),
+    prisma.kpiCriterion.findMany({
+      orderBy: [{ departmentId: "asc" }, { createdAt: "desc" }],
+      include: {
+        department: { select: { id: true, name: true } },
+        division: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true } },
+        approvedBy: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.workingCalendar.findUnique({ where: { id: "default" } }),
   ]);
-  return { departments, users, templates, reviews, settings };
+  return { departments, users, templates, reviews, settings, criteria, workingCalendar };
 }
 
 function TabLink({ tab, activeTab, children }: { tab: string; activeTab: string; children: React.ReactNode }) {
@@ -132,10 +160,10 @@ export default async function AdminKpiPage({
   searchParams: Promise<Search>;
 }) {
   const sp = await searchParams;
-  const activeTab = ["departments", "templates", "scores", "reports"].includes(sp.tab ?? "")
+  const activeTab = ["departments", "templates", "criteria", "scores", "reports", "settings"].includes(sp.tab ?? "")
     ? sp.tab!
     : "departments";
-  const { departments, users, templates, reviews, settings } = await loadData();
+  const { departments, users, templates, reviews, settings, criteria, workingCalendar } = await loadData();
   const selectableDepartments = selectableKpiDepartments(departments);
   const rootDepartments = departments.filter((department) => !department.parentId);
   const childrenByParent = new Map<string, Department[]>();
@@ -166,10 +194,45 @@ export default async function AdminKpiPage({
   }));
   const ungroupedTemplateTasks = selectedTemplate?.items.filter((item) => item.itemKind === "TASK" && !item.parentItemId) ?? [];
   const selectedReviewCriteria = selectedReview?.items.filter((item) => item.itemKind === "CRITERION") ?? [];
-  const selectedReviewTaskGroups = selectedReviewCriteria.map((criterion) => ({
+const selectedReviewTaskGroups = selectedReviewCriteria.map((criterion) => ({
     criterion,
     tasks: selectedReview?.items.filter((item) => item.parentItemId === criterion.id && item.itemKind === "TASK") ?? [],
   }));
+
+const REVIEW_ITEM_STATUS_LABELS: Record<string, string> = {
+  NOT_COMPLETED: "Not completed",
+  PARTIALLY_COMPLETED: "Partially completed",
+  FULLY_COMPLETED: "Fully completed",
+};
+
+const REVIEW_APPROVAL_LABELS: Record<string, string> = {
+  PENDING: "Pending approval",
+  APPROVED: "Approved",
+  DISAPPROVED: "Disapproved",
+};
+
+const TASK_STATUS_LABELS: Record<string, string> = {
+  ASSIGNED: "Assigned",
+  IN_PROGRESS: "In progress",
+  WAITING_REVIEW: "Waiting for TL review",
+  PAUSED: "Paused",
+  PARTIALLY_COMPLETED: "Partially completed",
+  CLOSED: "Closed",
+  REOPENED: "Reopened",
+};
+
+function reviewItemStatusLabel(status: string) {
+  return REVIEW_ITEM_STATUS_LABELS[status] ?? status.replaceAll("_", " ").toLowerCase();
+}
+
+function reviewApprovalLabel(status: string, assigned: boolean) {
+  const approval = REVIEW_APPROVAL_LABELS[status] ?? status.replaceAll("_", " ").toLowerCase();
+  return `${approval} / ${assigned ? "Assigned" : "Not assigned"}`;
+}
+
+function taskStatusLabel(status: string) {
+  return TASK_STATUS_LABELS[status] ?? status.replaceAll("_", " ").toLowerCase();
+}
   const reportYear = Number(sp.year ?? new Date().getFullYear());
   const reportRows = reviews.filter(
     (review) => review.status === "FINALIZED" && review.month.getFullYear() === reportYear,
@@ -182,16 +245,6 @@ export default async function AdminKpiPage({
     annualByUser.set(review.userId, current);
   }
   const annualRows = [...annualByUser.values()].sort((a, b) => b.score - a.score);
-  const tlUsers = users.filter((user) => user.role === "TL");
-  const appraisableUsers = users.filter((user) => !["MANAGEMENT", "PARTNER"].includes(user.role));
-  const usersByTl = new Map<string, typeof users>();
-  for (const tl of tlUsers) usersByTl.set(tl.id, []);
-  const unassignedTlUsers = appraisableUsers.filter((user) => {
-    if (user.role === "TL") return false;
-    if (user.reportingManager?.role !== "TL") return true;
-    usersByTl.set(user.reportingManagerId!, [...(usersByTl.get(user.reportingManagerId!) ?? []), user]);
-    return false;
-  });
 
   return (
     <div className="max-w-7xl space-y-5">
@@ -214,8 +267,10 @@ export default async function AdminKpiPage({
         <div className="flex flex-wrap gap-2">
           <TabLink tab="departments" activeTab={activeTab}>Departments</TabLink>
           <TabLink tab="templates" activeTab={activeTab}>Templates</TabLink>
+          <TabLink tab="criteria" activeTab={activeTab}>KPI Criteria</TabLink>
           <TabLink tab="scores" activeTab={activeTab}>Monthly Scores</TabLink>
           <TabLink tab="reports" activeTab={activeTab}>Reports</TabLink>
+          <TabLink tab="settings" activeTab={activeTab}>Working Hours</TabLink>
         </div>
       </FadeIn>
 
@@ -376,67 +431,14 @@ export default async function AdminKpiPage({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <Users className="size-4 text-primary" /> TL Employee Ownership
-                </h2>
-                <form action={bulkAssignEmployeesToTlAction} className="space-y-3 rounded-lg border border-border p-3">
-                  <select name="tlId" required className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
-                    <option value="">Choose TL</option>
-                    {tlUsers.map((tl) => (
-                      <option key={tl.id} value={tl.id}>
-                        {tl.employeeNumber ? `${tl.employeeNumber} - ` : ""}{toTitleCase(tl.name)}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-                    {appraisableUsers.filter((user) => user.role !== "TL").map((user) => (
-                      <label key={user.id} className="flex items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted/40">
-                        <input type="checkbox" name="employeeId" value={user.id} />
-                        <span className="min-w-0 flex-1 truncate">
-                          {user.employeeNumber ? `${user.employeeNumber} - ` : ""}{toTitleCase(user.name)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {user.reportingManager?.role === "TL" ? toTitleCase(user.reportingManager.name) : "Unassigned"}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <Button type="submit" variant="outline" className="w-full">Assign Selected Employees</Button>
-                </form>
-                <div className="space-y-3">
-                  {tlUsers.map((tl) => {
-                    const ownedUsers = usersByTl.get(tl.id) ?? [];
-                    return (
-                      <div key={tl.id} className="rounded-lg border border-border p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-foreground">{toTitleCase(tl.name)}</p>
-                          <span className="text-[10px] text-muted-foreground">{ownedUsers.length} employee{ownedUsers.length === 1 ? "" : "s"}</span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {ownedUsers.map((user) => (
-                            <span key={user.id} className="rounded border border-border bg-muted/40 px-2 py-1 text-[10px] text-muted-foreground">
-                              {user.employeeNumber ? `${user.employeeNumber} - ` : ""}{toTitleCase(user.name)}
-                            </span>
-                          ))}
-                          {ownedUsers.length === 0 && <span className="text-[11px] text-muted-foreground">No employees assigned.</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {unassignedTlUsers.length > 0 && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/20">
-                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Unassigned employees</p>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {unassignedTlUsers.map((user) => (
-                          <span key={user.id} className="rounded border border-amber-200 bg-background px-2 py-1 text-[10px] text-muted-foreground dark:border-amber-900">
-                            {user.employeeNumber ? `${user.employeeNumber} - ` : ""}{toTitleCase(user.name)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="text-sm font-semibold text-foreground">TL &amp; Manager Ownership</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Assign employees to TLs and TLs to Managers in the dedicated Ownership page.
+                </p>
+                <Link href="/admin/ownership" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                  Go to Ownership <ChevronRight className="size-3" />
+                </Link>
               </div>
             </section>
           </div>
@@ -559,6 +561,21 @@ export default async function AdminKpiPage({
         </FadeIn>
       )}
 
+      {activeTab === "criteria" && (
+        <FadeIn delay={0.08}>
+          <CriteriaTab
+            criteria={criteria}
+            departments={departments}
+          />
+        </FadeIn>
+      )}
+
+      {activeTab === "settings" && (
+        <FadeIn delay={0.08}>
+          <WorkingCalendarForm calendar={workingCalendar} />
+        </FadeIn>
+      )}
+
       {activeTab === "scores" && (
         <FadeIn delay={0.08}>
           <div className="space-y-5">
@@ -648,8 +665,8 @@ export default async function AdminKpiPage({
                               </td>
                               <td className="px-4 font-semibold">{item.weightage}%</td>
                               <td className="px-4 text-xs text-muted-foreground">{item.target || "-"}</td>
-                              <td className="px-4 text-xs">{item.completionStatus.replaceAll("_", " ")}</td>
-                              <td className="px-4 text-xs">{item.approvalStatus}{item.assignedToEmployee ? " / Assigned" : " / Not assigned"}</td>
+                              <td className="px-4 text-xs">{reviewItemStatusLabel(item.completionStatus)}</td>
+                              <td className="px-4 text-xs">{reviewApprovalLabel(item.approvalStatus, item.assignedToEmployee)}</td>
                               <td className="px-4">
                                 <input name={`rating:${item.id}`} type="number" step="0.01" min="1" max="5" defaultValue={item.rating ?? ""} disabled={selectedReview.status === "FINALIZED" || !item.assignedToEmployee} className="h-9 w-20 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-60" />
                               </td>
@@ -683,6 +700,59 @@ export default async function AdminKpiPage({
                   </div>
                 </div>
               </form>
+            )}
+            {selectedReview && selectedReview.kpiTasks.length > 0 && (
+              <section className="rounded-xl border border-border bg-card">
+                <div className="border-b border-border px-5 py-4">
+                  <h2 className="text-sm font-semibold">Task Audit Trail</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Human-readable KPI task events and rating explanations. Internal rule JSON is not shown.
+                  </p>
+                </div>
+                <div className="grid gap-3 p-5 lg:grid-cols-2">
+                  {selectedReview.kpiTasks.map((task) => (
+                    <div key={task.id} className="rounded-lg border border-border bg-muted/10 p-3">
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">{task.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {task.criterion.name} - {taskStatusLabel(task.status)}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                          {task.finalRating?.toFixed(2) ?? "Not rated"}
+                        </span>
+                      </div>
+                      {task.ratingExplanation && (
+                        <p className="mb-3 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+                          {task.ratingExplanation}
+                        </p>
+                      )}
+                      <form action={adminOverrideKpiTaskRatingAction} className="mb-3 grid gap-2 rounded-lg border border-border bg-card p-3 sm:grid-cols-[110px_1fr_auto]">
+                        <input type="hidden" name="taskId" value={task.id} />
+                        <input
+                          name="rating"
+                          type="number"
+                          min="0"
+                          max="5"
+                          step="0.01"
+                          defaultValue={task.finalRating ?? ""}
+                          placeholder="Rating"
+                          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                        />
+                        <input
+                          name="reason"
+                          required
+                          placeholder="Admin override reason"
+                          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                        />
+                        <Button type="submit" size="sm" variant="outline">Override</Button>
+                      </form>
+                      <KpiTaskTimeline events={task.events} compact />
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
           </div>
         </FadeIn>
@@ -755,6 +825,305 @@ export default async function AdminKpiPage({
           </div>
         </FadeIn>
       )}
+    </div>
+  );
+}
+
+type WorkingCalendarRow = Awaited<ReturnType<typeof loadData>>["workingCalendar"];
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const COMMON_TIMEZONES = [
+  "Asia/Kolkata",
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Los_Angeles",
+  "Europe/London",
+  "Europe/Paris",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Australia/Sydney",
+];
+
+function WorkingCalendarForm({ calendar }: { calendar: WorkingCalendarRow }) {
+  const cal = calendar ?? {
+    workStartTime: "10:00",
+    workEndTime: "17:30",
+    timezone: "Asia/Kolkata",
+    graceMinutes: 30,
+    workingDays: [1, 2, 3, 4, 5, 6],
+    breaks: [{ start: "13:00", end: "14:00" }],
+    holidays: [] as string[],
+  };
+
+  const workingDays = Array.isArray(cal.workingDays)
+    ? (cal.workingDays as number[])
+    : [1, 2, 3, 4, 5, 6];
+  const breaks = Array.isArray(cal.breaks)
+    ? (cal.breaks as Array<{ start: string; end: string }>)
+    : [];
+  const holidays = Array.isArray(cal.holidays) ? (cal.holidays as string[]) : [];
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      <div>
+        <h2 className="text-sm font-semibold">Working Hours Configuration</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Defines valid working time for KPI task timers. Grace period is added to elapsed time before rating.
+        </p>
+      </div>
+
+      <form action={saveWorkingCalendarAction} className="space-y-5">
+        <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hours &amp; Timezone</h3>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Work Start</label>
+              <input
+                name="workStartTime"
+                type="time"
+                defaultValue={cal.workStartTime}
+                required
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Work End</label>
+              <input
+                name="workEndTime"
+                type="time"
+                defaultValue={cal.workEndTime}
+                required
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Grace Period (min)</label>
+              <input
+                name="graceMinutes"
+                type="number"
+                min="0"
+                max="120"
+                defaultValue={cal.graceMinutes}
+                required
+                className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Timezone</label>
+            <select
+              name="timezone"
+              defaultValue={cal.timezone}
+              className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary sm:max-w-xs"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Working Days</h3>
+          <div className="flex flex-wrap gap-3">
+            {WEEKDAY_LABELS.map((label, idx) => (
+              <label key={idx} className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="workingDay"
+                  value={idx}
+                  defaultChecked={workingDays.includes(idx)}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm">{label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Break Times</h3>
+          <p className="text-xs text-muted-foreground">Comma-separated list of HH:MM-HH:MM ranges excluded from working time. Example: 13:00-14:00, 16:00-16:15</p>
+          <textarea
+            name="breaks"
+            rows={3}
+            defaultValue={breaks.map((b) => `${b.start}-${b.end}`).join(", ")}
+            className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder="13:00-14:00, 16:00-16:15"
+          />
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Public Holidays</h3>
+          <p className="text-xs text-muted-foreground">One date per line or comma-separated, in YYYY-MM-DD format. Timer does not run on these days.</p>
+          <textarea
+            name="holidays"
+            rows={5}
+            defaultValue={holidays.join("\n")}
+            className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder={"2026-01-01\n2026-08-15\n2026-10-02"}
+          />
+        </section>
+
+        <button
+          type="submit"
+          className="rounded-lg bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Save Working Calendar
+        </button>
+      </form>
+    </div>
+  );
+}
+
+type CriterionRow = Awaited<ReturnType<typeof loadData>>["criteria"][number];
+
+const RULE_TYPE_LABELS: Record<string, string> = {
+  TURNAROUND_TIME: "Turnaround Time",
+  DUE_DATE: "Due Date",
+  RECURRING_WEEKLY_DUE_DATE: "Recurring Weekly",
+  MANUAL: "Manual",
+  HYBRID: "Hybrid",
+};
+
+const APPROVAL_BADGE: Record<string, { label: string; className: string }> = {
+  PENDING: { label: "Pending TL", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  APPROVED: { label: "Approved", className: "bg-green-500/10 text-green-600 dark:text-green-400" },
+  DISAPPROVED: { label: "Disapproved", className: "bg-red-500/10 text-red-600 dark:text-red-400" },
+};
+
+function CriteriaTab({
+  criteria,
+  departments,
+}: {
+  criteria: CriterionRow[];
+  departments: Department[];
+}) {
+  const rootDepts = departments.filter((d) => !d.parentId);
+  const byDept = new Map<string, CriterionRow[]>();
+  for (const c of criteria) {
+    const arr = byDept.get(c.departmentId) ?? [];
+    arr.push(c);
+    byDept.set(c.departmentId, arr);
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            Admin-defined criteria with rule types. TL approves each criterion before tasks can be created under it.
+          </p>
+        </div>
+        <CriteriaFormToggle departments={departments} />
+      </div>
+
+      {criteria.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+          <ListChecks className="mx-auto mb-3 size-8 text-muted-foreground/40" />
+          <p className="text-sm font-semibold text-muted-foreground">No criteria yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Create a criterion above and assign it to a department. The TL will then approve it.
+          </p>
+        </div>
+      )}
+
+      {rootDepts.map((dept) => {
+        const deptCriteria = byDept.get(dept.id) ?? [];
+        if (deptCriteria.length === 0) return null;
+        const totalWeight = deptCriteria
+          .filter((c) => c.status === "ACTIVE" && c.approvalStatus === "APPROVED")
+          .reduce((sum, c) => sum + c.weightage, 0);
+        return (
+          <section key={dept.id} className="rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Building2 className="size-4 text-primary" /> {dept.name}
+              </h2>
+              {totalWeight > 0 && (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    Math.abs(totalWeight - 100) < 0.01
+                      ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  }`}
+                >
+                  Approved: {totalWeight.toFixed(1)}% / 100%
+                </span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <div className="min-w-205">
+                <div className="grid grid-cols-[1fr_110px_140px_120px_100px_140px] border-b border-border bg-muted/40 px-5 py-3 text-xs font-medium text-muted-foreground">
+                  <span>Criterion</span>
+                  <span>Weight</span>
+                  <span>Rule Type</span>
+                  <span>TL Approval</span>
+                  <span>Status</span>
+                  <span className="text-right">Actions</span>
+                </div>
+                <div className="divide-y divide-border">
+                  {deptCriteria.map((c) => {
+                    const approval = APPROVAL_BADGE[c.approvalStatus] ?? APPROVAL_BADGE.PENDING;
+                    return (
+                      <div key={c.id}>
+                        <div className="grid grid-cols-[1fr_110px_140px_120px_100px_140px] items-center px-5 py-3">
+                          <div>
+                            <p className="text-sm font-medium">{c.name}</p>
+                            {c.description && (
+                              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{c.description}</p>
+                            )}
+                            {c.division && (
+                              <span className="mt-1 inline-block rounded bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                Division: {c.division.name}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-sm font-semibold">{c.weightage}%</span>
+                          <span className="text-xs text-muted-foreground">
+                            {RULE_TYPE_LABELS[c.ruleType] ?? c.ruleType}
+                          </span>
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${approval.className}`}
+                          >
+                            {approval.label}
+                          </span>
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              c.status === "ACTIVE"
+                                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {c.status === "ACTIVE" ? "Active" : "Inactive"}
+                          </span>
+                          <div className="flex items-center justify-end gap-2">
+                            <CriteriaEditInline criterion={c} departments={departments} />
+                            <form action={toggleKpiCriterionStatusAction}>
+                              <input type="hidden" name="id" value={c.id} />
+                              <input type="hidden" name="currentStatus" value={c.status} />
+                              <button
+                                type="submit"
+                                className="rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
+                              >
+                                {c.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
