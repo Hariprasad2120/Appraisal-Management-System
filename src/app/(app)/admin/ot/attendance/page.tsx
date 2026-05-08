@@ -25,6 +25,22 @@ interface AttendanceLog {
   remarks: string | null;
 }
 
+type ImportSkippedDetail = {
+  row: number;
+  reason: string;
+  payload: unknown;
+  employeeId?: string;
+  employeeName?: string;
+};
+
+type AttendanceImportResult = {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  skippedDetails?: ImportSkippedDetail[];
+};
+
 const currentMonth = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -47,12 +63,7 @@ export default function AttendancePage() {
   const [submitting, setSubmitting] = useState(false);
   
   // Import results modal state
-  const [importResult, setImportResult] = useState<{
-    imported: number;
-    updated: number;
-    skipped: number;
-    errors: string[];
-  } | null>(null);
+  const [importResult, setImportResult] = useState<AttendanceImportResult | null>(null);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -455,7 +466,7 @@ export default function AttendancePage() {
                     Skipped Row Details
                   </h3>
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {importResult.skippedDetails.map((error: any, idx: number) => (
+                    {importResult.skippedDetails.map((error, idx: number) => (
                       <div key={idx} className="p-3 bg-muted/30 border border-border rounded-xl text-xs">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-foreground">Row {error.row}</span>
