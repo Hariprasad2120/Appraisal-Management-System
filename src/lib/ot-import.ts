@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { processMonthOT, upsertAttendanceLogRecord } from "@/lib/ot";
+import { normalizeToISTMidnight, processMonthOT, upsertAttendanceLogRecord, toDateString } from "@/lib/ot";
 
 type Row = Record<string, unknown>;
 
@@ -21,6 +21,8 @@ export type AttendanceImportMapping = {
   approvalStatus?: string;
   regularizationStatus?: string;
   remarks?: string;
+  permissionMins?: string;
+  earlyLeavingMins?: string;
 };
 
 export type HolidayImportMapping = {
@@ -38,11 +40,20 @@ export type LopImportMapping = {
   remarks?: string;
 };
 
+export type ImportError = {
+  row: number;
+  employeeId?: string;
+  employeeName?: string;
+  reason: string;
+  payload: any;
+};
+
 export type ImportSummary = {
   imported: number;
   updated: number;
   skipped: number;
   errors: string[];
+  skippedDetails?: ImportError[];
 };
 
 function text(value: unknown): string {
@@ -91,12 +102,12 @@ function parseMonthStart(value: unknown, fallbackMonth?: string): Date | null {
 
   const yyyyMm = monthValue.match(/^(\d{4})-(\d{2})$/);
   if (yyyyMm) {
-    return new Date(Number(yyyyMm[1]), Number(yyyyMm[2]) - 1, 1);
+    return normalizeToISTMidnight(new Date(Number(yyyyMm[1]), Number(yyyyMm[2]) - 1, 1));
   }
 
   const parsed = parseDate(monthValue);
   if (!parsed) return null;
-  return new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+  return normalizeToISTMidnight(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
 }
 
 function formatMonthKey(date: Date): string {
@@ -107,11 +118,12 @@ function parseTimeOnDate(date: Date, value: unknown): Date | null {
   const raw = text(value);
   if (!raw) return null;
 
-  const full = new Date(raw);
-  if (!Number.isNaN(full.getTime())) return full;
-
   const match = raw.match(/^(\d{1,2})(?::(\d{2}))(?::(\d{2}))?\s*(AM|PM)?$/i);
-  if (!match) return null;
+  if (!match) {
+    const full = new Date(raw);
+    if (!Number.isNaN(full.getTime())) return full;
+    return null;
+  }
 
   let hour = Number(match[1]);
   const minute = Number(match[2] ?? "0");
@@ -121,15 +133,10 @@ function parseTimeOnDate(date: Date, value: unknown): Date | null {
   if (meridiem === "PM" && hour < 12) hour += 12;
   if (meridiem === "AM" && hour === 12) hour = 0;
 
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    hour,
-    minute,
-    second,
-    0,
-  );
+  // Use IST offset to ensure correct UTC storage
+  const dateStr = toDateString(date); 
+  const isoStr = `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}.000+05:30`;
+  return new Date(isoStr);
 }
 
 function fieldValue(row: Row, key?: string): unknown {
@@ -203,7 +210,7 @@ export async function importAttendanceRows(
   rows: Row[],
   mapping: AttendanceImportMapping,
 ): Promise<ImportSummary> {
-  const summary: ImportSummary = { imported: 0, updated: 0, skipped: 0, errors: [] };
+  const summary: ImportSummary = { imported: 0, updated: 0, skipped: 0, errors: [], skippedDetails: [] };
   const employees = await getImportEmployees();
   const affectedMonths = new Set<string>();
 
@@ -211,20 +218,29 @@ export async function importAttendanceRows(
     try {
       const employee = matchEmployee(row, mapping, employees);
       if (!employee) {
-        throw new Error("Employee match not found");
+        throw new Error("Employee match not found (ID/Name/Email)");
       }
 
-      const attendanceDate = parseDate(fieldValue(row, mapping.attendanceDate));
-      if (!attendanceDate) {
-        throw new Error("Invalid attendance date");
+      const rawDate = parseDate(fieldValue(row, mapping.attendanceDate));
+      if (!rawDate) {
+        throw new Error("Invalid or missing attendance date");
       }
+      
+      const attendanceDate = normalizeToISTMidnight(rawDate);
 
       const checkIn = parseTimeOnDate(attendanceDate, fieldValue(row, mapping.checkIn));
       const checkOut = parseTimeOnDate(attendanceDate, fieldValue(row, mapping.checkOut));
+      
+      if (checkIn && checkOut && checkOut < checkIn) {
+        throw new Error("Check-out time is earlier than check-in time");
+      }
+
       const totalHours = parseNumber(fieldValue(row, mapping.totalHours));
       const approvalStatus = text(fieldValue(row, mapping.approvalStatus)) || "Approved";
       const regularizationStatus = text(fieldValue(row, mapping.regularizationStatus)) || null;
       const remarks = text(fieldValue(row, mapping.remarks)) || null;
+      const permissionMins = parseNumber(fieldValue(row, mapping.permissionMins)) || 0;
+      const earlyLeavingMins = parseNumber(fieldValue(row, mapping.earlyLeavingMins)) || 0;
 
       const existing = await prisma.attendanceLog.findUnique({
         where: {
@@ -246,6 +262,8 @@ export async function importAttendanceRows(
           approvalStatus,
           regularizationStatus,
           remarks,
+          permissionMins,
+          earlyLeavingMins,
         },
         { recalculateOt: false },
       );
@@ -254,7 +272,13 @@ export async function importAttendanceRows(
       upsertSummary(summary, existing ? "updated" : "imported");
     } catch (error) {
       upsertSummary(summary, "skipped");
-      summary.errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : "Import failed"}`);
+      const reason = error instanceof Error ? error.message : "Import failed";
+      summary.errors.push(`Row ${index + 1}: ${reason}`);
+      summary.skippedDetails?.push({
+        row: index + 1,
+        reason,
+        payload: row
+      });
     }
   }
 

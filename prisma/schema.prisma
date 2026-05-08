@@ -1033,6 +1033,8 @@ model OtSettings {
   otRatePerHour      Decimal  @default(100) @db.Decimal(10, 2)
   /// JSON: [{minHours: number, compOffDays: number}] sorted ascending
   compOffSlabs       Json
+  requiresWorkReport Boolean  @default(false)
+  graceMinutes       Int      @default(15)
   updatedAt          DateTime @updatedAt
   updatedById        String?
 }
@@ -1061,6 +1063,9 @@ model AttendanceLog {
   regularizationStatus String?
   approvalStatus       String   @default("Approved")
   remarks              String?
+  earlyLeavingMins     Int      @default(0)
+  permissionMins       Int      @default(0)
+  workReportSubmitted  Boolean  @default(false)
   createdAt            DateTime @default(now())
 
   ot EmployeeOt?
@@ -1084,7 +1089,14 @@ model EmployeeOt {
   otRatePerHour    Decimal         @default(0) @db.Decimal(10, 2)
   otAmount         Decimal         @default(0) @db.Decimal(10, 2)
   compOffDays      Decimal         @default(0) @db.Decimal(4, 2)
+  earlyLeavingMins Int             @default(0)
+  regularizedPenaltyMins Int       @default(0)
+  adjustedOtMins   Int             @default(0)
+  permissionMins   Int             @default(0)
   approvalStatus   OtApprovalStatus @default(PENDING)
+  tlApprovalStatus OtApprovalStatus @default(PENDING)
+  managerApprovalStatus OtApprovalStatus @default(PENDING)
+  hrApprovalStatus OtApprovalStatus @default(PENDING)
   approvedById     String?
   approvedBy       User?           @relation("OtApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt       DateTime?

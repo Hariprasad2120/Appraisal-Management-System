@@ -20,12 +20,16 @@ export async function GET() {
       standardHoursPerDay: 8,
       otRatePerHour: 100,
       compOffSlabs: DEFAULT_COMPOFF_SLABS,
+      graceMinutes: 15,
+      requiresWorkReport: false,
     });
   }
   return NextResponse.json({
     standardHoursPerDay: Number(settings.standardHoursPerDay),
     otRatePerHour: Number(settings.otRatePerHour),
     compOffSlabs: settings.compOffSlabs,
+    graceMinutes: settings.graceMinutes,
+    requiresWorkReport: settings.requiresWorkReport,
   });
 }
 
@@ -33,6 +37,8 @@ const settingsSchema = z.object({
   standardHoursPerDay: z.number().min(1).max(24),
   otRatePerHour: z.number().min(0),
   compOffSlabs: z.array(z.object({ minHours: z.number(), compOffDays: z.number() })),
+  graceMinutes: z.number().min(0).max(120).optional(),
+  requiresWorkReport: z.boolean().optional(),
 });
 
 export async function PUT(req: NextRequest) {
@@ -52,6 +58,8 @@ export async function PUT(req: NextRequest) {
       standardHoursPerDay: data.standardHoursPerDay,
       otRatePerHour: data.otRatePerHour,
       compOffSlabs: data.compOffSlabs,
+      graceMinutes: data.graceMinutes ?? 15,
+      requiresWorkReport: data.requiresWorkReport ?? false,
       updatedById: session.user.id,
     },
     create: {
@@ -59,6 +67,8 @@ export async function PUT(req: NextRequest) {
       standardHoursPerDay: data.standardHoursPerDay,
       otRatePerHour: data.otRatePerHour,
       compOffSlabs: data.compOffSlabs,
+      graceMinutes: data.graceMinutes ?? 15,
+      requiresWorkReport: data.requiresWorkReport ?? false,
       updatedById: session.user.id,
     },
   });

@@ -1,5 +1,5 @@
 /**
- * OT and comp-off calculation engine.
+ * OT and comp-off calculation engine with advanced rules for early leaving, penalties, and grace periods.
  */
 
 import { prisma } from "@/lib/db";
@@ -11,15 +11,16 @@ export interface CompOffSlab {
 }
 
 export const DEFAULT_COMPOFF_SLABS: CompOffSlab[] = [
-  { minHours: 4, compOffDays: 0.5 },
-  { minHours: 8, compOffDays: 1 },
-  { minHours: 11, compOffDays: 1.5 },
+  { minHours: 2, compOffDays: 0.5 },
+  { minHours: 4, compOffDays: 1 },
 ];
 
 export const DEFAULT_OT_SETTINGS = {
   standardHoursPerDay: 8,
   otRatePerHour: 100,
   compOffSlabs: DEFAULT_COMPOFF_SLABS,
+  graceMinutes: 15,
+  requiresWorkReport: false,
 };
 
 type AttendanceLogForOt = {
@@ -30,6 +31,9 @@ type AttendanceLogForOt = {
   checkOut: Date | null;
   totalHours: unknown;
   approvalStatus: string;
+  regularizationStatus: string | null;
+  earlyLeavingMins: number;
+  permissionMins: number;
   employee: {
     id: string;
     currentSalary: unknown;
@@ -38,11 +42,7 @@ type AttendanceLogForOt = {
 };
 
 type OtMonthContext = {
-  settings: {
-    standardHoursPerDay: number;
-    otRatePerHour: number;
-    compOffSlabs: CompOffSlab[];
-  };
+  settings: typeof DEFAULT_OT_SETTINGS;
   holidayDateSet: Set<string>;
   workingDays: number[];
 };
@@ -54,6 +54,9 @@ type OtComputation = {
   otRatePerHour: number;
   otAmount: number;
   compOffDays: number;
+  earlyLeavingMins: number;
+  regularizedPenaltyMins: number;
+  permissionMins: number;
 };
 
 export type AttendanceLogUpsertInput = {
@@ -65,6 +68,8 @@ export type AttendanceLogUpsertInput = {
   regularizationStatus?: string | null;
   approvalStatus?: string;
   remarks?: string | null;
+  earlyLeavingMins?: number;
+  permissionMins?: number;
 };
 
 export function calculateHours(checkIn: Date, checkOut: Date): number {
@@ -73,29 +78,80 @@ export function calculateHours(checkIn: Date, checkOut: Date): number {
   return Math.max(0, Number(diff.toFixed(2)));
 }
 
-export function calculateOT(hoursWorked: number, standardHours: number): number {
-  if (hoursWorked <= standardHours) return 0;
-  return Number((hoursWorked - standardHours).toFixed(2));
-}
-
-export function calculateCompOff(
-  hoursWorked: number,
-  slabs: CompOffSlab[] = DEFAULT_COMPOFF_SLABS,
-): number {
-  const sorted = [...slabs].sort((a, b) => b.minHours - a.minHours);
-  for (const slab of sorted) {
-    if (hoursWorked >= slab.minHours) return slab.compOffDays;
-  }
-  return 0;
-}
-
 export function isWeekend(date: Date): boolean {
   const day = new Date(date).getDay();
   return day === 0 || day === 6;
 }
 
 export function toDateString(date: Date): string {
-  return date.toISOString().split("T")[0];
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+export function normalizeToISTMidnight(date: Date): Date {
+  const dateStr = toDateString(date);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d!, 0, 0, 0));
+}
+
+export function getAllDatesInMonth(year: number, month: number): Date[] {
+  // Construct a date at 12:00 PM IST on the 1st of the month
+  // Note: Date constructor uses 0-based month (0-11)
+  const lastDay = new Date(year, month, 0).getDate();
+  const dates = [];
+  for (let d = 1; d <= lastDay; d++) {
+    // We create a date object that we'll normalize
+    dates.push(normalizeToISTMidnight(new Date(year, month - 1, d)));
+  }
+  return dates;
+}
+
+export function getSaturdayNumber(date: Date): number {
+  const dateStr = toDateString(date);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const istDate = new Date(y!, m! - 1, d!);
+  
+  if (istDate.getDay() !== 6) return 0;
+  return Math.ceil(istDate.getDate() / 7);
+}
+
+export function isSunday(date: Date): boolean {
+  const dateStr = toDateString(date);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const istDate = new Date(y!, m! - 1, d!);
+  return istDate.getDay() === 0;
+}
+
+export function isFirstOrThirdSaturday(date: Date): boolean {
+  const num = getSaturdayNumber(date);
+  return num === 1 || num === 3 || num === 5;
+}
+
+export function isSecondOrFourthSaturday(date: Date): boolean {
+  const num = getSaturdayNumber(date);
+  return num === 2 || num === 4;
+}
+
+export function getDayType(date: Date, holidayDateSet: Set<string>): "WORKING_DAY" | "HOLIDAY" | "WEEKEND" | "SUNDAY" {
+  const dateStr = toDateString(date);
+  if (holidayDateSet.has(dateStr)) return "HOLIDAY";
+  
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const istDate = new Date(y!, m! - 1, d!);
+  const day = istDate.getDay();
+  
+  if (day === 0) return "SUNDAY";
+  if (day === 6) {
+    const num = Math.ceil(istDate.getDate() / 7);
+    if (num === 2 || num === 4) return "WEEKEND";
+    return "WORKING_DAY"; // 1st, 3rd, 5th are working
+  }
+  
+  return "WORKING_DAY";
 }
 
 export function isApprovedAttendanceStatus(status: string | null | undefined): boolean {
@@ -116,23 +172,21 @@ export function deriveAttendanceTotalHours(input: {
   return null;
 }
 
-export async function getOtSettings() {
+export async function getOtSettings(): Promise<typeof DEFAULT_OT_SETTINGS> {
   const settings = await prisma.otSettings.findUnique({
     where: { id: "default" },
   });
 
   if (!settings) {
-    return {
-      standardHoursPerDay: DEFAULT_OT_SETTINGS.standardHoursPerDay,
-      otRatePerHour: DEFAULT_OT_SETTINGS.otRatePerHour,
-      compOffSlabs: DEFAULT_OT_SETTINGS.compOffSlabs as CompOffSlab[],
-    };
+    return { ...DEFAULT_OT_SETTINGS };
   }
 
   return {
     standardHoursPerDay: Number(settings.standardHoursPerDay),
     otRatePerHour: Number(settings.otRatePerHour),
     compOffSlabs: (settings.compOffSlabs as CompOffSlab[] | null) ?? DEFAULT_COMPOFF_SLABS,
+    graceMinutes: settings.graceMinutes ?? 15,
+    requiresWorkReport: settings.requiresWorkReport ?? false,
   };
 }
 
@@ -163,14 +217,15 @@ function getAnnualSalary(employee: AttendanceLogForOt["employee"]): number | nul
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function resolveEmployeeOtRate(
+function resolveEmployeeOtRatePerMinute(
   employee: AttendanceLogForOt["employee"],
   attendanceDate: Date,
   context: OtMonthContext,
 ): number {
+  const fallbackMinuteRate = context.settings.otRatePerHour / 60;
   const annualSalary = getAnnualSalary(employee);
   if (!annualSalary) {
-    return context.settings.otRatePerHour;
+    return fallbackMinuteRate;
   }
 
   const workingDays = countWorkingDaysInMonth(
@@ -178,13 +233,15 @@ function resolveEmployeeOtRate(
     context.workingDays,
     context.holidayDateSet,
   );
+  
   const standardMonthlyHours = workingDays * context.settings.standardHoursPerDay;
   if (standardMonthlyHours <= 0) {
-    return context.settings.otRatePerHour;
+    return fallbackMinuteRate;
   }
 
   const monthlyGross = annualSalary / 12;
-  return Number((monthlyGross / standardMonthlyHours).toFixed(2));
+  const hourlyRate = monthlyGross / standardMonthlyHours;
+  return hourlyRate / 60;
 }
 
 function computeOtForLog(
@@ -199,35 +256,76 @@ function computeOtForLog(
         : 0;
 
   if (!isApprovedAttendanceStatus(log.approvalStatus)) return null;
+  // If no work was done, we don't generate an OT record via this flow, 
+  // but wait, the user wants all days visible. The API will handle missing days.
   if (!log.checkIn || !log.checkOut || hoursWorked <= 0) return null;
 
-  const dateStr = toDateString(new Date(log.attendanceDate));
-  const holiday = context.holidayDateSet.has(dateStr);
-  const weekend = isWeekend(new Date(log.attendanceDate));
-  const otRatePerHour = resolveEmployeeOtRate(log.employee, log.attendanceDate, context);
+  const dayTypeStr = getDayType(new Date(log.attendanceDate), context.holidayDateSet);
+  const otRatePerMinute = resolveEmployeeOtRatePerMinute(log.employee, log.attendanceDate, context);
 
   let dayType: OtComputation["dayType"] = "WORKING_DAY";
-  let otHours = 0;
+  if (dayTypeStr === "HOLIDAY") dayType = "HOLIDAY";
+  else if (dayTypeStr === "WEEKEND" || dayTypeStr === "SUNDAY") dayType = "WEEKEND";
+
+  const minutesWorked = Math.round(hoursWorked * 60);
+  const standardMinutes = Math.round(context.settings.standardHoursPerDay * 60);
+  const permissionMinutes = log.permissionMins || 0;
+  const requiredMinutes = Math.max(0, standardMinutes - permissionMinutes);
+  
+  let otMins = 0;
+  let earlyLeavingMins = 0;
+  let regularizedPenaltyMins = 0;
   let otAmount = 0;
   let compOffDays = 0;
 
-  if (holiday) dayType = "HOLIDAY";
-  else if (weekend) dayType = "WEEKEND";
+  const isRegularized = !!log.regularizationStatus && String(log.regularizationStatus).trim() !== '';
 
-  if (holiday || weekend) {
-    compOffDays = calculateCompOff(hoursWorked, context.settings.compOffSlabs);
+  if (dayType === "HOLIDAY" || dayType === "WEEKEND") {
+    // NON-WORKING DAY: Comp Off Logic
+    if (minutesWorked > 0) {
+      const applicableSlabs = context.settings.compOffSlabs
+        .filter((s) => (minutesWorked / 60) >= s.minHours)
+        .sort((a, b) => b.minHours - a.minHours);
+
+      if (applicableSlabs.length > 0) {
+        compOffDays = applicableSlabs[0].compOffDays;
+      }
+
+      if (isRegularized && compOffDays > 0) {
+        // Regularized penalty of 75% on compOff
+        const penalty = compOffDays * 0.75;
+        compOffDays = compOffDays - penalty;
+      }
+    }
+    // OT is NOT calculated on non-working days
   } else {
-    otHours = calculateOT(hoursWorked, context.settings.standardHoursPerDay);
-    otAmount = Number((otHours * otRatePerHour).toFixed(2));
+    // WORKING DAY: OT Logic
+    if (minutesWorked < requiredMinutes) {
+      earlyLeavingMins = requiredMinutes - minutesWorked;
+    } else if (minutesWorked >= requiredMinutes + context.settings.graceMinutes) {
+      // Overtime calculation starts strictly AFTER the grace period
+      otMins = minutesWorked - (requiredMinutes + context.settings.graceMinutes);
+    }
+
+    if (isRegularized && otMins > 0) {
+      regularizedPenaltyMins = Math.floor(otMins * 0.75);
+      otMins = otMins - regularizedPenaltyMins;
+    }
+
+    otAmount = Number((otMins * otRatePerMinute).toFixed(2));
+    // Comp Off is NOT calculated on working days
   }
 
   return {
     dayType,
     hoursWorked: Number(hoursWorked.toFixed(2)),
-    otHours,
-    otRatePerHour,
+    otHours: Number((otMins / 60).toFixed(2)), 
+    otRatePerHour: Number((otRatePerMinute * 60).toFixed(2)),
     otAmount,
     compOffDays,
+    earlyLeavingMins,
+    regularizedPenaltyMins,
+    permissionMins: permissionMinutes,
   };
 }
 
@@ -276,6 +374,9 @@ async function syncEmployeeOtForLogRecord(log: AttendanceLogForOt, context: OtMo
       otRatePerHour: computed.otRatePerHour,
       otAmount: computed.otAmount,
       compOffDays: computed.compOffDays,
+      earlyLeavingMins: computed.earlyLeavingMins,
+      regularizedPenaltyMins: computed.regularizedPenaltyMins,
+      permissionMins: computed.permissionMins,
     },
     create: {
       attendanceLogId: log.id,
@@ -287,7 +388,13 @@ async function syncEmployeeOtForLogRecord(log: AttendanceLogForOt, context: OtMo
       otRatePerHour: computed.otRatePerHour,
       otAmount: computed.otAmount,
       compOffDays: computed.compOffDays,
+      earlyLeavingMins: computed.earlyLeavingMins,
+      regularizedPenaltyMins: computed.regularizedPenaltyMins,
+      permissionMins: computed.permissionMins,
       approvalStatus: "PENDING",
+      tlApprovalStatus: "PENDING",
+      managerApprovalStatus: "PENDING",
+      hrApprovalStatus: "PENDING",
     },
   });
 
@@ -311,20 +418,21 @@ export async function syncEmployeeOtForAttendanceLog(attendanceLogId: string) {
   if (!log) return false;
 
   const context = await getOtMonthContext(log.attendanceDate);
-  return syncEmployeeOtForLogRecord(log, context);
+  return syncEmployeeOtForLogRecord(log as AttendanceLogForOt, context);
 }
 
 export async function upsertAttendanceLogRecord(
   input: AttendanceLogUpsertInput,
   options?: { recalculateOt?: boolean },
 ) {
+  const attendanceDate = normalizeToISTMidnight(new Date(input.attendanceDate));
   const totalHours = deriveAttendanceTotalHours(input);
 
   const record = await prisma.attendanceLog.upsert({
     where: {
       employeeId_attendanceDate: {
         employeeId: input.employeeId,
-        attendanceDate: input.attendanceDate,
+        attendanceDate: attendanceDate,
       },
     },
     update: {
@@ -334,16 +442,20 @@ export async function upsertAttendanceLogRecord(
       regularizationStatus: input.regularizationStatus ?? null,
       approvalStatus: input.approvalStatus ?? "Approved",
       remarks: input.remarks ?? null,
+      earlyLeavingMins: input.earlyLeavingMins ?? 0,
+      permissionMins: input.permissionMins ?? 0,
     },
     create: {
       employeeId: input.employeeId,
-      attendanceDate: input.attendanceDate,
+      attendanceDate: attendanceDate,
       checkIn: input.checkIn ?? null,
       checkOut: input.checkOut ?? null,
       totalHours,
       regularizationStatus: input.regularizationStatus ?? null,
       approvalStatus: input.approvalStatus ?? "Approved",
       remarks: input.remarks ?? null,
+      earlyLeavingMins: input.earlyLeavingMins ?? 0,
+      permissionMins: input.permissionMins ?? 0,
     },
   });
 
@@ -358,8 +470,8 @@ export async function processMonthOT(monthDate: Date): Promise<{
   processed: number;
   skipped: number;
 }> {
-  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const monthStart = normalizeToISTMidnight(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+  const monthEnd = normalizeToISTMidnight(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
   const context = await getOtMonthContext(monthDate);
 
   const logs = await prisma.attendanceLog.findMany({
@@ -381,7 +493,8 @@ export async function processMonthOT(monthDate: Date): Promise<{
   let skipped = 0;
 
   for (const log of logs) {
-    const synced = await syncEmployeeOtForLogRecord(log, context);
+    // Note: Future integration step: if context.settings.requiresWorkReport is true, check if report exists
+    const synced = await syncEmployeeOtForLogRecord(log as AttendanceLogForOt, context);
     if (synced) processed++;
     else skipped++;
   }

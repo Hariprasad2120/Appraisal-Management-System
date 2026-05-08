@@ -20,6 +20,8 @@ const bodySchema = z.object({
     approvalStatus: z.string().optional(),
     regularizationStatus: z.string().optional(),
     remarks: z.string().optional(),
+    permissionMins: z.string().optional(),
+    earlyLeavingMins: z.string().optional(),
   }),
 });
 

@@ -14,16 +14,19 @@ interface OtSettingsData {
   standardHoursPerDay: number;
   otRatePerHour: number;
   compOffSlabs: CompOffSlab[];
+  graceMinutes: number;
+  requiresWorkReport: boolean;
 }
 
 export default function OtSettingsPage() {
   const [settings, setSettings] = useState<OtSettingsData>({
     standardHoursPerDay: 8,
     otRatePerHour: 100,
+    graceMinutes: 15,
+    requiresWorkReport: false,
     compOffSlabs: [
-      { minHours: 4, compOffDays: 0.5 },
-      { minHours: 8, compOffDays: 1 },
-      { minHours: 11, compOffDays: 1.5 },
+      { minHours: 2, compOffDays: 0.5 },
+      { minHours: 4, compOffDays: 1 },
     ],
   });
   const [loading, setLoading] = useState(true);
@@ -124,8 +127,26 @@ export default function OtSettingsPage() {
                 <p className="text-xs text-muted-foreground">OT applies when hours exceed this threshold on regular days</p>
               </div>
               <div className="space-y-1.5">
+                <label className="ds-label" htmlFor="grace-mins">
+                  Grace Period (Minutes)
+                </label>
+                <input
+                  id="grace-mins"
+                  type="number"
+                  min={0}
+                  max={120}
+                  step={1}
+                  value={settings.graceMinutes}
+                  onChange={(e) =>
+                    setSettings((s) => ({ ...s, graceMinutes: parseInt(e.target.value) || 0 }))
+                  }
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <p className="text-xs text-muted-foreground">Minutes after standard hours before OT calculation starts</p>
+              </div>
+              <div className="space-y-1.5">
                 <label className="ds-label" htmlFor="ot-rate">
-                  OT Rate per Hour (₹)
+                  Fallback OT Rate / Hr (₹)
                 </label>
                 <input
                   id="ot-rate"
@@ -138,7 +159,20 @@ export default function OtSettingsPage() {
                   }
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
-                <p className="text-xs text-muted-foreground">Amount paid per overtime hour</p>
+                <p className="text-xs text-muted-foreground">Used only if employee has no active salary. Otherwise dynamic.</p>
+              </div>
+              <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20">
+                <div className="space-y-0.5">
+                  <label className="ds-label mb-0" htmlFor="req-work">Require Work Report</label>
+                  <p className="text-xs text-muted-foreground">If checked, OT is processed only when a report is submitted</p>
+                </div>
+                <input
+                  id="req-work"
+                  type="checkbox"
+                  checked={settings.requiresWorkReport}
+                  onChange={(e) => setSettings(s => ({ ...s, requiresWorkReport: e.target.checked }))}
+                  className="size-4 rounded border-border"
+                />
               </div>
             </div>
           </div>

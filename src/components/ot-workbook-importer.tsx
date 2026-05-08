@@ -22,7 +22,7 @@ type ImporterProps = {
   endpoint: string;
   fields: ImportFieldConfig[];
   additionalPayload?: Record<string, unknown>;
-  onImported?: () => void;
+  onImported?: (result: any) => void;
   validateMappings?: (mappings: Record<string, string>) => string | null;
 };
 
@@ -193,7 +193,7 @@ export function OtWorkbookImporter({
       if (Array.isArray(result.errors) && result.errors.length > 0) {
         toast.info(`Some rows were skipped. First issue: ${result.errors[0]}`);
       }
-      onImported?.();
+      onImported?.(result);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Import failed");
     } finally {

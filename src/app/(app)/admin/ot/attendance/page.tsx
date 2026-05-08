@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { FadeIn } from "@/components/motion-div";
-import { ClipboardList, Plus, Loader2, Play } from "lucide-react";
+import { ClipboardList, Plus, Loader2, Play, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OtWorkbookImporter } from "@/components/ot-workbook-importer";
@@ -45,6 +45,14 @@ export default function AttendancePage() {
     remarks: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  
+  // Import results modal state
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    updated: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -122,7 +130,7 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-6xl relative">
       <FadeIn>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -165,7 +173,8 @@ export default function AttendancePage() {
               title="Attendance Workbook Import"
               description="Choose the source sheet, pick the real header row, and map employee/date/time fields manually. This is designed for sheets like your OT workbook where headers start below title rows."
               endpoint="/api/ot/import/attendance"
-              onImported={() => {
+              onImported={(result) => {
+                setImportResult(result);
                 void fetchLogs();
               }}
               validateMappings={(mappings) =>
@@ -211,6 +220,17 @@ export default function AttendancePage() {
                   label: "Total Hours",
                   aliases: ["total hours", "total hrs", "hours worked"],
                   helpText: "If check-in and check-out are mapped, total hours will be recalculated automatically.",
+                },
+                {
+                  key: "permissionMins",
+                  label: "Permission (Mins)",
+                  aliases: ["permission", "permission mins", "perm mins"],
+                  helpText: "Deducts from standard 8 hours (e.g. 60 for 1 hr permission)",
+                },
+                {
+                  key: "earlyLeavingMins",
+                  label: "Early Leaving (Mins)",
+                  aliases: ["early leaving", "early out", "early min"],
                 },
                 {
                   key: "approvalStatus",
@@ -393,6 +413,77 @@ export default function AttendancePage() {
           )}
         </div>
       </FadeIn>
+
+      {/* Import Result Modal */}
+      {importResult && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className={`size-10 rounded-full flex items-center justify-center ${importResult.errors.length > 0 ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600" : "bg-teal-100 dark:bg-teal-900/30 text-teal-600"}`}>
+                  {importResult.errors.length > 0 ? <AlertCircle className="size-5" /> : <CheckCircle2 className="size-5" />}
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Import Summary</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {importResult.errors.length > 0 ? "Import completed with some skipped rows." : "Import completed successfully."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">{importResult.imported}</div>
+                  <div className="text-xs font-medium text-teal-800 dark:text-teal-300 mt-1 uppercase tracking-wider">Imported</div>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{importResult.updated}</div>
+                  <div className="text-xs font-medium text-blue-800 dark:text-blue-300 mt-1 uppercase tracking-wider">Updated</div>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{importResult.skipped}</div>
+                  <div className="text-xs font-medium text-amber-800 dark:text-amber-300 mt-1 uppercase tracking-wider">Skipped</div>
+                </div>
+              </div>
+
+              {importResult.skippedDetails && importResult.skippedDetails.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <AlertCircle className="size-4 text-amber-500" />
+                    Skipped Row Details
+                  </h3>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {importResult.skippedDetails.map((error: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-muted/30 border border-border rounded-xl text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-foreground">Row {error.row}</span>
+                          <span className="text-[10px] bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded font-bold uppercase">
+                            {error.reason}
+                          </span>
+                        </div>
+                        <div className="font-mono text-[10px] text-muted-foreground bg-background/50 p-2 rounded mt-2 overflow-x-auto">
+                          {JSON.stringify(error.payload, null, 2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-border bg-muted/10 flex justify-end">
+              <button
+                onClick={() => setImportResult(null)}
+                className="bg-foreground text-background rounded-lg px-6 py-2 text-sm font-medium hover:bg-foreground/90 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

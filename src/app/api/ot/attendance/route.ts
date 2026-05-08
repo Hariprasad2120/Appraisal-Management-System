@@ -50,6 +50,8 @@ const logSchema = z.object({
   regularizationStatus: z.string().optional(),
   approvalStatus: z.string().default("Approved"),
   remarks: z.string().optional(),
+  earlyLeavingMins: z.number().optional(),
+  permissionMins: z.number().optional(),
 });
 
 const bulkSchema = z.object({
@@ -66,11 +68,34 @@ export async function POST(req: NextRequest) {
   const parsed = bulkSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  const logs = parsed.data.logs;
+  
+  // Batch check employee existence
+  const uniqueEmpIds = Array.from(new Set(logs.map(l => l.employeeId)));
+  const existingEmps = await prisma.user.findMany({
+    where: { id: { in: uniqueEmpIds } },
+    select: { id: true }
+  });
+  const existingEmpSet = new Set(existingEmps.map(e => e.id));
+
   let inserted = 0;
   let skipped = 0;
+  const skippedDetails: any[] = [];
 
-  for (const log of parsed.data.logs) {
+  for (let i = 0; i < logs.length; i++) {
+    const log = logs[i];
     try {
+      if (!existingEmpSet.has(log.employeeId)) {
+        throw new Error(`Employee ID "${log.employeeId}" does not exist in the system.`);
+      }
+
+      // Time sequence validation
+      if (log.checkIn && log.checkOut) {
+        const ci = new Date(log.checkIn);
+        const co = new Date(log.checkOut);
+        if (co < ci) throw new Error("Check-out time is earlier than check-in time.");
+      }
+
       await upsertAttendanceLogRecord({
         employeeId: log.employeeId,
         attendanceDate: new Date(log.attendanceDate),
@@ -80,12 +105,25 @@ export async function POST(req: NextRequest) {
         regularizationStatus: log.regularizationStatus ?? null,
         approvalStatus: log.approvalStatus,
         remarks: log.remarks ?? null,
+        earlyLeavingMins: log.earlyLeavingMins ?? 0,
+        permissionMins: log.permissionMins ?? 0,
       });
       inserted++;
-    } catch {
+    } catch (e: any) {
       skipped++;
+      skippedDetails.push({
+        row: i + 1,
+        employeeId: log.employeeId,
+        reason: e.message || "Prisma or Database error",
+        payload: log
+      });
     }
   }
 
-  return NextResponse.json({ inserted, skipped }, { status: 201 });
+  return NextResponse.json({ 
+    message: skipped > 0 ? "Import partially completed" : "Import successful",
+    inserted, 
+    skipped,
+    skippedDetails 
+  }, { status: 201 });
 }

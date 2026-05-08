@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Adarsh Shipping - Comprehensive Enterprise Showcase</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* === BASE STYLES === */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; background: #000; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; }
+.presentation { position: relative; width: 1280px; height: 720px; overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8); background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%); }
+
+/* === SLIDER LOGIC === */
+.slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.6s ease, transform 0.6s ease; opacity: 0; pointer-events: none; transform: scale(0.95) translateX(100px); display: flex; flex-direction: column; z-index: 2;}
+.slide.active { opacity: 1; pointer-events: all; transform: scale(1) translateX(0); z-index: 10; }
+.slide.prev { transform: scale(0.95) translateX(-100px); opacity: 0; }
+
+/* === CONTROLS === */
+.controls { position: absolute; bottom: 30px; right: 30px; z-index: 100; display: flex; gap: 15px; }
+.controls button { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 12px; width: 50px; height: 50px; cursor: pointer; transition: all 0.3s; font-size: 20px; display: flex; align-items: center; justify-content: center;}
+.controls button:hover { background: rgba(59, 130, 246, 0.4); border-color: #3b82f6; transform: translateY(-2px); }
+.slide-indicator { position: absolute; bottom: 45px; left: 50%; transform: translateX(-50%); z-index: 100; color: rgba(255,255,255,0.4); font-size: 14px; font-weight: 600; letter-spacing: 3px;}
+
+/* === COMMON BACKGROUND EFFECTS === */
+.bg-particles { position: absolute; width: 100%; height: 100%; overflow: hidden; z-index: 1; pointer-events: none;}
+.particle { position: absolute; width: 4px; height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 50%; animation: float 15s infinite linear; }
+@keyframes float { 0% { transform: translateY(100vh) translateX(0); opacity: 1; } 100% { transform: translateY(-100vh) translateX(100px); opacity: 1; } }
+.decoration { position: absolute; width: 400px; height: 400px; background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%); border-radius: 50%; top: -200px; right: -200px; z-index: 0; pointer-events: none;}
+.decoration-2 { position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, rgba(6, 182, 212, 0.08) 0%, transparent 70%); border-radius: 50%; bottom: -150px; left: -150px; z-index: 0; pointer-events: none;}
+.bg-pattern { position: absolute; width: 100%; height: 100%; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); z-index: 1; pointer-events: none;}
+
+/* === GLOBALS === */
+.main-content { position: relative; z-index: 2; padding: 60px 80px; display: flex; flex-direction: column; height: 100%; width: 100%;}
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+.logo-section { display: flex; align-items: center; gap: 20px; }
+.logo-icon { width: 64px; height: 64px; background: linear-gradient(135deg, #3b82f6, #06b6d4); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; }
+.logo-text { color: white; font-family: 'Poppins', sans-serif; font-size: 32px; font-weight: 700; line-height: 1; }
+.logo-subtitle { color: #94a3b8; font-size: 16px; font-weight: 400; margin-top: 4px; }
+
+/* Custom Layout Utilities */
+.title-section { display: flex; align-items: center; gap: 18px; }
+.title-icon { width: 54px; height: 54px; background: linear-gradient(135deg, #3b82f6, #06b6d4); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 26px; }
+.title-text { font-family: 'Poppins', sans-serif; font-size: 32px; font-weight: 700; color: white; line-height: 1.2; }
+.title-subtitle { color: #94a3b8; font-size: 16px; margin-top: 2px; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; flex: 1;}
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; flex: 1;}
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.custom-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 25px; position: relative;}
+.card-header-icon { width: 44px; height: 44px; background: rgba(59, 130, 246, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #3b82f6; font-size: 20px; margin-bottom: 15px;}
+.card-title-text { color: white; font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+.card-body-text { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+
+/* Animations */
+.anim-up { opacity: 0; transform: translateY(30px); transition: all 0.6s ease; }
+.slide.active .anim-up { opacity: 1; transform: translateY(0); }
+.delay-1 { transition-delay: 0.1s; }
+.delay-2 { transition-delay: 0.2s; }
+.delay-3 { transition-delay: 0.3s; }
+
+/* Specific components */
+.workflow-number { width: 32px; height: 32px; background: linear-gradient(135deg, #3b82f6, #06b6d4); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 14px; flex-shrink: 0;}
+.styled-list { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.styled-list li { display: flex; align-items: flex-start; gap: 12px; color: #cbd5e1; font-size: 15px; }
+
+</style>
+</head>
+<body>
+<div class="presentation">
+    <!-- Particles & Decorations -->
+    <div class="bg-particles" id="particles"></div>
+    <div class="decoration"></div>
+    <div class="decoration-2"></div>
+    <div class="bg-pattern"></div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 1: COVER -->
+    <!-- ============================================== -->
+    <div class="slide active">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="logo-section">
+                    <div class="logo-icon"><i class="fas fa-shipping-fast"></i></div>
+                    <div>
+                        <div class="logo-text">Adarsh Shipping</div>
+                        <div class="logo-subtitle">Enterprise System Showcase</div>
+                    </div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.07); padding: 10px 20px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; font-size: 14px;">
+                    <i class="fas fa-code-branch" style="margin-right: 6px;"></i> v1.0.1 Production Release
+                </div>
+            </div>
+            <div class="anim-up delay-1" style="margin-bottom: 45px;">
+                <div style="font-family: 'Poppins', sans-serif; font-size: 64px; font-weight: 700; color: white; margin-bottom: 20px; line-height: 1.1;">Appraisal Management <span style="background: linear-gradient(135deg, #3b82f6, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">System</span></div>
+                <div style="color: #94a3b8; font-size: 20px; line-height: 1.6; margin-bottom: 40px; max-width: 1000px;">Streamlining performance reviews, automating compensation data, and empowering management decisions through a unified digital workflow tailored for modern logistics excellence.</div>
+            </div>
+            <div class="grid-4 anim-up delay-2" style="margin-bottom: 50px;">
+                <div class="custom-card" style="border-top: 4px solid #3b82f6; text-align: center; padding: 30px 20px;">
+                    <div style="font-size: 48px; font-weight: 700; color: white; margin-bottom: 5px;">7</div>
+                    <div style="color: #3b82f6; font-size: 14px; font-weight: 600; text-transform: uppercase;">User Roles</div>
+                </div>
+                <div class="custom-card" style="border-top: 4px solid #06b6d4; text-align: center; padding: 30px 20px;">
+                    <div style="font-size: 48px; font-weight: 700; color: white; margin-bottom: 5px;">10</div>
+                    <div style="color: #06b6d4; font-size: 14px; font-weight: 600; text-transform: uppercase;">Workflow Stages</div>
+                </div>
+                <div class="custom-card" style="border-top: 4px solid #10b981; text-align: center; padding: 30px 20px;">
+                    <div style="font-size: 48px; font-weight: 700; color: white; margin-bottom: 5px;">9</div>
+                    <div style="color: #10b981; font-size: 14px; font-weight: 600; text-transform: uppercase;">Rating Criteria</div>
+                </div>
+                <div class="custom-card" style="border-top: 4px solid #8b5cf6; text-align: center; padding: 30px 20px;">
+                    <div style="font-size: 48px; font-weight: 700; color: white; margin-bottom: 5px;">3</div>
+                    <div style="color: #8b5cf6; font-size: 14px; font-weight: 600; text-transform: uppercase;">Review Layers</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 2: CONTEXT & OVERVIEW -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-bullseye"></i></div>
+                    <div>
+                        <div class="title-text">Project Overview & Objectives</div>
+                        <div class="title-subtitle">What AMS is, why it exists, and the business goals it supports</div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2 anim-up delay-1">
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="custom-card">
+                        <div class="card-header-icon"><i class="fas fa-rocket"></i></div>
+                        <div class="card-title-text">What the system does</div>
+                        <div class="card-body-text">Digitizes the full appraisal cycle from initiation and self-assessment through reviewer ratings, management decision, salary revision, meeting records, and closure.</div>
+                    </div>
+                    <div class="custom-card">
+                        <div class="card-header-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;"><i class="fas fa-wrench"></i></div>
+                        <div class="card-title-text" style="color: #ef4444;">Problems Solved</div>
+                        <div class="card-body-text">Replaces paper forms, spreadsheets, and email chasing with a structured, transparent workflow. Fixes inconsistent ratings, un-auditable decisions, and missed deadlines.</div>
+                    </div>
+                </div>
+                
+                <div class="custom-card" style="border-top: 4px solid #3b82f6;">
+                    <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 20px; padding-left: 5px;"><i class="fas fa-star" style="margin-right: 10px; color: #3b82f6;"></i> Core Objectives</div>
+                    <ul class="styled-list">
+                        <li><i class="fas fa-check-circle" style="color: #3b82f6; margin-top: 2px;"></i> <div><strong>Streamline workflow:</strong> Define a strict digital appraisal lifecycle.</div></li>
+                        <li><i class="fas fa-check-circle" style="color: #3b82f6; margin-top: 2px;"></i> <div><strong>Fair Scoring:</strong> Ensure scores via three independent reviewers.</div></li>
+                        <li><i class="fas fa-check-circle" style="color: #3b82f6; margin-top: 2px;"></i> <div><strong>Automate Triggers:</strong> Deadlines, reminders, and arrear calculations.</div></li>
+                        <li><i class="fas fa-check-circle" style="color: #3b82f6; margin-top: 2px;"></i> <div><strong>Protect Data:</strong> Role-based access and complete audit history.</div></li>
+                        <li><i class="fas fa-check-circle" style="color: #3b82f6; margin-top: 2px;"></i> <div><strong>Centralize Records:</strong> Ratings, salary revisions, MOMs, and KPIs in one place.</div></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 3: 10-STAGE WORKFLOW -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-project-diagram"></i></div>
+                    <div>
+                        <div class="title-text">Complete Appraisal Workflow</div>
+                        <div class="title-subtitle">A strict 10-stage lifecycle from creation to permanent archive</div>
+                    </div>
+                </div>
+            </div>
+            <div class="anim-up delay-1" style="flex: 1; display: flex; align-items: center; justify-content: center;">
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; width: 100%;">
+                    <!-- Top Row -->
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">1</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Cycle Created</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Admin assigns reviewers</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">2</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Confirmations</div>
+                        <div style="color: #94a3b8; font-size: 12px;">HR, TL, Manager confirm</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">3</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Self-Assessment</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Employee submits (3 days)</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">4</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Peer Ratings</div>
+                        <div style="color: #94a3b8; font-size: 12px;">3 reviewers score 9 criteria</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">5</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Rating Review</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Disagreements are revised</div>
+                    </div>
+                    
+                    <!-- Bottom Row -->
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">10</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Cycle Closed</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Records permanently archived</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">9</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">MOM Created</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Discussion documented</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">8</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Meeting Scheduled</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Date voted and held</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px;">
+                        <div class="workflow-number" style="margin: 0 auto 15px;">7</div>
+                        <div style="color: white; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Decision Made</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Final Rating, slab, & hike set</div>
+                    </div>
+                    <div class="custom-card" style="text-align: center; padding: 20px 15px; border-top: 2px solid #f59e0b;">
+                        <div class="workflow-number" style="margin: 0 auto 15px; background: #f59e0b;">6</div>
+                        <div style="color: #f59e0b; font-weight: 600; font-size: 15px; margin-bottom: 5px;">Mgmt Review</div>
+                        <div style="color: #94a3b8; font-size: 12px;">Scores reviewed by mgmt</div>
+                    </div>
+                </div>
+            </div>
+            <div class="anim-up delay-2" style="text-align: center; color: #94a3b8; font-size: 14px; margin-top: 30px; font-family: monospace;">
+                STATUS PIPELINE: PENDING → SELF SUBMITTED → RATING IN PROGRESS → RATINGS COMPLETE → MANAGEMENT REVIEW → DECIDED → CLOSED
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 4: CAPABILITIES -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-layer-group"></i></div>
+                    <div>
+                        <div class="title-text">System Capabilities</div>
+                        <div class="title-subtitle">Core appraisal processes combined into one unified view</div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-4 anim-up delay-1" style="flex: 1;">
+                <div class="custom-card">
+                    <div class="card-header-icon"><i class="fas fa-user-edit"></i></div>
+                    <div class="card-title-text">Digital Assessments</div>
+                    <div class="card-body-text">Employees complete a 9-category self-assessment. Three reviewers then score independently before scores are revealed.</div>
+                </div>
+                <div class="custom-card">
+                    <div class="card-header-icon"><i class="fas fa-chart-bar"></i></div>
+                    <div class="card-title-text">KPI Tracking</div>
+                    <div class="card-body-text">Monthly KPI history connects day-to-day employee performance directly with year-end appraisal decisions.</div>
+                </div>
+                <div class="custom-card">
+                    <div class="card-header-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                    <div class="card-title-text">Salary & Arrears</div>
+                    <div class="card-body-text">Management selects increment slabs. Late meetings trigger automatic daily-rate arrear calculation for approval.</div>
+                </div>
+                <div class="custom-card">
+                    <div class="card-header-icon"><i class="fas fa-clipboard-list"></i></div>
+                    <div class="card-title-text">Meeting Minutes</div>
+                    <div class="card-body-text">HR, Admin, and Management can record and store separate meeting notes (MOM) against each appraisal cycle.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 5: USER ROLES -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-users-cog"></i></div>
+                    <div>
+                        <div class="title-text">User Roles & Access Control</div>
+                        <div class="title-subtitle">Seven roles with strict access boundaries and clear responsibilities</div>
+                    </div>
+                </div>
+            </div>
+            <div class="anim-up delay-1" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px;">
+                <div class="custom-card" style="border-top: 3px solid #ef4444; padding: 20px;">
+                    <div style="color: #ef4444; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-user-shield"></i> Admin</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Full system control, cycle creation, salary slabs, extensions, and data tools.</div>
+                </div>
+                <div class="custom-card" style="border-top: 3px solid #8b5cf6; padding: 20px;">
+                    <div style="color: #8b5cf6; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-chart-line"></i> Management</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Reviews aggregate ratings, decides salary hikes, approves arrears.</div>
+                </div>
+                <div class="custom-card" style="border-top: 3px solid #06b6d4; padding: 20px;">
+                    <div style="color: #06b6d4; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-user-tie"></i> HR</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Reviewer role, confirms availability, writes MOM, handles notifications.</div>
+                </div>
+                <div class="custom-card" style="border-top: 3px solid #10b981; padding: 20px;">
+                    <div style="color: #10b981; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-users"></i> Team Lead</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Rates direct reports, confirms availability, views team KPI data, votes on dates.</div>
+                </div>
+            </div>
+            <div class="anim-up delay-2" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                <div class="custom-card" style="border-top: 3px solid #f59e0b; padding: 20px;">
+                    <div style="color: #f59e0b; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-user-check"></i> Manager</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Independent reviewer for assigned employees with rating responsibilities.</div>
+                </div>
+                <div class="custom-card" style="border-top: 3px solid #3b82f6; padding: 20px;">
+                    <div style="color: #3b82f6; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-user"></i> Employee</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Performs self-assessment, views cycle status, KPI records, and salary history.</div>
+                </div>
+                <div class="custom-card" style="border-top: 3px solid #6366f1; padding: 20px;">
+                    <div style="color: #6366f1; font-weight: 700; font-size: 18px; margin-bottom: 5px;"><i class="fas fa-eye"></i> Partner/Director</div>
+                    <div style="color: #94a3b8; font-size: 13px;">Read-only oversight across all employee records and appraisal information.</div>
+                </div>
+            </div>
+            <div class="anim-up delay-3" style="margin-top: 20px; text-align: center; color: #cbd5e1; font-size: 14px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+                <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Users can hold dual roles (e.g., HR + Employee) so one person can submit their own appraisal while reviewing others.
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 6: DASHBOARDS -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-desktop"></i></div>
+                    <div>
+                        <div class="title-text">Role-Based Dashboards</div>
+                        <div class="title-subtitle">Each user lands on a customized interface focused on their required actions</div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2 anim-up delay-1" style="flex: 1;">
+                <div class="custom-card" style="border-left: 4px solid #ef4444;">
+                    <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;"><i class="fas fa-shield-alt" style="color: #ef4444;"></i> Admin Dashboard</div>
+                    <div style="color: #94a3b8; font-size: 15px; line-height: 1.8;">
+                        • Alerts for cycles due this month<br>
+                        • Overview of all active cycles & confirmations<br>
+                        • Extension request management<br>
+                        • Global support ticket overview
+                    </div>
+                </div>
+                <div class="custom-card" style="border-left: 4px solid #8b5cf6;">
+                    <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;"><i class="fas fa-chart-pie" style="color: #8b5cf6;"></i> Management Dashboard</div>
+                    <div style="color: #94a3b8; font-size: 15px; line-height: 1.8;">
+                        • Queues awaiting final salary decisions<br>
+                        • Arrear payment approvals<br>
+                        • Top performers & performance charts<br>
+                        • Real-time financial metrics
+                    </div>
+                </div>
+                <div class="custom-card" style="border-left: 4px solid #10b981;">
+                    <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;"><i class="fas fa-tasks" style="color: #10b981;"></i> Reviewer/HR/TL Dashboard</div>
+                    <div style="color: #94a3b8; font-size: 15px; line-height: 1.8;">
+                        • Assigned cycles & availability status<br>
+                        • Pending rating submissions<br>
+                        • MOM entry interface & Meeting date votes<br>
+                        • Team KPI overviews for Leaders
+                    </div>
+                </div>
+                <div class="custom-card" style="border-left: 4px solid #3b82f6;">
+                    <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;"><i class="fas fa-user" style="color: #3b82f6;"></i> Employee Dashboard</div>
+                    <div style="color: #94a3b8; font-size: 15px; line-height: 1.8;">
+                        • Personal cycle progress & status<br>
+                        • Self-assessment submission forms<br>
+                        • Monthly KPI records & Salary history<br>
+                        • Personal notifications & tickets
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 7: AUTOMATION & TRIGGERS -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-bolt"></i></div>
+                    <div>
+                        <div class="title-text">Automation & Triggers</div>
+                        <div class="title-subtitle">The system keeps users moving without manual email chasing</div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2 anim-up delay-1" style="flex: 1; align-items: center;">
+                <div>
+                    <div style="color: white; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Automated Triggers</div>
+                    <ul class="styled-list">
+                        <li><i class="fas fa-cogs" style="color: #3b82f6; font-size: 20px;"></i> <div><strong>Anniversary Detection:</strong> Detects appraisal month and notifies Admin to create a cycle.</div></li>
+                        <li><i class="fas fa-cogs" style="color: #3b82f6; font-size: 20px;"></i> <div><strong>Smart Unlocking:</strong> Self-assessment is unlocked automatically as soon as reviewers confirm availability.</div></li>
+                        <li><i class="fas fa-cogs" style="color: #3b82f6; font-size: 20px;"></i> <div><strong>Deadline Reminders:</strong> Sent before self-assessment and rating deadlines close.</div></li>
+                        <li><i class="fas fa-cogs" style="color: #3b82f6; font-size: 20px;"></i> <div><strong>Arrear Auto-Calculation:</strong> Late meetings automatically create daily-rate arrears for payout approval.</div></li>
+                    </ul>
+                </div>
+                <div class="custom-card" style="background: rgba(59, 130, 246, 0.05); border-color: rgba(59, 130, 246, 0.2);">
+                    <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 20px;"><i class="fas fa-bell" style="color: #3b82f6;"></i> In-App Notifications</div>
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; border-left: 3px solid #10b981;">✅ Cycle Started</div>
+                        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; border-left: 3px solid #3b82f6;">🔓 Self-assessment unlocked</div>
+                        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; border-left: 3px solid #f59e0b;">⚠️ Deadline approaching</div>
+                        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; border-left: 3px solid #ef4444;">🚨 Urgent action needed</div>
+                    </div>
+                    <div style="margin-top: 20px; font-size: 13px; color: #94a3b8; text-align: center;">Critical notifications appear as persistent banners until acknowledged.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 8: GOVERNANCE & SECURITY -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div>
+                        <div class="title-text">Governance & Security</div>
+                        <div class="title-subtitle">Controls and records combined for auditability and management oversight</div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2 anim-up delay-1" style="flex: 1;">
+                <div class="custom-card">
+                    <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);"><i class="fas fa-lock" style="color: #3b82f6;"></i> Security Controls</div>
+                    <ul class="styled-list">
+                        <li><div><strong>Authentication:</strong> Challenge-based passkey login, reset approval, and bcrypt hashing.</div></li>
+                        <li><div><strong>Role-Based Access:</strong> Every page enforces permissions; salary data is visible only where required.</div></li>
+                        <li><div><strong>Session Management:</strong> Timeout controls, active session monitoring, and admin forced logout.</div></li>
+                        <li><div><strong>Privacy Controls:</strong> Employees cannot view others' data; partner access is strictly read-only.</div></li>
+                    </ul>
+                </div>
+                <div class="custom-card">
+                    <div style="font-size: 20px; font-weight: 600; color: white; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);"><i class="fas fa-history" style="color: #3b82f6;"></i> Reports & Audit Trails</div>
+                    <ul class="styled-list">
+                        <li><div><strong>Complete Audit Trail:</strong> Actions, ratings, decisions, state changes, and timestamps are permanently logged.</div></li>
+                        <li><div><strong>Appraisal History:</strong> Ratings, reviewers, meeting dates, and MOM records per employee.</div></li>
+                        <li><div><strong>Salary Sheet:</strong> Components, approved revisions, effective dates, and payout months.</div></li>
+                        <li><div><strong>Security Logs:</strong> All login attempts and reset requests are available for admin review.</div></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 9: MARKET COMPARISON -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-columns"></i></div>
+                    <div>
+                        <div class="title-text">Market Comparison</div>
+                        <div class="title-subtitle">Off-the-shelf SaaS vs. Our Tailor-Made Solution</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="anim-up delay-1">
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">Feature Category</th>
+                            <th style="width: 40%;">Generic SaaS (e.g., Workday, Zoho)</th>
+                            <th style="width: 40%;" class="highlight-col"><i class="fas fa-check-circle" style="color: #3b82f6; margin-right: 8px;"></i> Adarsh Custom Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Customization</strong></td>
+                            <td>Rigid. Forces you to change your workflows to match the software.</td>
+                            <td class="highlight-col">Flexible. Molds perfectly to your exact business processes.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data Ownership</strong></td>
+                            <td>Stored on 3rd-party shared servers with thousands of other clients.</td>
+                            <td class="highlight-col">You own 100% of the codebase and the database.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pricing Model</strong></td>
+                            <td>Expensive recurring per-user, per-month licensing fees.</td>
+                            <td class="highlight-col">One-time development cost + nominal standard hosting.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Feature Bloat</strong></td>
+                            <td>Bloated with hundreds of unused tools that clutter the interface.</td>
+                            <td class="highlight-col">Lean, intuitive, and contains exactly what you need.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 10: PRICING -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                    <div>
+                        <div class="title-text">Cost Effectiveness & Pricing</div>
+                        <div class="title-subtitle">Click the numbers below to live-edit them during your presentation</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid-2 anim-up delay-1" style="height: 380px;">
+                <div class="pricing-box">
+                    <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;"><i class="fas fa-building"></i></div>
+                    <div style="color: white; font-size: 24px; margin-bottom: 10px; font-weight: 600;">Generic Enterprise SaaS</div>
+                    <div style="color: #94a3b8; margin-bottom: 30px; font-size: 16px;">Recurring Annual Cost (Per-User Licensing)</div>
+                    <div style="color: #ef4444; font-size: 48px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px;">
+                        $<span class="editable-field" contenteditable="true" style="color: #ef4444;">12,500</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 15px; margin-top: 10px;">Cost compounds every year. Adds up significantly over 5 years.</div>
+                </div>
+
+                <div class="pricing-box" style="border: 2px solid rgba(59, 130, 246, 0.5); background: rgba(59, 130, 246, 0.05); position: relative;">
+                    <div style="position: absolute; top: -15px; right: 20px; background: linear-gradient(135deg, #3b82f6, #06b6d4); color: white; padding: 8px 24px; border-radius: 20px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 15px rgba(59,130,246,0.4);">Best Value</div>
+                    <div style="font-size: 60px; color: #3b82f6; margin-bottom: 20px;"><i class="fas fa-laptop-code"></i></div>
+                    <div style="color: white; font-size: 24px; margin-bottom: 10px; font-weight: 600;">Our Custom Solution</div>
+                    <div style="color: #94a3b8; margin-bottom: 30px; font-size: 16px;">One-Time Development Cost</div>
+                    <div style="color: #3b82f6; font-size: 48px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 15px;">
+                        $<span class="editable-field" contenteditable="true">_____</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 15px; margin-top: 10px;">Zero recurring license fees. You only pay for standard hosting.</div>
+                </div>
+            </div>
+            
+            <div class="anim-up delay-2" style="text-align: center; margin-top: 40px; font-size: 24px; color: white; display: flex; justify-content: center; align-items: center; gap: 15px;">
+                Estimated ROI Timeline: <span class="editable-field" contenteditable="true" style="font-size: 32px; min-width: 80px; text-align: center; color: #10b981; border-color: #10b981;"> 8 </span> Months
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 11: ROADMAP -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content">
+            <div class="header anim-up">
+                <div class="title-section">
+                    <div class="title-icon"><i class="fas fa-map-signs"></i></div>
+                    <div>
+                        <div class="title-text">Future Enhancements Roadmap</div>
+                        <div class="title-subtitle">High-value enhancements planned for future phases</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid-2 anim-up delay-1">
+                <div class="custom-card" style="border-left: 4px solid #ef4444;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="width: 40px; height: 40px; background: rgba(239, 68, 68, 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ef4444; font-size: 20px;"><i class="fas fa-chart-line"></i></div>
+                            <div style="font-size: 18px; font-weight: 600; color: white;">Advanced Analytics Dashboard</div>
+                        </div>
+                        <span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">HIGH PRIORITY</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 14px; line-height: 1.6;">Deep-dive BI tools for management to analyze long-term trends, departmental performance, and budget utilization.</div>
+                </div>
+
+                <div class="custom-card" style="border-left: 4px solid #ef4444;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="width: 40px; height: 40px; background: rgba(239, 68, 68, 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #ef4444; font-size: 20px;"><i class="fas fa-mobile-alt"></i></div>
+                            <div style="font-size: 18px; font-weight: 600; color: white;">Mobile App (iOS/Android)</div>
+                        </div>
+                        <span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">HIGH PRIORITY</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 14px; line-height: 1.6;">Native applications allowing employees to complete appraisals and managers to approve hikes on the go.</div>
+                </div>
+                
+                <div class="custom-card" style="border-left: 4px solid #f59e0b;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="width: 40px; height: 40px; background: rgba(245, 158, 11, 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #f59e0b; font-size: 20px;"><i class="fas fa-brain"></i></div>
+                            <div style="font-size: 18px; font-weight: 600; color: white;">AI Performance Insights</div>
+                        </div>
+                        <span style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">MEDIUM PRIORITY</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 14px; line-height: 1.6;">Automated AI-driven insights identifying flight risks, top talent retention strategies, and skill gap analysis.</div>
+                </div>
+                
+                <div class="custom-card" style="border-left: 4px solid #f59e0b;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="width: 40px; height: 40px; background: rgba(245, 158, 11, 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #f59e0b; font-size: 20px;"><i class="fas fa-file-invoice-dollar"></i></div>
+                            <div style="font-size: 18px; font-weight: 600; color: white;">HRMS & Payroll Integration</div>
+                        </div>
+                        <span style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">MEDIUM PRIORITY</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 14px; line-height: 1.6;">Seamless data transfer of decided salary hikes and arrear payouts directly into existing financial systems.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE 12: THANK YOU -->
+    <!-- ============================================== -->
+    <div class="slide">
+        <div class="main-content" style="align-items: center; justify-content: center; text-align: center;">
+            <div class="anim-up">
+                <i class="fas fa-rocket" style="font-size: 90px; color: #3b82f6; margin-bottom: 40px;"></i>
+                <div style="font-size: 72px; font-weight: 700; color: white; margin-bottom: 20px; font-family: 'Poppins', sans-serif;">Thank You</div>
+                <div style="font-size: 22px; color: #94a3b8; max-width: 800px; margin: 0 auto; line-height: 1.5;">For questions, implementation details, or a live demo, please contact the Technology Team.</div>
+                <button class="btn" style="margin: 50px auto 0; font-size: 18px; padding: 15px 40px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 10px; cursor: pointer;" onclick="location.reload()"><i class="fas fa-redo"></i> Restart Presentation</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- CONTROLS -->
+    <!-- ============================================== -->
+    <div class="controls">
+        <button id="prevBtn" title="Previous Slide (Left Arrow)"><i class="fas fa-chevron-left"></i></button>
+        <button id="nextBtn" title="Next Slide (Right Arrow)"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    
+    <div class="slide-indicator">
+        SLIDE <span id="currentSlide">1</span> OF <span id="totalSlides">12</span>
+    </div>
+</div>
+
+<script>
+    function createParticles() {
+        const container = document.getElementById('particles');
+        for (let i = 0; i < 40; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 100 + '%';
+            particle.style.opacity = Math.random() * 0.5;
+            particle.style.animationDelay = Math.random() * 15 + 's';
+            particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+            container.appendChild(particle);
+        }
+    }
+    createParticles();
+
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const currentIndicator = document.getElementById('currentSlide');
+    const totalIndicator = document.getElementById('totalSlides');
+    
+    let currentSlide = 0;
+    totalIndicator.textContent = slides.length;
+
+    function updateSlides() {
+        slides.forEach((slide, index) => {
+            slide.classList.remove('active', 'prev');
+            const animatedElements = slide.querySelectorAll('.anim-up');
+            if (index === currentSlide) {
+                slide.classList.add('active');
+                slide.style.transform = 'scale(1) translateX(0)';
+                animatedElements.forEach(el => {
+                    el.style.animation = 'none';
+                    el.offsetHeight; 
+                    el.style.animation = null; 
+                });
+            } else if (index < currentSlide) {
+                slide.classList.add('prev');
+                slide.style.transform = 'scale(0.95) translateX(-100px)';
+            } else {
+                slide.style.transform = 'scale(0.95) translateX(100px)';
+            }
+        });
+        currentIndicator.textContent = currentSlide + 1;
+    }
+
+    function nextSlide() {
+        if (currentSlide < slides.length - 1) {
+            currentSlide++;
+            updateSlides();
+        }
+    }
+
+    function prevSlide() {
+        if (currentSlide > 0) {
+            currentSlide--;
+            updateSlides();
+        }
+    }
+
+    nextBtn.addEventListener('click', nextSlide);
+    prevBtn.addEventListener('click', prevSlide);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.target.isContentEditable) return;
+        if (e.key === 'ArrowRight' || e.key === ' ') {
+            nextSlide();
+        } else if (e.key === 'ArrowLeft') {
+            prevSlide();
+        }
+    });
+
+    updateSlides();
+</script>
+</body>
+</html>

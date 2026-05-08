@@ -82,7 +82,17 @@ function dateKeyDayOfWeek(dateKey: string): number {
 
 function isWorkingDate(dateKey: string, calendar: WorkingCalendarConfig): boolean {
   if (calendar.holidays.includes(dateKey)) return false;
-  return calendar.workingDays.includes(dateKeyDayOfWeek(dateKey));
+  const dayOfWeek = dateKeyDayOfWeek(dateKey);
+  
+  // Custom logic for Adarsh Shipping: 1st and 3rd Saturdays are working, others are holidays.
+  if (dayOfWeek === 6) {
+    const dayOfMonth = Number(dateKey.split("-")[2]);
+    const weekOfMonth = Math.ceil(dayOfMonth / 7);
+    // Only 1st and 3rd Saturdays are working days.
+    return weekOfMonth === 1 || weekOfMonth === 3;
+  }
+  
+  return calendar.workingDays.includes(dayOfWeek);
 }
 
 /** Minutes of valid working time within a single day for a given start–end window (in minutes-since-midnight). */
