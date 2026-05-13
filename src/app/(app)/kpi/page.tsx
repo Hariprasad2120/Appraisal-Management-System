@@ -60,7 +60,7 @@ export default async function KpiPage() {
             </p>
           </div>
           {isManagerial && (
-            <Link href={role === "TL" ? "/reviewer/kpi" : "/admin/kpi"}>
+            <Link href={role === "TL" ? "/ams/reviewer/kpi" : "/ams/admin/kpi"}>
               <Button variant="outline" size="sm">
                 {role === "TL" ? "Team KPI" : "Department KPI"}
               </Button>

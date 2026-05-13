@@ -101,7 +101,7 @@ export default async function TasksPage() {
             </p>
           </div>
           {["ADMIN", "MANAGEMENT"].includes(role) && (
-            <Link href="/admin/kpi">
+            <Link href="/ams/admin/kpi">
               <Button variant="outline" size="sm">View Department KPI</Button>
             </Link>
           )}

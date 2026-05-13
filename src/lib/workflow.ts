@@ -191,7 +191,7 @@ export function getCycleStageInfo(
       label: "Cycle Closed",
       detail: cycle.arrear?.status === "PAID" ? "Meeting recorded and arrear completed" : "Meeting recorded",
       actionLabel: "View History",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "green",
     };
   }
@@ -202,7 +202,7 @@ export function getCycleStageInfo(
       label: "Set Availability",
       detail: "Reviewer action required",
       actionLabel: "Set Availability",
-      actionHref: `/reviewer/${cycle.id}/availability`,
+      actionHref: `/ams/reviewer/${cycle.id}/availability`,
       tone: "amber",
     };
   }
@@ -213,7 +213,7 @@ export function getCycleStageInfo(
       label: "Not Available",
       detail: "No reviewer action needed",
       actionLabel: "View Details",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "slate",
     };
   }
@@ -224,7 +224,7 @@ export function getCycleStageInfo(
       label: "Rating Open",
       detail: "Reviewer rating pending",
       actionLabel: "Rate Now",
-      actionHref: `/reviewer/${cycle.id}/rate`,
+      actionHref: `/ams/reviewer/${cycle.id}/rate`,
       tone: "primary",
     };
   }
@@ -235,7 +235,7 @@ export function getCycleStageInfo(
       label: "Arrear Pending",
       detail: "Meeting recorded; arrear approval pending",
       actionLabel: "View Status",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "amber",
     };
   }
@@ -246,7 +246,7 @@ export function getCycleStageInfo(
       label: "Arrear Approved",
       detail: "Awaiting arrear payout completion",
       actionLabel: "View Status",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "blue",
     };
   }
@@ -257,7 +257,7 @@ export function getCycleStageInfo(
       label: "Meeting Recorded",
       detail: "Post-meeting records available",
       actionLabel: "View Status",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "green",
     };
   }
@@ -268,7 +268,7 @@ export function getCycleStageInfo(
       label: hrMomRecorded ? "HR MoM Recorded" : "Meeting Scheduled",
       detail: hrMomRecorded ? "Awaiting management MoM" : "Awaiting meeting record",
       actionLabel: isHrAssignment && !hrMomRecorded ? "Record MoM" : "Meeting Status",
-      actionHref: isHrAssignment && !hrMomRecorded ? `/reviewer/mom/${cycle.id}` : `/reviewer/${cycle.id}`,
+      actionHref: isHrAssignment && !hrMomRecorded ? `/ams/reviewer/mom/${cycle.id}` : `/ams/reviewer/${cycle.id}`,
       tone: "purple",
     };
   }
@@ -279,7 +279,7 @@ export function getCycleStageInfo(
       label: "Confirm Meeting",
       detail: "Management proposed meeting dates",
       actionLabel: "Confirm Date",
-      actionHref: `/reviewer/${cycle.id}/schedule`,
+      actionHref: `/ams/reviewer/${cycle.id}/schedule`,
       tone: "primary",
     };
   }
@@ -290,7 +290,7 @@ export function getCycleStageInfo(
       label: status === "DATE_VOTING" ? "Scheduling Meeting" : "Salary Discussion",
       detail: "Rating completed; meeting flow in progress",
       actionLabel: "View Status",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "blue",
     };
   }
@@ -301,7 +301,7 @@ export function getCycleStageInfo(
       label: "Rating Submitted",
       detail: "Waiting for cycle to move forward",
       actionLabel: "View Status",
-      actionHref: `/reviewer/${cycle.id}`,
+      actionHref: `/ams/reviewer/${cycle.id}`,
       tone: "green",
     };
   }
@@ -311,7 +311,7 @@ export function getCycleStageInfo(
     label: "Waiting",
     detail: "No reviewer action right now",
     actionLabel: "View Details",
-    actionHref: `/reviewer/${cycle.id}`,
+    actionHref: `/ams/reviewer/${cycle.id}`,
     tone: "slate",
   };
 }
@@ -366,7 +366,7 @@ export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | nu
           userId: cycle.userId,
           type: "ALL_REVIEWERS_AVAILABLE",
           message: "All your reviewers have confirmed availability. You can now start your self-assessment.",
-          link: "/employee",
+          link: "/ams/employee",
           persistent: true,
           critical: true,
         },
@@ -408,7 +408,7 @@ export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | nu
               userId: u.id,
               type: "RATINGS_COMPLETE",
               message: `All reviewers have rated ${empName}'s appraisal. Management review is now open — please claim and finalise the decision.`,
-              link: `/management/decide/${cycleId}`,
+              link: `/ams/management/decide/${cycleId}`,
               persistent: true,
               critical: true,
             },
@@ -423,7 +423,7 @@ export async function syncCycleStatus(cycleId: string): Promise<CycleStatus | nu
             userId: cycle.userId,
             type: "RATINGS_COMPLETE",
             message: "All your reviewer ratings are complete. Your appraisal has moved to management review.",
-            link: "/employee",
+            link: "/ams/employee",
             persistent: true,
             critical: true,
           },

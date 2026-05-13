@@ -162,7 +162,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/90 text-white text-xs font-semibold z-50">
             <FlaskConical className="size-3.5 shrink-0" />
             Simulation Mode Active — deadlines modified for testing
-            <Link href="/admin/simulation" className="ml-auto underline underline-offset-2 hover:opacity-80">
+            <Link href="/ams/admin/simulation" className="ml-auto underline underline-offset-2 hover:opacity-80">
               Manage →
             </Link>
           </div>

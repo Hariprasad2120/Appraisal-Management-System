@@ -88,7 +88,7 @@ export default async function PlatformHomePage({ searchParams }: { searchParams:
                       {launchable ? "Enabled" : "Not enabled"}
                     </div>
                     {launchable ? (
-                      <Link href="/admin" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/85">
+                      <Link href="/ams/admin" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/85">
                         Open
                         <ArrowRight className="size-4" />
                       </Link>

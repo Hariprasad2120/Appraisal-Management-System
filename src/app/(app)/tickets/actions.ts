@@ -56,7 +56,7 @@ export async function createTicketAction(input: z.infer<typeof createSchema>): P
   }
 
   revalidatePath("/tickets");
-  revalidatePath("/admin/tickets");
+  revalidatePath("/account/tickets");
   return { ok: true };
 }
 
@@ -103,6 +103,6 @@ export async function addTicketCommentAction(input: z.infer<typeof commentSchema
   }
 
   revalidatePath("/tickets");
-  revalidatePath("/admin/tickets");
+  revalidatePath("/account/tickets");
   return { ok: true };
 }

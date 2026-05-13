@@ -69,14 +69,14 @@ export async function redirectToLegacyOrganizationRoute(
 }
 
 function getLegacyDestination(target: "admin" | "hr" | "manager" | "reviewer" | "employee", roles: OrganizationRole[]) {
-  if (target === "admin") return "/admin";
-  if (target === "hr") return "/reviewer";
-  if (target === "employee") return "/employee";
-  if (target === "reviewer") return "/reviewer";
+  if (target === "admin") return "/ams/admin";
+  if (target === "hr") return "/ams/reviewer";
+  if (target === "employee") return "/ams/employee";
+  if (target === "reviewer") return "/ams/reviewer";
   if (roles.some((role) => ["MANAGEMENT", "PARTNER_OR_DIRECTOR"].includes(role))) {
-    return "/management";
+    return "/ams/management";
   }
-  return "/reviewer";
+  return "/ams/reviewer";
 }
 
 export async function getOrganizationAccessSummary(user: SessionTenantUser, organizationId: string) {

@@ -21,7 +21,7 @@ function text(formData: FormData, key: string): string {
 function refreshPaths() {
   revalidatePath("/workspace/hrms/ownership");
   revalidatePath("/workspace/hrms/employees");
-  revalidatePath("/reviewer/kpi");
+  revalidatePath("/ams/reviewer/kpi");
   refresh();
 }
 

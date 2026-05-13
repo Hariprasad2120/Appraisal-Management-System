@@ -62,7 +62,7 @@ export async function POST() {
         userId: user.id,
         type: "APPRAISAL_MONTH_DUE",
         message: `Your ${eligibility.cycleType.toLowerCase()} appraisal month has arrived. Admin will assign reviewers soon.`,
-        link: "/employee",
+        link: "/ams/employee",
         persistent: true,
         critical: true,
       },

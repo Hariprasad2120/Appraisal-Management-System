@@ -19,7 +19,7 @@ type TipSet = {
 const TIP_SETS: TipSet[] = [
   // Employee self-assessment
   {
-    match: (p) => p.includes("/employee/self/"),
+    match: (p) => p.includes("/ams/employee/self/"),
     tips: [
       {
         title: "Be honest and specific",
@@ -42,7 +42,7 @@ const TIP_SETS: TipSet[] = [
 
   // Employee dashboard
   {
-    match: (p, role) => p === "/employee" || (p.startsWith("/employee") && !p.includes("/self/")),
+    match: (p, role) => p === "/ams/employee" || (p.startsWith("/ams/employee") && !p.includes("/self/")),
     tips: [
       {
         title: "How appraisal cycles work",
@@ -61,7 +61,7 @@ const TIP_SETS: TipSet[] = [
 
   // Reviewer availability
   {
-    match: (p) => p.includes("/reviewer/") && p.includes("/availability"),
+    match: (p) => p.includes("/ams/reviewer/") && p.includes("/availability"),
     tips: [
       {
         title: "Confirm availability early",
@@ -76,7 +76,7 @@ const TIP_SETS: TipSet[] = [
 
   // Reviewer rating
   {
-    match: (p) => p.includes("/reviewer/") && p.includes("/rate"),
+    match: (p) => p.includes("/ams/reviewer/") && p.includes("/rate"),
     tips: [
       {
         title: "Rating opens after self-assessment deadline",
@@ -99,7 +99,7 @@ const TIP_SETS: TipSet[] = [
 
   // Reviewer dashboard
   {
-    match: (p) => p === "/reviewer" || (p.startsWith("/reviewer") && !p.includes("/[cycleId]")),
+    match: (p) => p === "/ams/reviewer" || (p.startsWith("/ams/reviewer") && !p.includes("/[cycleId]")),
     tips: [
       {
         title: "Your review queue",
@@ -114,7 +114,7 @@ const TIP_SETS: TipSet[] = [
 
   // Management decide
   {
-    match: (p) => p.includes("/management/decide/"),
+    match: (p) => p.includes("/ams/management/decide/"),
     tips: [
       {
         title: "Scores are averaged",
@@ -137,7 +137,7 @@ const TIP_SETS: TipSet[] = [
 
   // Management vote
   {
-    match: (p) => p.includes("/management/vote/"),
+    match: (p) => p.includes("/ams/management/vote/"),
     tips: [
       {
         title: "Date voting",
@@ -152,7 +152,7 @@ const TIP_SETS: TipSet[] = [
 
   // Management dashboard
   {
-    match: (p) => p === "/management" || p.startsWith("/management/salary"),
+    match: (p) => p === "/ams/management" || p.startsWith("/ams/management/salary"),
     tips: [
       {
         title: "Salary calculator",
@@ -197,7 +197,7 @@ const TIP_SETS: TipSet[] = [
 
   // Admin MOM
   {
-    match: (p) => p.startsWith("/admin/mom"),
+    match: (p) => p.startsWith("/ams/admin/mom"),
     tips: [
       {
         title: "MOM purpose",
@@ -212,7 +212,7 @@ const TIP_SETS: TipSet[] = [
 
   // Admin notifications
   {
-    match: (p) => p.startsWith("/admin/notifications"),
+    match: (p) => p.startsWith("/ams/admin/notifications"),
     tips: [
       {
         title: "Re-triggering notifications",
@@ -231,7 +231,7 @@ const TIP_SETS: TipSet[] = [
 
   // Admin extensions
   {
-    match: (p) => p.startsWith("/admin/extensions"),
+    match: (p) => p.startsWith("/ams/admin/extensions"),
     tips: [
       {
         title: "Extension window",
@@ -246,7 +246,7 @@ const TIP_SETS: TipSet[] = [
 
   // Tickets
   {
-    match: (p) => p.startsWith("/tickets") || p.startsWith("/admin/tickets"),
+    match: (p) => p.startsWith("/tickets") || p.startsWith("/ams/admin/tickets"),
     tips: [
       {
         title: "Ticket categories",
