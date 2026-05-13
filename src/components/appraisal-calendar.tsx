@@ -152,7 +152,7 @@ export function AppraisalCalendar({ cycles }: { cycles: CycleEntry[] }) {
           {selectedCycles.map((c) => (
             <a
               key={c.cycleId}
-              href={`/admin/employees/${c.employeeId}/assign`}
+              href={`/workspace/hrms/employees/${c.employeeId}/assign`}
               className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
             >
               <div>

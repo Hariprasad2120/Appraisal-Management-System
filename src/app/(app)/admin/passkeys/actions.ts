@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 async function requireAdmin() {

@@ -10,7 +10,7 @@ import { HikeEditForm } from "./hike-edit-form";
 import { CheckCircle, FileText, Calendar, Pencil, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { CRITERIA_CATEGORIES, getCriteriaForRole, getSalaryTier } from "@/lib/criteria";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { ClaimPanel } from "./claim-panel";
 import { getRatingDeadline, isManagementReviewOpen } from "@/lib/workflow";
 import { isDateReached } from "@/lib/business-days";

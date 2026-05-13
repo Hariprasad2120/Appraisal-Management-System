@@ -27,7 +27,7 @@ export function SignOutButton({ expanded }: { expanded: boolean }) {
     } catch {
       // silent
     }
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/" });
   };
 
   return (
@@ -52,7 +52,7 @@ export function SignOutButton({ expanded }: { expanded: boolean }) {
           <DialogHeader>
             <DialogTitle>Sign Out?</DialogTitle>
             <DialogDescription>
-              You will return to the login page and this session will be ended.
+              You will return to the home page and this session will be ended.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

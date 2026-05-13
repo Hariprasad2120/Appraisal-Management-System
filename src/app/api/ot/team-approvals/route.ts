@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   // A TL sees their direct reports (where user.reportingToId === session.user.id).
   // A Manager sees the reports of the TLs they manage (user.managerId === session.user.id).
 
-  const where: any = {
+  const where: Record<string, unknown> = {
     hrApprovalStatus: "APPROVED",
   };
 

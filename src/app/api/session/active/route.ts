@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 // Admin-only: get all active sessions with user details
 export async function GET() {
@@ -9,12 +10,13 @@ export async function GET() {
   if (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN") {
     return NextResponse.json([], { status: 403 });
   }
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
   // Consider sessions active if lastSeenAt within last 2 minutes
   const cutoff = new Date(Date.now() - 2 * 60 * 1000);
 
   const sessions = await prisma.userSession.findMany({
-    where: { status: "ACTIVE", lastSeenAt: { gte: cutoff } },
+    where: { organizationId, status: "ACTIVE", lastSeenAt: { gte: cutoff } },
     include: {
       user: {
         select: { id: true, name: true, email: true, role: true },

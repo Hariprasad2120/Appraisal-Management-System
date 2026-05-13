@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath, refresh } from "next/cache";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { monthStart } from "@/lib/kpi";
 import { countWorkingMinutes, calendarFromDb } from "@/lib/working-hours";

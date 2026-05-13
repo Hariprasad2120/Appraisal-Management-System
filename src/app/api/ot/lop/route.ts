@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 import { z } from "zod";
 
 function isAdminOrHR(role: string, secondary?: string | null) {
@@ -52,10 +53,12 @@ export async function POST(req: NextRequest) {
 
   const [y, m] = parsed.data.payrollMonth.split("-").map(Number);
   const payrollMonth = new Date(y, m - 1, 1);
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
   const record = await prisma.employeeLop.upsert({
     where: {
-      employeeId_payrollMonth: {
+      organizationId_employeeId_payrollMonth: {
+        organizationId,
         employeeId: parsed.data.employeeId,
         payrollMonth,
       },
@@ -65,6 +68,7 @@ export async function POST(req: NextRequest) {
       remarks: parsed.data.remarks ?? null,
     },
     create: {
+      organizationId,
       employeeId: parsed.data.employeeId,
       payrollMonth,
       lopDays: parsed.data.lopDays,

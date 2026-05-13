@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { seedSalaryRevisions } from "./seed-salary-revisions";
 import {
   DEFAULT_KPI_ANNUAL_TARGET,
@@ -18,7 +19,51 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL not set");
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
-type Role = "ADMIN" | "MANAGEMENT" | "MANAGER" | "HR" | "TL" | "EMPLOYEE" | "PARTNER";
+type Role = "ADMIN" | "MANAGEMENT" | "MANAGER" | "HR" | "TL" | "EMPLOYEE" | "REVIEWER" | "PARTNER";
+type OrgRole = "ORG_OWNER" | "ORG_ADMIN" | "MANAGEMENT" | "HR" | "MANAGER" | "TEAM_LEAD" | "EMPLOYEE" | "PARTNER_OR_DIRECTOR" | "APPRAISAL_ADMIN";
+
+const DEFAULT_ORG_ID = "default-org";
+const DEFAULT_ACCOUNT_ID = "default-account";
+const DEFAULT_ORG_SLUG = "adarsh-shipping-and-services";
+const DEFAULT_ACCOUNT_SLUG = "adarsh";
+const MODULES = [
+  {
+    id: "module-appraisal-management",
+    key: "appraisal-management",
+    name: "Appraisal Management",
+    description: "Self-assessments, reviewer ratings, management decisions, MOM, arrears, KPI, notifications, support tickets, and audit logs.",
+    enabledByDefault: true,
+  },
+  {
+    id: "module-human-resource-management",
+    key: "human-resource-management",
+    name: "Human Resource Management",
+    description: "Core people operations, organization records, and broader HR workflows.",
+    enabledByDefault: false,
+  },
+  {
+    id: "module-attendance-management",
+    key: "attendance-management",
+    name: "Attendance Management",
+    description: "Attendance, shift tracking, OT, holidays, and payroll attendance inputs.",
+    enabledByDefault: false,
+  },
+  {
+    id: "module-customer-relationship-management",
+    key: "customer-relationship-management",
+    name: "Customer Relationship Management",
+    description: "Customer relationship management and pipeline tracking.",
+    enabledByDefault: false,
+  },
+] as const;
+const PLATFORM_ADMIN_EMAIL = (process.env.PLATFORM_SUPER_ADMIN_EMAIL ?? "hariprasad.official.137@gmail.com").toLowerCase();
+const ADARSH_ACCOUNT_OWNER_EMAIL = (process.env.ADARSH_ACCOUNT_OWNER_EMAIL ?? "hr@adarshshipping.in").toLowerCase();
+
+function requireSeedPassword(name: string) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} must be set before running prisma/seed.ts`);
+  return value;
+}
 
 type EmpRow = {
   empNo: number;
@@ -163,6 +208,25 @@ function mapRole(row: EmpRow): Role {
   return "EMPLOYEE";
 }
 
+function mapOrganizationRole(role: Role): OrgRole {
+  switch (role) {
+    case "ADMIN":
+      return "ORG_ADMIN";
+    case "MANAGEMENT":
+      return "MANAGEMENT";
+    case "MANAGER":
+      return "MANAGER";
+    case "HR":
+      return "HR";
+    case "TL":
+      return "TEAM_LEAD";
+    case "PARTNER":
+      return "PARTNER_OR_DIRECTOR";
+    default:
+      return "EMPLOYEE";
+  }
+}
+
 function emailFor(row: EmpRow): string {
   if (row.email && row.email.includes("@")) return row.email.toLowerCase();
   if (row.personalEmail && row.personalEmail.includes("@")) return row.personalEmail.toLowerCase();
@@ -170,9 +234,25 @@ function emailFor(row: EmpRow): string {
 }
 
 async function main() {
-  const pw = await bcrypt.hash("password123", 10);
+  const platformAdminPasswordHash = await bcrypt.hash(requireSeedPassword("SEED_PLATFORM_SUPER_ADMIN_PASSWORD"), 10);
+  const accountOwnerPasswordHash = await bcrypt.hash(requireSeedPassword("SEED_ACCOUNT_OWNER_PASSWORD"), 10);
 
   console.log("Wiping existing data...");
+  await prisma.invite.deleteMany({});
+  await prisma.accountModule.deleteMany({});
+  await prisma.accountMembership.deleteMany({});
+  await prisma.subscription.deleteMany({});
+  await prisma.userRoleAssignment.deleteMany({});
+  await prisma.reportingHierarchy.deleteMany({});
+  await prisma.organizationUser.deleteMany({});
+  await prisma.organizationModule.deleteMany({});
+  await prisma.organizationAccess.deleteMany({});
+  await prisma.organizationSettings.deleteMany({});
+  await prisma.module.deleteMany({});
+  await prisma.designation.deleteMany({});
+  await prisma.division.deleteMany({});
+  await prisma.department.deleteMany({});
+  await prisma.branch.deleteMany({});
   await prisma.auditLog.deleteMany({});
   await prisma.securityEvent.deleteMany({});
   await prisma.userSession.deleteMany({});
@@ -200,7 +280,149 @@ async function main() {
   await prisma.salaryRevision.deleteMany({});
   await prisma.employeeSalary.deleteMany({});
   await prisma.incrementSlab.deleteMany({});
+  await prisma.plan.deleteMany({});
+  await prisma.account.deleteMany({});
   await prisma.user.deleteMany({});
+  await prisma.organization.deleteMany({});
+
+  console.log("Creating default account, organization and appraisal module...");
+  await prisma.account.create({
+    data: {
+      id: DEFAULT_ACCOUNT_ID,
+      slug: DEFAULT_ACCOUNT_SLUG,
+      name: "Adarsh",
+      status: "ACTIVE",
+    },
+  });
+  await prisma.organization.create({
+    data: {
+      id: DEFAULT_ORG_ID,
+      accountId: DEFAULT_ACCOUNT_ID,
+      slug: DEFAULT_ORG_SLUG,
+      name: "Adarsh Shipping and Services",
+      legalName: "Adarsh Shipping and Services",
+      industry: "Shipping and logistics",
+      logoUrl: "/api/logo?v=2",
+      primaryColor: "#0e8a95",
+      status: "ACTIVE",
+      access: {
+        create: {
+          id: "default-org-access",
+          status: "ACTIVE",
+          planName: "Legacy default organization",
+          startsAt: new Date(),
+        },
+      },
+      settings: {
+        create: {
+          id: "default-org-settings",
+          branding: { productName: "Performance Management Platform" },
+        },
+      },
+    },
+  });
+  await prisma.plan.createMany({
+    data: [
+      {
+        id: "plan-basic",
+        key: "basic",
+        name: "Basic",
+        priceDisplay: "Contact sales",
+        maxOrganizations: 1,
+        maxEmployees: 50,
+        allowedModules: MODULES.map((moduleItem) => moduleItem.key),
+        features: ["Single organization", "Appraisal Management"],
+        status: "ACTIVE",
+      },
+      {
+        id: "plan-professional",
+        key: "professional",
+        name: "Professional",
+        priceDisplay: "Contact sales",
+        maxOrganizations: 3,
+        maxEmployees: 300,
+        allowedModules: MODULES.map((moduleItem) => moduleItem.key),
+        features: ["Multi-organization", "Appraisal Management", "KPI ready"],
+        status: "ACTIVE",
+      },
+      {
+        id: "plan-enterprise",
+        key: "enterprise",
+        name: "Enterprise",
+        priceDisplay: "Custom",
+        maxOrganizations: null,
+        maxEmployees: null,
+        allowedModules: MODULES.map((moduleItem) => moduleItem.key),
+        features: ["Unlimited organizations", "Custom limits", "All modules"],
+        status: "ACTIVE",
+      },
+    ],
+  });
+  await prisma.subscription.create({
+    data: {
+      id: "default-account-subscription",
+      accountId: DEFAULT_ACCOUNT_ID,
+      planId: "plan-professional",
+      status: "ACTIVE",
+      startedAt: new Date(),
+    },
+  });
+  for (const moduleItem of MODULES) {
+    await prisma.module.create({
+      data: {
+        id: moduleItem.id,
+        key: moduleItem.key,
+        name: moduleItem.name,
+        description: moduleItem.description,
+        organizations: {
+          create: {
+            id: `default-org-${moduleItem.key}-module`,
+            organizationId: DEFAULT_ORG_ID,
+            enabled: moduleItem.enabledByDefault,
+            enabledAt: moduleItem.enabledByDefault ? new Date() : null,
+          },
+        },
+      },
+    });
+    await prisma.accountModule.create({
+      data: {
+        accountId: DEFAULT_ACCOUNT_ID,
+        moduleId: moduleItem.id,
+        enabled: true,
+      },
+    });
+  }
+
+  const branchNames = new Set(EMPLOYEES.map((row) => row.location || "Head Office"));
+  branchNames.add("Head Office");
+  const departmentNames = new Set(EMPLOYEES.map((row) => row.department || "General"));
+  departmentNames.add("Administration");
+  const designationNames = new Set(EMPLOYEES.map((row) => row.designation || "Employee"));
+  designationNames.add("Administrator");
+
+  const branchByName = new Map<string, string>();
+  for (const name of branchNames) {
+    const branch = await prisma.branch.create({
+      data: { organizationId: DEFAULT_ORG_ID, name, city: name, active: true },
+    });
+    branchByName.set(name, branch.id);
+  }
+
+  const departmentByName = new Map<string, string>();
+  for (const name of departmentNames) {
+    const department = await prisma.department.create({
+      data: { organizationId: DEFAULT_ORG_ID, name, active: true },
+    });
+    departmentByName.set(name, department.id);
+  }
+
+  const designationByName = new Map<string, string>();
+  for (const name of designationNames) {
+    const designation = await prisma.designation.create({
+      data: { organizationId: DEFAULT_ORG_ID, name, active: true },
+    });
+    designationByName.set(name, designation.id);
+  }
 
   const empNoToId = new Map<number, string>();
   const usedEmails = new Set<string>();
@@ -216,13 +438,20 @@ async function main() {
     const created = await prisma.user.create({
       data: {
         email,
-        passwordHash: pw,
+        emailNormalized: email,
+        passwordHash: await bcrypt.hash(randomBytes(24).toString("hex"), 10),
         name,
         role: mapRole(row),
         secondaryRole: row.secondaryRole ?? null,
+        organizationId: DEFAULT_ORG_ID,
+        activeOrganizationId: null,
+        branchId: branchByName.get(row.location || "Head Office"),
+        departmentId: departmentByName.get(row.department || "General"),
+        designationId: designationByName.get(row.designation || "Employee"),
         department: row.department,
         joiningDate: new Date(row.joiningDate),
-        active: (row.employeeStatus ?? "Active") === "Active",
+        active: false,
+        status: "INVITED",
         currentSalary: salary ? salary.gross : null,
         employeeNumber: row.empNo,
         firstName: row.firstName,
@@ -264,12 +493,66 @@ async function main() {
     await prisma.user.update({ where: { id: selfId }, data: { reportingManagerId: mgrId } });
   }
 
+  console.log("Creating organization memberships and reporting hierarchy...");
+  const seededUsers = await prisma.user.findMany({
+    where: { organizationId: DEFAULT_ORG_ID },
+    select: {
+      id: true,
+      role: true,
+      secondaryRole: true,
+      active: true,
+      branchId: true,
+      departmentId: true,
+      designationId: true,
+      reportingManagerId: true,
+      reportingManager: { select: { id: true, role: true } },
+    },
+  });
+  for (const user of seededUsers) {
+    const membership = await prisma.organizationUser.create({
+      data: {
+        organizationId: DEFAULT_ORG_ID,
+        userId: user.id,
+        branchId: user.branchId,
+        departmentId: user.departmentId,
+        designationId: user.designationId,
+        status: user.active ? "ACTIVE" : "SUSPENDED",
+      },
+    });
+    const roles = new Set<OrgRole>([mapOrganizationRole(user.role)]);
+    if (user.secondaryRole) roles.add(mapOrganizationRole(user.secondaryRole));
+    for (const role of roles) {
+      await prisma.userRoleAssignment.create({
+        data: {
+          organizationId: DEFAULT_ORG_ID,
+          userId: user.id,
+          membershipId: membership.id,
+          role,
+          branchId: user.branchId,
+          departmentId: user.departmentId,
+        },
+      });
+    }
+    if (user.reportingManagerId) {
+      await prisma.reportingHierarchy.create({
+        data: {
+          organizationId: DEFAULT_ORG_ID,
+          employeeId: user.id,
+          teamLeadId: user.reportingManager?.role === "TL" ? user.reportingManager.id : null,
+          managerId: user.reportingManager?.role === "MANAGER" ? user.reportingManager.id : null,
+          managementId: user.reportingManager?.role === "MANAGEMENT" || user.reportingManager?.role === "PARTNER" ? user.reportingManager.id : null,
+        },
+      });
+    }
+  }
+
   console.log("Seeding salaries...");
   for (const s of SALARIES) {
     const userId = empNoToId.get(s.empNo);
     if (!userId) continue;
     await prisma.employeeSalary.create({
       data: {
+        organizationId: DEFAULT_ORG_ID,
         userId,
         grossAnnum: s.gross,
         ctcAnnum: s.ctc,
@@ -287,21 +570,139 @@ async function main() {
   console.log("Seeding salary revision history...");
   await seedSalaryRevisions(prisma);
 
-  // Site admin account — hr@adarshshipping.in is the admin login, not linked to any employee
-  console.log("Creating site admin account...");
+  console.log("Creating platform super admin account...");
   await prisma.user.upsert({
-    where: { email: "hr@adarshshipping.in" },
+    where: { email: PLATFORM_ADMIN_EMAIL },
     create: {
-      email: "hr@adarshshipping.in",
-      passwordHash: pw,
-      name: "Site Admin",
+      email: PLATFORM_ADMIN_EMAIL,
+      emailNormalized: PLATFORM_ADMIN_EMAIL,
+      passwordHash: platformAdminPasswordHash,
+      name: "Platform Super Admin",
       role: "ADMIN",
       secondaryRole: null,
+      platformRole: "PLATFORM_SUPER_ADMIN",
+      organizationId: DEFAULT_ORG_ID,
+      activeOrganizationId: null,
+      joiningDate: new Date("2020-01-01"),
+      active: true,
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+    },
+    update: {
+      emailNormalized: PLATFORM_ADMIN_EMAIL,
+      passwordHash: platformAdminPasswordHash,
+      role: "ADMIN",
+      platformRole: "PLATFORM_SUPER_ADMIN",
+      organizationId: DEFAULT_ORG_ID,
+      activeOrganizationId: null,
+      active: true,
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  console.log("Creating Adarsh account owner...");
+  await prisma.user.upsert({
+    where: { email: ADARSH_ACCOUNT_OWNER_EMAIL },
+    create: {
+      email: ADARSH_ACCOUNT_OWNER_EMAIL,
+      emailNormalized: ADARSH_ACCOUNT_OWNER_EMAIL,
+      passwordHash: accountOwnerPasswordHash,
+      name: "Adarsh Account Owner",
+      role: "ADMIN",
+      secondaryRole: null,
+      organizationId: DEFAULT_ORG_ID,
+      activeOrganizationId: DEFAULT_ORG_ID,
+      branchId: branchByName.get("Head Office"),
+      departmentId: departmentByName.get("Administration"),
+      designationId: designationByName.get("Administrator"),
       department: "Administration",
       joiningDate: new Date("2020-01-01"),
       active: true,
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
     },
-    update: { passwordHash: pw, role: "ADMIN", active: true },
+    update: {
+      emailNormalized: ADARSH_ACCOUNT_OWNER_EMAIL,
+      passwordHash: accountOwnerPasswordHash,
+      role: "ADMIN",
+      secondaryRole: null,
+      platformRole: null,
+      organizationId: DEFAULT_ORG_ID,
+      activeOrganizationId: DEFAULT_ORG_ID,
+      branchId: branchByName.get("Head Office"),
+      departmentId: departmentByName.get("Administration"),
+      designationId: designationByName.get("Administrator"),
+      department: "Administration",
+      active: true,
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  const siteAdmin = await prisma.user.findUniqueOrThrow({ where: { email: ADARSH_ACCOUNT_OWNER_EMAIL } });
+  const siteAdminMembership = await prisma.organizationUser.upsert({
+    where: { organizationId_userId: { organizationId: DEFAULT_ORG_ID, userId: siteAdmin.id } },
+    create: {
+      organizationId: DEFAULT_ORG_ID,
+      userId: siteAdmin.id,
+      branchId: siteAdmin.branchId,
+      departmentId: siteAdmin.departmentId,
+      designationId: siteAdmin.designationId,
+      status: "ACTIVE",
+    },
+    update: { status: "ACTIVE" },
+  });
+  await prisma.userRoleAssignment.create({
+    data: {
+      organizationId: DEFAULT_ORG_ID,
+      userId: siteAdmin.id,
+      membershipId: siteAdminMembership.id,
+      role: "ORG_ADMIN",
+      branchId: siteAdmin.branchId,
+      departmentId: siteAdmin.departmentId,
+    },
+  });
+  const platformAdmin = await prisma.user.findUniqueOrThrow({ where: { email: PLATFORM_ADMIN_EMAIL } });
+  await prisma.account.update({
+    where: { id: DEFAULT_ACCOUNT_ID },
+    data: { ownerUserId: siteAdmin.id },
+  });
+  await prisma.accountMembership.upsert({
+    where: {
+      accountId_userId: {
+        accountId: DEFAULT_ACCOUNT_ID,
+        userId: siteAdmin.id,
+      },
+    },
+    create: {
+      accountId: DEFAULT_ACCOUNT_ID,
+      userId: siteAdmin.id,
+      role: "ACCOUNT_OWNER",
+      status: "ACTIVE",
+    },
+    update: {
+      role: "ACCOUNT_OWNER",
+      status: "ACTIVE",
+    },
+  });
+  await prisma.accountMembership.upsert({
+    where: {
+      accountId_userId: {
+        accountId: DEFAULT_ACCOUNT_ID,
+        userId: platformAdmin.id,
+      },
+    },
+    create: {
+      accountId: DEFAULT_ACCOUNT_ID,
+      userId: platformAdmin.id,
+      role: "ACCOUNT_ADMIN",
+      status: "ACTIVE",
+    },
+    update: {
+      role: "ACCOUNT_ADMIN",
+      status: "ACTIVE",
+    },
   });
 
   console.log("Seeding increment slabs...");
@@ -323,6 +724,7 @@ async function main() {
     for (const [index, tier] of salaryTiers.entries()) {
       await prisma.incrementSlab.create({
         data: {
+          organizationId: DEFAULT_ORG_ID,
           label: `Grade ${band.grade} (${tier.label})`,
           grade: band.grade,
           minRating: band.minRating,
@@ -335,30 +737,19 @@ async function main() {
   }
 
   console.log("Seeding KPI departments and templates...");
-  await prisma.systemSetting.upsert({
-    where: { key: KPI_MONTHLY_TARGET_SETTING },
-    create: { key: KPI_MONTHLY_TARGET_SETTING, value: String(DEFAULT_KPI_MONTHLY_TARGET) },
-    update: { value: String(DEFAULT_KPI_MONTHLY_TARGET) },
-  });
-  await prisma.systemSetting.upsert({
-    where: { key: KPI_ANNUAL_TARGET_SETTING },
-    create: { key: KPI_ANNUAL_TARGET_SETTING, value: String(DEFAULT_KPI_ANNUAL_TARGET) },
-    update: { value: String(DEFAULT_KPI_ANNUAL_TARGET) },
-  });
-  await prisma.systemSetting.upsert({
-    where: { key: KPI_RATING_SCALE_SETTING },
-    create: { key: KPI_RATING_SCALE_SETTING, value: JSON.stringify(DEFAULT_KPI_RATING_SCALE) },
-    update: { value: JSON.stringify(DEFAULT_KPI_RATING_SCALE) },
-  });
+  await upsertSystemSetting(KPI_MONTHLY_TARGET_SETTING, String(DEFAULT_KPI_MONTHLY_TARGET));
+  await upsertSystemSetting(KPI_ANNUAL_TARGET_SETTING, String(DEFAULT_KPI_ANNUAL_TARGET));
+  await upsertSystemSetting(KPI_RATING_SCALE_SETTING, JSON.stringify(DEFAULT_KPI_RATING_SCALE));
 
   async function createTemplate(departmentId: string, departmentName: string, items: KpiSeedItem[]) {
     const template = await prisma.kpiTemplate.create({
-      data: { departmentId, name: `${departmentName} KPI Template`, version: 1, active: true },
+      data: { organizationId: DEFAULT_ORG_ID, departmentId, name: `${departmentName} KPI Template`, version: 1, active: true },
     });
     for (const [index, item] of items.entries()) {
       await prisma.kpiTemplateItem.create({
         data: {
           templateId: template.id,
+          organizationId: DEFAULT_ORG_ID,
           name: item.name,
           weightage: item.weightage,
           measurement: item.measurement,
@@ -371,13 +762,14 @@ async function main() {
 
   for (const [rootIndex, root] of KPI_SEED_DEPARTMENTS.entries()) {
     const rootDepartment = await prisma.kpiDepartment.create({
-      data: { name: root.name, sortOrder: rootIndex + 1 },
+      data: { organizationId: DEFAULT_ORG_ID, name: root.name, sortOrder: rootIndex + 1 },
     });
     if (root.items) await createTemplate(rootDepartment.id, root.name, root.items);
     for (const [childIndex, child] of (root.children ?? []).entries()) {
       const childDepartment = await prisma.kpiDepartment.create({
         data: {
           name: child.name,
+          organizationId: DEFAULT_ORG_ID,
           parentId: rootDepartment.id,
           sortOrder: childIndex + 1,
         },
@@ -412,7 +804,24 @@ async function main() {
     });
   }
 
-  console.log(`Seed complete. ${EMPLOYEES.length} users. Default password: password123`);
+  console.log(`Seed complete. ${EMPLOYEES.length} employees plus platform/account owners seeded.`);
+}
+
+async function upsertSystemSetting(key: string, value: string) {
+  const existing = await prisma.systemSetting.findFirst({
+    where: { organizationId: DEFAULT_ORG_ID, key },
+    select: { id: true },
+  });
+  if (existing) {
+    await prisma.systemSetting.update({
+      where: { id: existing.id },
+      data: { value },
+    });
+    return;
+  }
+  await prisma.systemSetting.create({
+    data: { organizationId: DEFAULT_ORG_ID, key, value },
+  });
 }
 
 main()

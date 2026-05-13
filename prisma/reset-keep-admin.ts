@@ -3,7 +3,15 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const ADMIN_EMAIL = "hr@adarshshipping.in";
+const PLATFORM_ADMIN_EMAIL = (process.env.PLATFORM_SUPER_ADMIN_EMAIL ?? "hariprasad.official.137@gmail.com").toLowerCase();
+
+function requireResetAdminPassword() {
+  const password = process.env.RESET_ADMIN_PASSWORD?.trim();
+  if (!password) {
+    throw new Error("RESET_ADMIN_PASSWORD must be set for reset-keep-admin.");
+  }
+  return password;
+}
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -13,25 +21,33 @@ async function main() {
     throw new Error("Set CONFIRM_RESET=KEEP_ONLY_ADMIN to run the data reset.");
   }
 
-  const adminEmail = ADMIN_EMAIL.toLowerCase();
+  const adminEmail = PLATFORM_ADMIN_EMAIL;
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
       email: adminEmail,
+      emailNormalized: adminEmail,
       role: "ADMIN",
       active: true,
+      status: "ACTIVE",
       passkeySetupRequired: true,
       googleLoginAllowed: true,
+      platformRole: "PLATFORM_SUPER_ADMIN",
+      emailVerifiedAt: new Date(),
     },
     create: {
       email: adminEmail,
-      name: "HR Admin",
+      emailNormalized: adminEmail,
+      name: "Platform Super Admin",
       role: "ADMIN",
       joiningDate: new Date(),
       active: true,
-      passwordHash: await bcrypt.hash(process.env.RESET_ADMIN_PASSWORD ?? "Admin@12345", 10),
+      status: "ACTIVE",
+      passwordHash: await bcrypt.hash(requireResetAdminPassword(), 10),
       passkeySetupRequired: true,
       googleLoginAllowed: true,
+      platformRole: "PLATFORM_SUPER_ADMIN",
+      emailVerifiedAt: new Date(),
     },
   });
 

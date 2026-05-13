@@ -1,8 +1,6 @@
-import Image from "next/image";
 import { Suspense } from "react";
+import { Building2 } from "lucide-react";
 import { LoginForm } from "./login-form";
-
-const LOGO_SRC = "/api/logo?v=2";
 
 export default function LoginPage() {
   return (
@@ -11,38 +9,38 @@ export default function LoginPage() {
         <div className="grid w-full gap-10 lg:grid-cols-[1fr_400px] lg:items-center">
           <section className="hidden lg:block space-y-8">
             <div>
-              <Image
-                src={LOGO_SRC}
-                alt="Adarsh Shipping logo"
-                width={430}
-                height={143}
-                className="h-auto w-[260px] object-contain opacity-90"
-                unoptimized
-              />
+              <div className="flex items-center gap-3">
+                <span className="flex size-12 items-center justify-center rounded-xl">
+                  <p className="text-3xl ds-h1" style={{ fontSize: "32px", letterSpacing: "0.03em" }}>ME</p>
+                </span>
+                <div>
+                  <p className="ds-h1 text-foreground" style={{ fontSize: "32px", letterSpacing: "0.03em" }}>Monolith Engine</p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3">
               <p className="ds-label text-primary">
-                Appraisal Management Portal
+                Multi-organization workspace
               </p>
               <h1
                 className="ds-h1 heading-icon-none"
                 style={{ fontSize: "32px", letterSpacing: "0.03em" }}
               >
-                Performance.{" "}
-                <span className="text-gradient-teal">Rewarded fairly.</span>
+                Appraisals, KPI reviews, and team workflows in one{" "}
+                <span className="text-gradient-teal">secure SaaS portal.</span>
               </h1>
               <p className="text-muted-foreground text-base leading-relaxed max-w-sm">
-                Manage employee reviews, self-assessments, ratings, and
-                appraisal workflows from one unified portal.
+                Sign in to manage organization-level reviews, employee performance,
+                and operational follow-through without losing tenant separation.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2.5">
               {[
-                { dot: "bg-[#00cec4]", label: "Self-assessments" },
-                { dot: "bg-primary", label: "360 Reviews" },
-                { dot: "bg-[#ffaa2d]", label: "Salary insights" },
+                { dot: "bg-[#00cec4]", label: "Organization routing" },
+                { dot: "bg-primary", label: "Appraisal workflows" },
+                { dot: "bg-[#ffaa2d]", label: "KPI visibility" },
                 { dot: "bg-[#ff8333]", label: "Role-based access" },
               ].map((feature) => (
                 <span
@@ -67,16 +65,11 @@ export default function LoginPage() {
 
           <section className="w-full">
             <div className="flex flex-col items-center mb-8 lg:hidden">
-              <Image
-                src={LOGO_SRC}
-                alt="Adarsh Shipping logo"
-                width={320}
-                height={107}
-                className="h-auto w-[180px] object-contain opacity-90"
-                unoptimized
-              />
+              <span className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Building2 className="size-6" />
+              </span>
               <p className="mt-3 text-xs font-medium text-primary">
-                Appraisal Portal
+                Monolith Engine
               </p>
             </div>
 

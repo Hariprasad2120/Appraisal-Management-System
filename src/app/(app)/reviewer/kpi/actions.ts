@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath, refresh } from "next/cache";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   DEFAULT_KPI_MONTHLY_TARGET,
@@ -46,7 +46,7 @@ async function ensureTaskForTlEmployee(itemId: string, tlId: string) {
 
 async function recalculateReview(reviewId: string) {
   const [monthlyTargetSetting, items] = await Promise.all([
-    prisma.systemSetting.findUnique({ where: { key: KPI_MONTHLY_TARGET_SETTING } }),
+    prisma.systemSetting.findFirst({ where: { key: KPI_MONTHLY_TARGET_SETTING } }),
     prisma.kpiReviewItem.findMany({ where: { reviewId, itemKind: "TASK", assignedToEmployee: true } }),
   ]);
   const monthlyTarget = Number(monthlyTargetSetting?.value ?? DEFAULT_KPI_MONTHLY_TARGET);
@@ -67,7 +67,7 @@ async function recalculateReview(reviewId: string) {
 
 async function recalculateTaskReview(reviewId: string) {
   const [monthlyTargetSetting, workingCalendar, tasks] = await Promise.all([
-    prisma.systemSetting.findUnique({ where: { key: KPI_MONTHLY_TARGET_SETTING } }),
+    prisma.systemSetting.findFirst({ where: { key: KPI_MONTHLY_TARGET_SETTING } }),
     prisma.workingCalendar.findUnique({ where: { id: "default" } }),
     prisma.kpiTask.findMany({
       where: { reviewId, status: "CLOSED", finalRating: { not: null } },
@@ -191,7 +191,7 @@ export async function rateKpiTaskAction(formData: FormData): Promise<void> {
   const item = await ensureTaskForTlEmployee(itemId, session.user.id);
   if (item.approvalStatus !== "APPROVED") throw new Error("Approve the task before rating");
   if (!item.assignedToEmployee) throw new Error("Assign the task to the employee before rating");
-  const monthlyTargetSetting = await prisma.systemSetting.findUnique({ where: { key: KPI_MONTHLY_TARGET_SETTING } });
+  const monthlyTargetSetting = await prisma.systemSetting.findFirst({ where: { key: KPI_MONTHLY_TARGET_SETTING } });
   const monthlyTarget = Number(monthlyTargetSetting?.value ?? DEFAULT_KPI_MONTHLY_TARGET);
   // weightedAchievement stores criterion points for this task
   const criterionPoints = calculateCriterionPoints(item.weightage, rating, monthlyTarget);
@@ -388,7 +388,7 @@ export async function closeKpiTaskAction(formData: FormData): Promise<void> {
     systemRating,
     finalRating,
   );
-  const monthlyTargetSetting = await prisma.systemSetting.findUnique({ where: { key: KPI_MONTHLY_TARGET_SETTING } });
+  const monthlyTargetSetting = await prisma.systemSetting.findFirst({ where: { key: KPI_MONTHLY_TARGET_SETTING } });
   const monthlyTarget = Number(monthlyTargetSetting?.value ?? DEFAULT_KPI_MONTHLY_TARGET);
   const points = calculateCriterionPoints(task.criterion.weightage, finalRating, monthlyTarget);
   const pointsExplanation = buildKpiPointsExplanation(task.criterion.weightage, finalRating, monthlyTarget);

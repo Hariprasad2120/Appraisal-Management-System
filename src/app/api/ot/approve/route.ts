@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   // If forceApprove is true, we skip TL and Manager entirely.
   // If forceApprove is false/undefined, we just mark HR as having approved the base records,
   // which opens it up for the TL to approve.
-  const dataToUpdate: any = {
+  const dataToUpdate: NonNullable<Parameters<typeof prisma.employeeOt.updateMany>[0]>["data"] = {
     hrApprovalStatus: "APPROVED",
     approvedById: session.user.id,
     approvedAt: new Date(),
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     data: {
       actorId: session.user.id,
       action: parsed.data.forceApprove ? "BULK_FORCE_APPROVE_OT" : "BULK_FORWARD_OT",
-      after: { ids: parsed.data.ids, updated: result.count } as any,
+      after: { ids: parsed.data.ids, updated: result.count },
     },
   });
 

@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { toTitleCase } from "@/lib/utils";
@@ -7,6 +7,7 @@ import Link from "next/link";
 import { HistoryFilters } from "./history-filters";
 import { computeCycleStatus } from "@/lib/workflow";
 import { getSystemDate } from "@/lib/system-date";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 const STATUS_COLORS: Record<string, string> = {
   DECIDED:
@@ -45,12 +46,13 @@ export default async function HistoryPage({
   const now = await getSystemDate();
 
   const role = session.user.role;
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const secondaryRole = session.user.secondaryRole;
   const isReviewerRole = ["HR", "TL", "MANAGER"].includes(role);
   const isAdminRole = role === "ADMIN" || secondaryRole === "ADMIN";
   const isManagementOrPartner = role === "MANAGEMENT" || role === "PARTNER";
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { organizationId };
 
   if (isManagementOrPartner || isAdminRole) {
     // see all
@@ -192,7 +194,7 @@ export default async function HistoryPage({
                         <td className="py-3 px-4 font-medium text-foreground">
                           {canViewEmployeeDetail ? (
                             <Link
-                              href={`/admin/employees/${c.user.id}`}
+                              href={`/workspace/hrms/employees/${c.user.id}`}
                               className="hover:text-primary transition-colors"
                             >
                               {toTitleCase(c.user.name)}

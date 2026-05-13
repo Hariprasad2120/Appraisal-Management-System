@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { SelfForm } from "./self-form";
 import { SUPPLEMENTARY_SECTIONS } from "@/lib/criteria";

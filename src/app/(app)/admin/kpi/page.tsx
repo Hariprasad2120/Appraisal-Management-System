@@ -436,7 +436,7 @@ function taskStatusLabel(status: string) {
                 <p className="mt-1 text-xs text-muted-foreground">
                   Assign employees to TLs and TLs to Managers in the dedicated Ownership page.
                 </p>
-                <Link href="/admin/ownership" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                <Link href="/hrms/ownership" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
                   Go to Ownership <ChevronRight className="size-3" />
                 </Link>
               </div>

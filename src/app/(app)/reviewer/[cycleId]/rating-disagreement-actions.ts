@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 
 const schema = z.object({
   ratingId: z.string().min(1),

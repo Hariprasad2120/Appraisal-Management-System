@@ -1,15 +1,18 @@
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { TicketForm } from "./ticket-form";
 import { TicketList } from "./ticket-list";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 export default async function TicketsPage() {
   const session = await auth();
   if (!session?.user) return null;
 
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
+
   const tickets = await prisma.ticket.findMany({
-    where: { raisedById: session.user.id },
+    where: { organizationId, raisedById: session.user.id },
     orderBy: { createdAt: "desc" },
     include: {
       comments: {

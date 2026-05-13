@@ -232,7 +232,7 @@ export const SUPPLEMENTARY_SECTIONS: SupplementarySection[] = [
     questions: [
       {
         id: "c1",
-        text: "How long do you see yourself working with Adarsh Shipping and Services?",
+        text: "How long do you see yourself working with this organization?",
         type: "choice",
         choices: [
           "a) Less than a year",
@@ -265,7 +265,7 @@ export const SUPPLEMENTARY_SECTIONS: SupplementarySection[] = [
       },
       {
         id: "c4",
-        text: "If Adarsh Shipping and Services introduces a new role with greater responsibilities but no immediate salary hike, would you take it? Why or why not?",
+        text: "If your organization introduces a new role with greater responsibilities but no immediate salary hike, would you take it? Why or why not?",
         type: "text",
       },
     ],

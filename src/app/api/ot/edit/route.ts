@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
 
 function isAdminOrHR(role: string, secondary?: string | null) {
   return role === "ADMIN" || role === "HR" || secondary === "ADMIN" || secondary === "HR";
@@ -42,8 +43,8 @@ export async function POST(req: NextRequest) {
     data: {
       actorId: session.user.id,
       action: "MANUAL_OT_ADJUSTMENT",
-      before: before as any,
-      after: record as any,
+      before: before ? (JSON.parse(JSON.stringify(before)) as Prisma.JsonObject) : undefined,
+      after: JSON.parse(JSON.stringify(record)) as Prisma.JsonObject,
     },
   });
 

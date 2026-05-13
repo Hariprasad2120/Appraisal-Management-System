@@ -14,6 +14,14 @@ const prisma = new PrismaClient({ adapter });
 const ROLES = new Set(["ADMIN", "HR", "EMPLOYEE", "REVIEWER", "MANAGER", "MANAGEMENT", "PARTNER"]);
 const ACCOUNT_STATUSES = new Set(["Pending", "Active", "Disabled"]);
 
+function requireImportDefaultPassword() {
+  const password = process.env.IMPORT_DEFAULT_PASSWORD?.trim();
+  if (!password) {
+    throw new Error("IMPORT_DEFAULT_PASSWORD must be set before importing fresh data.");
+  }
+  return password;
+}
+
 type Row = Record<string, unknown>;
 
 function sheet(wb: XLSX.WorkBook, name: string): Row[] {
@@ -83,7 +91,7 @@ async function main() {
   }
 
   const accessByEmployee = new Map(accessRows.map((row) => [required(row, "employee_id"), row]));
-  const defaultPasswordHash = await bcrypt.hash(process.env.IMPORT_DEFAULT_PASSWORD ?? "Welcome@12345", 10);
+  const defaultPasswordHash = await bcrypt.hash(requireImportDefaultPassword(), 10);
 
   let imported = 0;
   for (const row of users) {
@@ -99,6 +107,7 @@ async function main() {
       where: { email: officialEmail },
       update: {
         name: required(row, "full_name"),
+        emailNormalized: officialEmail,
         role,
         department: required(row, "department"),
         designation: required(row, "designation"),
@@ -106,6 +115,7 @@ async function main() {
         employmentType: required(row, "employment_type"),
         employeeStatus: required(row, "status"),
         active: accountStatus === "Active",
+        status: accountStatus === "Active" ? "ACTIVE" : "SUSPENDED",
         googleLoginAllowed: boolYes(access, "google_login_allowed"),
         passkeySetupRequired: boolYes(access, "force_passkey_setup") || boolYes(access, "passkey_required"),
         personalEmail: email(row, "personal_email") || null,
@@ -114,6 +124,7 @@ async function main() {
       },
       create: {
         email: officialEmail,
+        emailNormalized: officialEmail,
         passwordHash: defaultPasswordHash,
         name: required(row, "full_name"),
         role,
@@ -123,6 +134,7 @@ async function main() {
         employmentType: required(row, "employment_type"),
         employeeStatus: required(row, "status"),
         active: accountStatus === "Active",
+        status: accountStatus === "Active" ? "ACTIVE" : "SUSPENDED",
         googleLoginAllowed: boolYes(access, "google_login_allowed"),
         passkeySetupRequired: true,
         personalEmail: email(row, "personal_email") || null,

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { validateRuleConfig } from "@/lib/kpi-rules";
 import type { KpiApprovalStatus, KpiCriterionStatus, KpiRuleType } from "@/generated/prisma/client";

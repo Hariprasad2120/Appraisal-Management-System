@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { syncCycleStatus } from "@/lib/workflow";
 
 export async function forceMarkAvailableAction(assignmentId: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -34,7 +34,7 @@ export async function forceMarkAvailableAction(assignmentId: string): Promise<{ 
   });
 
   await syncCycleStatus(assignment.cycleId);
-  revalidatePath(`/admin/employees`);
+  revalidatePath(`/workspace/hrms/employees`);
   revalidatePath(`/reviewer/${assignment.cycleId}`);
   return { ok: true };
 }
@@ -88,7 +88,7 @@ export async function submitAvailabilityAction(input: z.infer<typeof schema>): P
           userId: admin.id,
           type: "NOT_AVAILABLE_ALERT",
           message: `${reviewer?.name ?? "A reviewer"} marked NOT AVAILABLE for ${cycle?.user.name ?? "an employee"}'s appraisal. Action required: reassign or force-mark available.`,
-          link: `/admin/employees/${cycle?.userId}/assign`,
+          link: `/workspace/hrms/employees/${cycle?.userId}/assign`,
           persistent: true,
           critical: true,
         },

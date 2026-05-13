@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; error: string };
 

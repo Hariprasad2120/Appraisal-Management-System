@@ -7,6 +7,8 @@ import { toTitleCase } from "@/lib/utils";
 import type { CycleStatus } from "@/generated/prisma/enums";
 import { computeCycleStatus } from "@/lib/workflow";
 import { getSystemDate } from "@/lib/system-date";
+import { getCachedSession as auth } from "@/lib/auth";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 const STATUS_COLORS: Record<CycleStatus, string> = {
   PENDING_SELF: "bg-slate-100 text-slate-600",
@@ -27,9 +29,12 @@ export default async function AdminCyclesPage({
   searchParams: Promise<{ status?: string; q?: string }>;
 }) {
   const sp = await searchParams;
+  const session = await auth();
+  if (!session?.user) return null;
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const now = await getSystemDate();
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { organizationId };
   if (sp.status) where.status = sp.status;
   if (sp.q) {
     where.user = {
@@ -142,7 +147,7 @@ export default async function AdminCyclesPage({
                     return (
                       <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                         <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">
-                          <Link href={`/admin/employees/${c.userId}/assign`} className="hover:text-[#008993] transition-colors">
+                          <Link href={`/workspace/hrms/employees/${c.userId}/assign`} className="hover:text-[#008993] transition-colors">
                             {toTitleCase(c.user.name)}
                           </Link>
                         </td>
@@ -165,7 +170,7 @@ export default async function AdminCyclesPage({
                               {c.assignments.map((a, index) => (
                                 <span key={a.reviewer.id}>
                                   <Link
-                                    href={`/admin/employees/${a.reviewer.id}/assign`}
+                                    href={`/workspace/hrms/employees/${a.reviewer.id}/assign`}
                                     className="transition-colors hover:text-primary hover:underline"
                                   >
                                     {a.reviewer.name.split(" ")[0]}

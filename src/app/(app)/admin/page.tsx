@@ -1,12 +1,14 @@
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import Link from "next/link";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { Users, Clock, AlertCircle, Calendar, ChevronRight, Bell } from "lucide-react";
 import { getAppraisalEligibility, getMilestoneAlert, autoCycleType } from "@/lib/appraisal-eligibility";
-import { ManagementCharts } from "../management/management-charts";
+import dynamic from "next/dynamic";
+const ManagementCharts = dynamic(() => import("../management/management-charts").then((m) => m.ManagementCharts));
 import { computeCycleStatus } from "@/lib/workflow";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 function ArrowUpRight() {
   return (
@@ -27,6 +29,8 @@ function ArrowUpRight() {
 
 export default async function AdminDashboard() {
   const session = await auth();
+  if (!session?.user) return null;
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -34,11 +38,12 @@ export default async function AdminDashboard() {
   const [allEmployees, cyclesForAdminStats, pendingAssignments, pendingExtensions, decidedCyclesRaw, recentNotifs] =
     await Promise.all([
       prisma.user.findMany({
-        where: { role: { notIn: ["MANAGEMENT", "PARTNER"] }, active: true },
+        where: { organizationId, role: { notIn: ["MANAGEMENT", "PARTNER"] }, active: true },
         orderBy: { name: "asc" },
         include: {
           cyclesAsEmployee: {
             where: {
+              organizationId,
               OR: [
                 { status: { notIn: ["CLOSED", "DECIDED"] } },
                 {
@@ -52,6 +57,7 @@ export default async function AdminDashboard() {
         },
       }),
       prisma.appraisalCycle.findMany({
+        where: { organizationId },
         select: {
           status: true,
           ratingDeadline: true,
@@ -62,10 +68,10 @@ export default async function AdminDashboard() {
           arrear: { select: { status: true } },
         },
       }),
-      prisma.cycleAssignment.count({ where: { availability: "PENDING" } }),
-      prisma.extensionRequest.count({ where: { status: "PENDING" } }),
+      prisma.cycleAssignment.count({ where: { organizationId, availability: "PENDING" } }),
+      prisma.extensionRequest.count({ where: { organizationId, status: "PENDING" } }),
       prisma.appraisalCycle.findMany({
-        where: { status: { in: ["DECIDED", "CLOSED"] } },
+        where: { organizationId, status: { in: ["DECIDED", "CLOSED"] } },
         include: {
           user: { select: { name: true } },
           ratings: { select: { averageScore: true } },
@@ -74,14 +80,12 @@ export default async function AdminDashboard() {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
-      session?.user
-        ? prisma.notification.findMany({
-            where: { userId: session.user.id, read: false },
+      prisma.notification.findMany({
+            where: { organizationId, userId: session.user.id, read: false },
             orderBy: { createdAt: "desc" },
             take: 5,
             select: { id: true, message: true, link: true, createdAt: true },
-          })
-        : Promise.resolve([] as { id: string; message: string; link: string | null; createdAt: Date }[]),
+          }),
     ]);
 
   const chartData = [...decidedCyclesRaw]
@@ -223,7 +227,7 @@ export default async function AdminDashboard() {
                 <div key={employee.id} className="flex items-center justify-between text-sm flex-wrap gap-2">
                   <div>
                     <Link
-                      href={`/admin/employees/${employee.id}/assign`}
+                      href={`/workspace/hrms/employees/${employee.id}/assign`}
                       className="font-medium text-foreground transition-colors hover:text-primary hover:underline"
                     >
                       {toTitleCase(employee.name)}
@@ -274,7 +278,7 @@ export default async function AdminDashboard() {
                         <tr key={u.id} className="relative cursor-pointer hover:bg-muted/40 transition-colors">
                           <td className="relative py-3 px-2 text-muted-foreground font-mono text-xs">
                             <Link
-                              href={`/admin/employees/${u.id}/assign`}
+                              href={`/workspace/hrms/employees/${u.id}/assign`}
                               className="absolute inset-y-0 left-0 z-10 w-[1000vw]"
                               aria-label={`Assign appraisal for ${toTitleCase(u.name)}`}
                             />
@@ -282,7 +286,7 @@ export default async function AdminDashboard() {
                           </td>
                           <td className="px-2 font-semibold text-foreground">
                             <Link
-                              href={`/admin/employees/${u.id}/assign`}
+                              href={`/workspace/hrms/employees/${u.id}/assign`}
                               className="transition-colors hover:text-primary hover:underline"
                             >
                               {toTitleCase(u.name)}
@@ -307,7 +311,7 @@ export default async function AdminDashboard() {
                           </td>
                           <td className="px-2">
                             <Link
-                              href={`/admin/employees/${u.id}/assign`}
+                              href={`/workspace/hrms/employees/${u.id}/assign`}
                               className="inline-flex items-center gap-1 text-primary hover:text-primary/80 text-xs font-medium transition-colors"
                             >
                               Assign <ChevronRight className="size-3" />
@@ -335,7 +339,8 @@ export default async function AdminDashboard() {
       <FadeIn delay={0.3}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { href: "/admin/employees", label: "Employees", desc: "Manage all users" },
+            { href: "/workspace/hrms/employees", label: "Employees", desc: "Manage all users" },
+            { href: "/admin/users", label: "User Management", desc: "Invites, access & seats" },
             { href: "/admin/cycles", label: "All Cycles", desc: "View appraisal cycles" },
             { href: "/admin/slabs", label: "Increment Slabs", desc: "Configure hike bands" },
             {

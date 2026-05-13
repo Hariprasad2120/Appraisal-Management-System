@@ -1,454 +1,183 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ROLE_HOME } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
 import {
-  LayoutDashboard,
-  Users,
-  History,
-  UserCheck,
-  BarChart3,
-  ClipboardList,
-  Layers,
-  Settings,
-  Building2,
-  TrendingUp,
-  ListChecks,
-  Ticket,
-  FlaskConical,
-  Bell,
-  MonitorCheck,
-  Star,
-  ShieldCheck,
-  Database,
-  Clock,
-} from "lucide-react";
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  iconColor: string;
-  activeBg: string;
-  activeBar: string;
-  activeLabel: string;
-};
-
-function item(
-  href: string,
-  label: string,
-  icon: React.ReactNode,
-  iconColor: string,
-  activeBg: string,
-  activeBar: string,
-  activeLabel: string,
-): NavItem {
-  return { href, label, icon, iconColor, activeBg, activeBar, activeLabel };
-}
-
-// DS per-item color palette
-const C = {
-  teal: {
-    color: "#2dd4bf",
-    activeBg: "rgba(14,137,149,0.12)",
-    bar: "#0e8a95",
-    label: "#2dd4bf",
-  },
-  blue: {
-    color: "#60a5fa",
-    activeBg: "rgba(59,130,246,0.10)",
-    bar: "#3b82f6",
-    label: "#60a5fa",
-  },
-  purple: {
-    color: "#a78bfa",
-    activeBg: "rgba(124,58,237,0.10)",
-    bar: "#7c3aed",
-    label: "#a78bfa",
-  },
-  cyan: {
-    color: "#22d3ee",
-    activeBg: "rgba(0,206,196,0.09)",
-    bar: "#00cec4",
-    label: "#22d3ee",
-  },
-  green: {
-    color: "#4ade80",
-    activeBg: "rgba(34,197,94,0.09)",
-    bar: "#22c55e",
-    label: "#4ade80",
-  },
-  amber: {
-    color: "#fbbf24",
-    activeBg: "rgba(255,170,45,0.09)",
-    bar: "#ffaa2d",
-    label: "#fbbf24",
-  },
-  orange: {
-    color: "#fb923c",
-    activeBg: "rgba(255,131,51,0.09)",
-    bar: "#ff8333",
-    label: "#fb923c",
-  },
-  rose: {
-    color: "#fb7185",
-    activeBg: "rgba(244,63,94,0.09)",
-    bar: "#f43f5e",
-    label: "#fb7185",
-  },
-  slate: {
-    color: "#94a3b8",
-    activeBg: "rgba(100,116,139,0.09)",
-    bar: "#64748b",
-    label: "#94a3b8",
-  },
-};
-
-function mkItem(
-  href: string,
-  label: string,
-  icon: React.ReactNode,
-  c: (typeof C)[keyof typeof C],
-): NavItem {
-  return item(href, label, icon, c.color, c.activeBg, c.bar, c.label);
-}
-
-function navFor(role: Role, secondaryRole?: Role | null): NavItem[] {
-  const sz = "size-[15px]";
-  const dashboard = mkItem(
-    ROLE_HOME[role],
-    "Dashboard",
-    <LayoutDashboard className={sz} />,
-    C.teal,
-  );
-
-  if (role === "ADMIN") {
-    return [
-      dashboard,
-      mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
-      mkItem("/admin/ownership", "Ownership", <UserCheck className={sz} />, C.cyan),
-      mkItem(
-        "/admin/appraisals",
-        "Appraisals",
-        <UserCheck className={sz} />,
-        C.purple,
-      ),
-      mkItem(
-        "/admin/cycles",
-        "All Cycles",
-        <ClipboardList className={sz} />,
-        C.cyan,
-      ),
-      mkItem(
-        "/admin/mom",
-        "Minutes of Meeting",
-        <Building2 className={sz} />,
-        C.slate,
-      ),
-      mkItem(
-        "/admin/slabs",
-        "Increment Slabs",
-        <Layers className={sz} />,
-        C.amber,
-      ),
-      mkItem(
-        "/admin/extensions",
-        "Extensions",
-        <Settings className={sz} />,
-        C.orange,
-      ),
-      mkItem(
-        "/admin/criteria",
-        "Criteria Questions",
-        <ListChecks className={sz} />,
-        C.orange,
-      ),
-      mkItem(
-        "/admin/kpi",
-        "Department KPI",
-        <BarChart3 className={sz} />,
-        C.green,
-      ),
-      mkItem(
-        "/admin/tickets",
-        "Support Tickets",
-        <Ticket className={sz} />,
-        C.rose,
-      ),
-      mkItem(
-        "/admin/salary-sheet",
-        "Salary Sheet",
-        <BarChart3 className={sz} />,
-        C.green,
-      ),
-      mkItem(
-        "/admin/salary-revisions",
-        "Salary Revisions",
-        <TrendingUp className={sz} />,
-        C.green,
-      ),
-      mkItem(
-        "/admin/ot",
-        "OT Management",
-        <Clock className={sz} />,
-        C.amber,
-      ),
-      mkItem(
-        "/admin/notifications",
-        "Notification Center",
-        <Bell className={sz} />,
-        C.amber,
-      ),
-      mkItem(
-        "/admin/passkeys",
-        "Passkey Resets",
-        <ShieldCheck className={sz} />,
-        C.purple,
-      ),
-      mkItem(
-        "/admin/data-tools",
-        "Data Tools",
-        <Database className={sz} />,
-        C.blue,
-      ),
-      mkItem(
-        "/admin/sessions",
-        "Session Monitor",
-        <MonitorCheck className={sz} />,
-        C.slate,
-      ),
-      mkItem(
-        "/admin/simulation",
-        "Simulation",
-        <FlaskConical className={sz} />,
-        C.slate,
-      ),
-      mkItem("/history", "History", <History className={sz} />, C.slate),
-    ];
-  }
-  if (role === "MANAGEMENT") {
-    return [
-      dashboard,
-      mkItem(
-        "/management/mom",
-        "Minutes of Meeting",
-        <Building2 className={sz} />,
-        C.slate,
-      ),
-      mkItem(
-        "/management/salary",
-        "Salary Calculator",
-        <BarChart3 className={sz} />,
-        C.green,
-      ),
-      mkItem(
-        "/management/slabs",
-        "Increment Slabs",
-        <Layers className={sz} />,
-        C.amber,
-      ),
-      mkItem(
-        "/management/arrears",
-        "Arrear Approvals",
-        <TrendingUp className={sz} />,
-        C.orange,
-      ),
-      mkItem(
-        "/management/kpi",
-        "KPI Reports",
-        <BarChart3 className={sz} />,
-        C.green,
-      ),
-      mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
-      mkItem("/history", "History", <History className={sz} />, C.slate),
-      mkItem(
-        "/notifications",
-        "Notifications",
-        <Bell className={sz} />,
-        C.amber,
-      ),
-      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
-    ];
-  }
-  if (role === "HR" || role === "TL" || role === "MANAGER" || role === "REVIEWER") {
-    return [
-      mkItem(
-        "/reviewer",
-        "Dashboard",
-        <LayoutDashboard className={sz} />,
-        C.teal,
-      ),
-      ...(role === "HR"
-        ? [
-            mkItem(
-              "/reviewer/mom",
-              "Minutes of Meeting",
-              <Building2 className={sz} />,
-              C.slate,
-            ),
-            mkItem(
-              "/admin/ot",
-              "OT Management",
-              <Clock className={sz} />,
-              C.orange,
-            ),
-          ]
-        : []),
-      mkItem(
-        "/assignments",
-        "All Assignments",
-        <ClipboardList className={sz} />,
-        C.blue,
-      ),
-      ...(role === "TL"
-        ? [
-            mkItem(
-              "/reviewer/kpi",
-              "Team KPI",
-              <BarChart3 className={sz} />,
-              C.green,
-            ),
-          ]
-        : []),
-      mkItem("/employee", "My Appraisal", <Star className={sz} />, C.purple),
-      mkItem(
-        "/history",
-        "Appraisal History",
-        <History className={sz} />,
-        C.slate,
-      ),
-      mkItem(
-        "/notifications",
-        "Notifications",
-        <Bell className={sz} />,
-        C.amber,
-      ),
-      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
-    ];
-  }
-  if (role === "EMPLOYEE") {
-    return [
-      dashboard,
-      mkItem("/history", "History", <History className={sz} />, C.slate),
-      mkItem(
-        "/notifications",
-        "Notifications",
-        <Bell className={sz} />,
-        C.amber,
-      ),
-      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
-    ];
-  }
-  if (role === "PARTNER") {
-    return [
-      mkItem(
-        "/partner",
-        "Dashboard",
-        <LayoutDashboard className={sz} />,
-        C.teal,
-      ),
-      mkItem("/admin/employees", "Employees", <Users className={sz} />, C.blue),
-      mkItem("/history", "History", <History className={sz} />, C.slate),
-      mkItem(
-        "/notifications",
-        "Notifications",
-        <Bell className={sz} />,
-        C.amber,
-      ),
-      mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
-    ];
-  }
-  return [
-    dashboard,
-    mkItem("/history", "History", <History className={sz} />, C.slate),
-    mkItem("/notifications", "Notifications", <Bell className={sz} />, C.amber),
-    mkItem("/tickets", "Support Tickets", <Ticket className={sz} />, C.rose),
-  ];
-}
+  getVisibleWorkspaces,
+  getWorkspaceForPath,
+  getWorkspaceNavItems,
+  getWorkspaceStatusLabel,
+} from "@/lib/workspace-navigation";
 
 export function SidebarNav({
   role,
   secondaryRole,
+  enabledModules,
+  homeHref,
+  organizationId,
 }: {
   role: Role;
   secondaryRole?: Role | null;
+  enabledModules?: string[] | null;
+  homeHref?: string;
+  organizationId: string;
 }) {
   const pathname = usePathname();
-  const items = navFor(role, secondaryRole);
+  const workspaces = getVisibleWorkspaces(enabledModules, role, secondaryRole);
+  const currentWorkspaceKey =
+    getWorkspaceForPath(pathname) ?? workspaces[0]?.key ?? null;
+  const currentWorkspace = workspaces.find(
+    (workspace) => workspace.key === currentWorkspaceKey,
+  );
+  const navItems = currentWorkspace
+    ? getWorkspaceNavItems(currentWorkspace.key, role, secondaryRole, homeHref)
+    : [];
 
   return (
-    <nav className="flex-1 px-1.5 py-2 flex flex-col gap-px overflow-y-auto overflow-x-hidden">
-      {items.map((item, i) => {
-        const exactMatch = pathname === item.href;
-        const prefixMatch =
-          item.href !== "/" && pathname.startsWith(item.href + "/");
-        const longerMatchExists =
-          prefixMatch &&
-          items.some(
-            (other) =>
-              other.href !== item.href &&
-              pathname.startsWith(other.href) &&
-              other.href.length > item.href.length,
-          );
-        const isActive = exactMatch || (prefixMatch && !longerMatchExists);
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="px-2 pb-2 pt-3">
+        <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+          Workspaces
+        </div>
+        <div className="mt-2 space-y-1">
+          {workspaces.map((workspace, index) => {
+            const isActive = workspace.key === currentWorkspaceKey;
+            const href = `/org/${organizationId}/workspace/${workspace.key}`;
+            const Icon = workspace.icon;
 
-        return (
-          <motion.div
-            key={item.href + item.label}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{
-              delay: i * 0.03,
-              duration: 0.22,
-              ease: [0.25, 0.46, 0.45, 0.94],
-            }}
-          >
-            <Link
-              href={item.href}
-              title={item.label}
-              className={cn(
-                "relative grid h-[34px] grid-cols-[52px_1fr] items-center rounded-[4px] transition-colors duration-200 group/nav overflow-hidden",
-                "hover:bg-white/5",
-              )}
-              style={isActive ? { background: item.activeBg } : undefined}
-            >
-              {/* Left accent bar */}
-              {isActive && (
+            return (
+              <motion.div
+                key={workspace.key}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  delay: index * 0.03,
+                  duration: 0.22,
+                  ease: [0.25, 0.46, 0.45, 0.94],
+                }}
+              >
+                <Link
+                  href={href}
+                  title={workspace.label}
+                  className={cn(
+                    "relative flex min-h-[42px] items-center gap-3 overflow-hidden rounded-xl px-3 py-2 transition-colors duration-200",
+                    isActive ? "bg-white/8" : "hover:bg-white/5",
+                  )}
+                >
+                  {isActive ? (
+                    <motion.div
+                      layoutId="workspace-active-bar"
+                      className="absolute left-0 top-[7px] bottom-[7px] w-[3px] rounded-r-sm bg-primary"
+                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                    />
+                  ) : null}
+                  <span
+                    className={cn(
+                      "z-10 flex size-8 shrink-0 items-center justify-center rounded-lg",
+                      workspace.accentClass,
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+                    <span className="block truncate text-sm font-medium text-white/90">
+                      {workspace.shortLabel}
+                    </span>
+                    <span className="block truncate text-[11px] text-white/45">
+                      {getWorkspaceStatusLabel(workspace)}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-white/25 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100" />
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-1 min-h-0 flex-1 overflow-hidden border-t border-white/6 px-2 pt-3">
+        <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/35 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+          {currentWorkspace?.shortLabel ?? "Navigation"}
+        </div>
+        <nav className="mt-2 flex h-full flex-col gap-1 overflow-y-auto overflow-x-hidden pb-3">
+          {navItems.map((item, index) => {
+            const isActive = isPathActive(pathname, item.href, navItems);
+            const Icon = item.icon;
+            const showGroupHeading = item.group && (index === 0 || navItems[index - 1]?.group !== item.group);
+
+            return (
+              <Fragment key={`${item.href}-${item.label}`}>
+                {showGroupHeading && (
+                  <div className="px-2 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+                    {item.group}
+                  </div>
+                )}
                 <motion.div
-                  layoutId="nav-active-bar"
-                  className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-r-sm"
-                  style={{ background: item.activeBar }}
-                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                />
-              )}
-
-              {/* Colored icon */}
-              <span
-                className="z-10 flex h-full w-[52px] shrink-0 items-center justify-center"
-                style={{ color: item.iconColor }}
-              >
-                {item.icon}
-              </span>
-
-              {/* Label */}
-              <span
-                className="z-10 w-[174px] min-w-0 -translate-x-1 truncate whitespace-nowrap text-[12px] font-medium opacity-0 transition-[opacity,transform] duration-200 ease-out group-hover/sidebar:translate-x-0 group-hover/sidebar:opacity-100"
-                style={
-                  isActive
-                    ? { color: item.activeLabel }
-                    : { color: "var(--muted-foreground)" }
-                }
-              >
-                {item.label}
-              </span>
-            </Link>
-          </motion.div>
-        );
-      })}
-    </nav>
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{
+                    delay: index * 0.02,
+                    duration: 0.22,
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                  }}
+                >
+                  <Link
+                    href={item.href}
+                    title={item.label}
+                    className={cn(
+                      "relative grid h-[36px] grid-cols-[36px_1fr] items-center overflow-hidden rounded-lg transition-colors duration-200",
+                      isActive ? "bg-primary/12" : "hover:bg-white/5",
+                    )}
+                  >
+                    {isActive ? (
+                      <motion.div
+                        layoutId="nav-active-bar"
+                        className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-r-sm bg-primary"
+                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      />
+                    ) : null}
+                    <span className={cn("z-10 flex items-center justify-center", isActive ? "text-primary" : "text-white/55")}>
+                      <Icon className="size-[15px]" />
+                    </span>
+                    <span
+                      className={cn(
+                        "z-10 min-w-0 -translate-x-1 truncate whitespace-nowrap text-[12px] font-medium opacity-0 transition-[opacity,transform] duration-200 ease-out group-hover/sidebar:translate-x-0 group-hover/sidebar:opacity-100",
+                        isActive ? "text-primary" : "text-white/55",
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                </motion.div>
+              </Fragment>
+            );
+          })}
+        </nav>
+      </div>
+    </div>
   );
+}
+
+function isPathActive(
+  pathname: string,
+  href: string,
+  items: { href: string }[],
+) {
+  const exactMatch = pathname === href;
+  const prefixMatch = href !== "/" && pathname.startsWith(`${href}/`);
+  const longerMatchExists =
+    prefixMatch &&
+    items.some(
+      (other) =>
+        other.href !== href &&
+        pathname.startsWith(other.href) &&
+        other.href.length > href.length,
+    );
+
+  return exactMatch || (prefixMatch && !longerMatchExists);
 }

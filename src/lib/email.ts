@@ -4,11 +4,21 @@ type SendArgs = {
   html: string;
 };
 
+const DEV_INBOX = "no-reply@adarshshipping.in";
+
 export async function sendEmail({ to, subject, html }: SendArgs) {
-  if (process.env.NODE_ENV !== "production" && process.env.EMAIL_ENABLED !== "true") {
-    return { skipped: true };
+  const isDev = process.env.NODE_ENV !== "production";
+  const originalTo = Array.isArray(to) ? to.join(", ") : to;
+  const actualTo: string | string[] = isDev ? DEV_INBOX : to;
+  const actualSubject = isDev ? `[DEV → ${originalTo}] ${subject}` : subject;
+
+  if (isDev && process.env.EMAIL_ENABLED !== "true") {
+    console.log("[email-dev] would send to:", actualTo);
+    console.log("[email-dev] subject:", actualSubject);
+    console.log(html);
+    return { skipped: true, devRedirectedTo: actualTo };
   }
-  console.log("[email]", { to, subject });
+  console.log("[email]", { to: actualTo, subject: actualSubject });
   console.log(html);
   return { stubbed: true };
 }

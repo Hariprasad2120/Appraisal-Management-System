@@ -1,0 +1,2 @@
+﻿export { default } from "@/modules/hrms/routes/salary/sheets/page";
+

@@ -2,7 +2,7 @@
 
 import { refresh, revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canBeAppraised } from "@/lib/rbac";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/lib/kpi";
 import { buildKpiPointsExplanation } from "@/lib/kpi-audit";
 import { calculateAssignedDayMonthlyRating } from "@/lib/kpi-rules";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 type KnownTemplateItem = {
   name: string;
@@ -388,7 +389,7 @@ export async function assignEmployeeKpiDepartmentAction(formData: FormData): Pro
   if (!userId) throw new Error("Missing employee");
   await prisma.user.update({ where: { id: userId }, data: { kpiDepartmentId } });
   revalidatePath("/admin/kpi");
-  revalidatePath(`/admin/employees/${userId}`);
+  revalidatePath(`/workspace/hrms/employees/${userId}`);
   refresh();
 }
 
@@ -422,7 +423,7 @@ export async function bulkAssignEmployeesToTlAction(formData: FormData): Promise
     data: { reportingManagerId: tlId },
   });
   revalidatePath("/admin/kpi");
-  revalidatePath("/admin/employees");
+  revalidatePath("/workspace/hrms/employees");
   revalidatePath("/reviewer/kpi");
   refresh();
 }
@@ -525,6 +526,7 @@ export async function updateKpiTemplateItemAction(formData: FormData): Promise<v
 
 export async function createKpiReviewDraftAction(formData: FormData): Promise<void> {
   const session = await requireAdmin();
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const userId = text(formData, "userId");
   const monthValue = text(formData, "month");
   if (!userId || !monthValue) throw new Error("Choose employee and month");
@@ -546,7 +548,7 @@ export async function createKpiReviewDraftAction(formData: FormData): Promise<vo
   }
   const month = monthStart(monthValue);
   const existing = await prisma.kpiReview.findUnique({
-    where: { userId_month: { userId, month } },
+    where: { organizationId_userId_month: { organizationId, userId, month } },
   });
   if (existing) throw new Error("A KPI review already exists for this employee and month");
   const snapshotItems: TemplateItemSnapshot[] = template.items.map((item) => ({
@@ -564,6 +566,7 @@ export async function createKpiReviewDraftAction(formData: FormData): Promise<vo
     const review = await tx.kpiReview.create({
       data: {
         userId,
+        organizationId,
         departmentId: employee.kpiDepartmentId!,
         templateId: template.id,
         month,
@@ -582,6 +585,7 @@ export async function createKpiReviewDraftAction(formData: FormData): Promise<vo
       const created = await tx.kpiReviewItem.create({
         data: {
           reviewId: review.id,
+          organizationId,
           templateItemId: item.id,
           itemKind: "CRITERION",
           name: item.name,
@@ -598,6 +602,7 @@ export async function createKpiReviewDraftAction(formData: FormData): Promise<vo
       ? await tx.kpiReviewItem.create({
           data: {
             reviewId: review.id,
+            organizationId,
             itemKind: "CRITERION",
             name: "General KPI",
             weightage: 0,
@@ -611,6 +616,7 @@ export async function createKpiReviewDraftAction(formData: FormData): Promise<vo
       await tx.kpiReviewItem.create({
         data: {
           reviewId: review.id,
+          organizationId,
           templateItemId: item.id,
           parentItemId: item.parentItemId ? idMap.get(item.parentItemId) : ungroupedCriterion?.id,
           itemKind: "TASK",
@@ -666,6 +672,7 @@ export async function finalizeKpiReviewAction(formData: FormData): Promise<void>
 
 export async function loadPreviousMonthKpiSetupAction(formData: FormData): Promise<void> {
   const session = await requireAdmin();
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const sourceReviewId = text(formData, "sourceReviewId");
   const targetUserId = text(formData, "targetUserId");
   const targetMonthValue = text(formData, "targetMonth");
@@ -677,13 +684,16 @@ export async function loadPreviousMonthKpiSetupAction(formData: FormData): Promi
   const employee = await prisma.user.findUnique({ where: { id: targetUserId }, include: { kpiDepartment: true } });
   if (!source || !employee?.kpiDepartmentId) throw new Error("Cannot load KPI setup");
   const targetMonth = monthStart(targetMonthValue);
-  const existing = await prisma.kpiReview.findUnique({ where: { userId_month: { userId: targetUserId, month: targetMonth } } });
+  const existing = await prisma.kpiReview.findUnique({
+    where: { organizationId_userId_month: { organizationId, userId: targetUserId, month: targetMonth } },
+  });
   if (existing) throw new Error("Target month already has KPI data. Reopen/edit it instead of overwriting.");
 
   await prisma.$transaction(async (tx) => {
     const review = await tx.kpiReview.create({
       data: {
         userId: targetUserId,
+        organizationId,
         departmentId: employee.kpiDepartmentId!,
         templateId: source.templateId,
         month: targetMonth,
@@ -696,6 +706,7 @@ export async function loadPreviousMonthKpiSetupAction(formData: FormData): Promi
       const created = await tx.kpiReviewItem.create({
         data: {
           reviewId: review.id,
+          organizationId,
           templateItemId: item.templateItemId,
           itemKind: "CRITERION",
           name: item.name,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DEFAULT_KPI_MONTHLY_TARGET, KPI_MONTHLY_TARGET_SETTING, calculateAverageRating, calculateCriterionPoints, monthStart } from "@/lib/kpi";
 import { calculateAssignedDayMonthlyRating } from "@/lib/kpi-rules";
@@ -173,7 +173,7 @@ async function loadData(tlId: string, kpiDepartmentId: string | null, month: Dat
         })
       : Promise.resolve([]),
     prisma.workingCalendar.findUnique({ where: { id: "default" } }),
-    prisma.systemSetting.findUnique({ where: { key: KPI_MONTHLY_TARGET_SETTING } }),
+    prisma.systemSetting.findFirst({ where: { key: KPI_MONTHLY_TARGET_SETTING } }),
   ]);
 
   return {

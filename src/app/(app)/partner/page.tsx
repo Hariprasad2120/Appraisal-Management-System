@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
@@ -124,7 +124,7 @@ export default async function PartnerDashboard() {
               <h1 className="text-2xl font-normal text-foreground">
                 Partner Dashboard
               </h1>
-              <p className="text-muted-foreground text-sm mt-0.5">Appraisal &amp; workforce overview - Adarsh Shipping</p>
+              <p className="text-muted-foreground text-sm mt-0.5">Appraisal &amp; workforce overview for your organization</p>
             </div>
           </div>
           <Link
@@ -219,7 +219,7 @@ export default async function PartnerDashboard() {
                       <tr key={e.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-2.5 px-4 text-slate-500 text-xs">{i + 1}</td>
                         <td className="px-4 font-medium text-foreground">
-                          <Link href={`/admin/employees/${e.id}/assign`} className="hover:text-[#00cec4] transition-colors">
+                          <Link href={`/workspace/hrms/employees/${e.id}/assign`} className="hover:text-[#00cec4] transition-colors">
                             {toTitleCase(e.name)}
                           </Link>
                         </td>
@@ -282,7 +282,7 @@ export default async function PartnerDashboard() {
                     return (
                       <tr key={emp.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-2.5 px-4 font-medium text-foreground">
-                          <Link href={`/admin/employees/${emp.id}/assign`} className="hover:text-[#00cec4] transition-colors">
+                          <Link href={`/workspace/hrms/employees/${emp.id}/assign`} className="hover:text-[#00cec4] transition-colors">
                             {toTitleCase(emp.name)}
                           </Link>
                         </td>

@@ -84,7 +84,7 @@ function isWorkingDate(dateKey: string, calendar: WorkingCalendarConfig): boolea
   if (calendar.holidays.includes(dateKey)) return false;
   const dayOfWeek = dateKeyDayOfWeek(dateKey);
   
-  // Custom logic for Adarsh Shipping: 1st and 3rd Saturdays are working, others are holidays.
+  // Default legacy policy: 1st and 3rd Saturdays are working, others are holidays.
   if (dayOfWeek === 6) {
     const dayOfMonth = Number(dateKey.split("-")[2]);
     const weekOfMonth = Math.ceil(dayOfMonth / 7);

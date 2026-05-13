@@ -1,21 +1,17 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import bcrypt from "bcryptjs";
+import { createHash, randomBytes } from "crypto";
 import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
-import bcrypt from "bcryptjs";
-import { createHash, randomBytes } from "crypto";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
+import { setBrowserSessionCookie } from "@/lib/session";
 
 type LoginResult =
-  | { ok: true; challengeToken: string; passkeySetupRequired: boolean }
-  | { ok: false; message: string };
-
-type PasskeyResult =
   | { ok: true; redirectTo: string }
   | { ok: false; message: string };
-
-const passkeyPattern = /^\d{4}$|^\d{6}$/;
 
 function normalizeEmail(email: string) {
   return email.toLowerCase().trim();
@@ -26,10 +22,10 @@ function hashToken(token: string) {
 }
 
 function sanitizeCallbackUrl(value: FormDataEntryValue | null): string {
-  if (typeof value !== "string") return "/";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-  if (value.startsWith("/api/")) return "/";
-  if (/\.[a-z0-9]+(?:$|\?)/i.test(value)) return "/";
+  if (typeof value !== "string") return "/role-redirect";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/role-redirect";
+  if (value.startsWith("/api/")) return "/role-redirect";
+  if (/\.[a-z0-9]+(?:$|\?)/i.test(value)) return "/role-redirect";
   return value;
 }
 
@@ -56,71 +52,12 @@ export async function loginWithCredentials(formData: FormData): Promise<LoginRes
     return { ok: false, message: "Enter your email and password." };
   }
 
-  try {
-    const normalizedEmail = normalizeEmail(email);
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (!user?.active) {
-      return { ok: false, message: "Invalid email or password. Please try again." };
-    }
-    const passwordOk = await bcrypt.compare(password, user.passwordHash);
-    if (!passwordOk) {
-      await prisma.securityEvent.create({
-        data: {
-          userId: user.id,
-          email: normalizedEmail,
-          event: "LOGIN_PASSWORD_STEP",
-          outcome: "FAILED",
-          details: { reason: "INVALID_PASSWORD" },
-        },
-      }).catch(() => null);
-      return { ok: false, message: "Invalid email or password. Please try again." };
-    }
-
-    const challengeToken = randomBytes(32).toString("hex");
-    await prisma.loginChallenge.create({
-      data: {
-        userId: user.id,
-        tokenHash: hashToken(challengeToken),
-        redirectTo,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      },
-    });
-
-    await prisma.securityEvent.create({
-      data: {
-        userId: user.id,
-        email: normalizedEmail,
-        event: "LOGIN_PASSWORD_STEP",
-        outcome: "SUCCESS",
-      },
-    }).catch(() => null);
-
-    return {
-      ok: true,
-      challengeToken,
-      passkeySetupRequired: !user.passkeyHash || user.passkeySetupRequired,
-    };
-  } catch (error) {
-    console.error("Login password step failed", error);
-    return { ok: false, message: "Sign in failed. Please try again." };
-  }
-}
-
-export async function verifyPasskeyAction(formData: FormData): Promise<PasskeyResult> {
-  const challengeToken = formData.get("challengeToken");
-  const passkey = formData.get("passkey");
-  const redirectTo = sanitizeCallbackUrl(formData.get("callbackUrl"));
-  if (typeof challengeToken !== "string" || typeof passkey !== "string") {
-    return { ok: false, message: "Enter your passkey." };
-  }
-  if (!passkeyPattern.test(passkey)) {
-    return { ok: false, message: "Passkey must be 4 or 6 digits." };
-  }
+  const normalizedEmail = normalizeEmail(email);
 
   try {
     const result = await signIn("credentials", {
-      challengeToken,
-      passkey,
+      email: normalizedEmail,
+      password,
       redirectTo,
       redirect: false,
     });
@@ -130,6 +67,7 @@ export async function verifyPasskeyAction(formData: FormData): Promise<PasskeyRe
       return { ok: false, message: "Invalid email or password. Please try again." };
     }
 
+    await setBrowserSessionCookie();
     return { ok: true, redirectTo: safeRedirect };
   } catch (error) {
     if (error instanceof AuthError) {
@@ -138,51 +76,6 @@ export async function verifyPasskeyAction(formData: FormData): Promise<PasskeyRe
     console.error("Login failed", error);
     return { ok: false, message: "Sign in failed. Please try again." };
   }
-}
-
-export async function setupPasskeyAction(formData: FormData): Promise<PasskeyResult> {
-  const challengeToken = formData.get("challengeToken");
-  const passkey = formData.get("passkey");
-  const confirmPasskey = formData.get("confirmPasskey");
-  if (typeof challengeToken !== "string" || typeof passkey !== "string" || typeof confirmPasskey !== "string") {
-    return { ok: false, message: "Enter and confirm your passkey." };
-  }
-  if (passkey !== confirmPasskey) return { ok: false, message: "Passkeys do not match." };
-  if (!passkeyPattern.test(passkey)) return { ok: false, message: "Passkey must be 4 or 6 digits." };
-
-  const challenge = await prisma.loginChallenge.findUnique({
-    where: { tokenHash: hashToken(challengeToken) },
-    include: { user: true },
-  });
-  if (!challenge || challenge.usedAt || challenge.expiresAt < new Date()) {
-    return { ok: false, message: "Your login verification expired. Please sign in again." };
-  }
-  const openReset = await prisma.passkeyResetRequest.findFirst({
-    where: { userId: challenge.userId, status: "APPROVED" },
-    orderBy: { requestedAt: "desc" },
-  });
-  const allowed = !challenge.user.passkeyHash || challenge.user.passkeySetupRequired || Boolean(openReset);
-  if (!allowed) return { ok: false, message: "Passkey setup is not approved for this account." };
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: challenge.userId },
-      data: { passkeyHash: await bcrypt.hash(passkey, 10), passkeySetupRequired: false },
-    }),
-    ...(openReset
-      ? [prisma.passkeyResetRequest.update({ where: { id: openReset.id }, data: { status: "COMPLETED" } })]
-      : []),
-    prisma.securityEvent.create({
-      data: {
-        userId: challenge.userId,
-        email: challenge.user.email,
-        event: "PASSKEY_SETUP",
-        outcome: "SUCCESS",
-      },
-    }),
-  ]);
-
-  return verifyPasskeyAction(formData);
 }
 
 export async function requestPasswordResetAction(formData: FormData) {
@@ -194,13 +87,14 @@ export async function requestPasswordResetAction(formData: FormData) {
       const token = randomBytes(32).toString("hex");
       await prisma.passwordResetToken.create({
         data: {
+          organizationId: user.organizationId ?? DEFAULT_ORGANIZATION_ID,
           userId: user.id,
           tokenHash: hashToken(token),
           expiresAt: new Date(Date.now() + 30 * 60 * 1000),
         },
       });
       await prisma.securityEvent.create({
-        data: { userId: user.id, email, event: "PASSWORD_RESET_REQUEST", outcome: "SUCCESS" },
+        data: { organizationId: user.organizationId ?? DEFAULT_ORGANIZATION_ID, userId: user.id, email, event: "PASSWORD_RESET_REQUEST", outcome: "SUCCESS" },
       });
       const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
       const resetUrl = new URL(`/login/reset?token=${token}`, baseUrl).toString();
@@ -233,20 +127,7 @@ export async function resetPasswordAction(formData: FormData) {
   await prisma.$transaction([
     prisma.user.update({ where: { id: reset.userId }, data: { passwordHash: await bcrypt.hash(password, 10) } }),
     prisma.passwordResetToken.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
-    prisma.securityEvent.create({ data: { userId: reset.userId, email: reset.user.email, event: "PASSWORD_RESET_COMPLETED", outcome: "SUCCESS" } }),
+    prisma.securityEvent.create({ data: { organizationId: reset.user.organizationId ?? DEFAULT_ORGANIZATION_ID, userId: reset.userId, email: reset.user.email, event: "PASSWORD_RESET_COMPLETED", outcome: "SUCCESS" } }),
   ]);
   return { ok: true, message: "Password updated. You can sign in now." };
-}
-
-export async function requestPasskeyResetAction(formData: FormData) {
-  const emailRaw = formData.get("email");
-  if (typeof emailRaw === "string") {
-    const email = normalizeEmail(emailRaw);
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (user?.active) {
-      await prisma.passkeyResetRequest.create({ data: { userId: user.id } });
-      await prisma.securityEvent.create({ data: { userId: user.id, email, event: "PASSKEY_RESET_REQUEST", outcome: "SUCCESS" } });
-    }
-  }
-  return { ok: true, message: "If the account exists, your admin will review the passkey reset request." };
 }

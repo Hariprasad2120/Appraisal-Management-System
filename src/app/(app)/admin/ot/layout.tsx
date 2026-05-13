@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 function isAdminOrHR(role: string, secondary?: string | null) {

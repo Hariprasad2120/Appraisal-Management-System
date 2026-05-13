@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { getSystemDate } from "@/lib/system-date";
 
 type Result = { ok: true } | { ok: false; error: string };

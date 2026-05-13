@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { daysUntilAnniversary } from "@/lib/business-days";
 import { toTitleCase } from "@/lib/utils";
@@ -21,6 +21,7 @@ import { Eye, Pencil } from "lucide-react";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { Button } from "@/components/ui/button";
 import { KpiTaskTimeline } from "@/components/kpi-task-timeline";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 import {
   Calendar,
   Star,
@@ -93,6 +94,7 @@ function latestEventReason(
 export default async function EmployeeDashboard() {
   const session = await auth();
   if (!session?.user) return null;
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     include: { salary: true },
@@ -102,13 +104,13 @@ export default async function EmployeeDashboard() {
   const currentMonth = monthStart(new Date());
   const [recentNotifs, salaryRevisions, monthlyKpis, workingCalendar] = await Promise.all([
     prisma.notification.findMany({
-      where: { userId: user.id, read: false },
+      where: { organizationId, userId: user.id, read: false },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, message: true, link: true, createdAt: true },
     }),
     prisma.salaryRevision.findMany({
-      where: { userId: user.id },
+      where: { organizationId, userId: user.id },
       orderBy: { effectiveFrom: "desc" },
       take: 6,
       select: {
@@ -120,7 +122,7 @@ export default async function EmployeeDashboard() {
       },
     }),
     prisma.kpiReview.findMany({
-      where: { userId: user.id },
+      where: { organizationId, userId: user.id },
       orderBy: { month: "desc" },
       take: 6,
       include: {
@@ -142,7 +144,7 @@ export default async function EmployeeDashboard() {
   ]);
 
   const cycles = await prisma.appraisalCycle.findMany({
-    where: { userId: user.id },
+    where: { organizationId, userId: user.id },
     orderBy: { createdAt: "desc" },
     take: 5,
     include: {
@@ -610,7 +612,7 @@ export default async function EmployeeDashboard() {
                           )}
                           <span className="text-sm text-foreground flex-1">
                             <Link
-                              href={`/admin/employees/${a.reviewer.id}/assign`}
+                              href={`/workspace/hrms/employees/${a.reviewer.id}/assign`}
                               className="transition-colors hover:text-primary hover:underline"
                             >
                               {toTitleCase(a.reviewer.name)}
@@ -749,7 +751,7 @@ export default async function EmployeeDashboard() {
                               )}
                               <span className="text-sm text-foreground flex-1">
                                 <Link
-                                  href={`/admin/employees/${a.reviewer.id}/assign`}
+                                  href={`/workspace/hrms/employees/${a.reviewer.id}/assign`}
                                   className="transition-colors hover:text-primary hover:underline"
                                 >
                                   {toTitleCase(a.reviewer.name)}

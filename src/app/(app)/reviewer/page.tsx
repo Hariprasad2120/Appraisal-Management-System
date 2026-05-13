@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   getVisibleAverageForReviewer,
@@ -522,7 +522,7 @@ export default async function ReviewerDashboard() {
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <Link
-                                  href={`/admin/employees/${assignment.cycle.user.id}/assign`}
+                                  href={`/workspace/hrms/employees/${assignment.cycle.user.id}/assign`}
                                   className="block truncate text-sm font-semibold text-foreground transition-colors hover:text-primary hover:underline"
                                 >
                                   {toTitleCase(assignment.cycle.user.name)}

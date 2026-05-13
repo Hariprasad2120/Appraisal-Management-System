@@ -27,7 +27,6 @@ export default function OtDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/api/ot/dashboard?month=${month}`)
       .then((r) => r.json())
       .then((d) => setData(d))
@@ -60,7 +59,10 @@ export default function OtDashboardPage() {
           <input
             type="month"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(e) => {
+              setLoading(true);
+              setMonth(e.target.value);
+            }}
             className="rounded-xl border border-border bg-background px-4 py-2 text-sm focus:ring-2 focus:ring-primary/40 outline-none"
           />
         </div>

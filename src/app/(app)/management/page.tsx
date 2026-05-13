@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCachedSession as auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
@@ -20,6 +20,7 @@ import type { CycleStatus } from "@/generated/prisma/enums";
 import dynamic from "next/dynamic";
 import { getSystemDate } from "@/lib/system-date";
 import { getSlabs } from "@/lib/slabs";
+import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 const ManagementCharts = dynamic(
   () => import("./management-charts").then((m) => m.ManagementCharts),
@@ -53,10 +54,13 @@ const ALL_STATUSES: CycleStatus[] = [
 
 export default async function ManagementDashboard() {
   const session = await auth();
+  if (!session?.user) return null;
+  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const now = await getSystemDate();
 
   const [cycles, slabs, allEmployees, recentNotifs] = await Promise.all([
     prisma.appraisalCycle.findMany({
+      where: { organizationId },
       select: {
         id: true,
         status: true,
@@ -95,14 +99,14 @@ export default async function ManagementDashboard() {
     }),
     getSlabs(),
     prisma.user.findMany({
-      where: { active: true, role: { notIn: ["MANAGEMENT", "PARTNER", "ADMIN"] } },
+      where: { organizationId, active: true, role: { notIn: ["MANAGEMENT", "PARTNER", "ADMIN"] } },
       select: {
         id: true,
         name: true,
         salary: { select: { grossAnnum: true, ctcAnnum: true, basic: true } },
         _count: { select: { cyclesAsEmployee: true } },
         cyclesAsEmployee: {
-          where: { status: "DECIDED" },
+          where: { organizationId, status: "DECIDED" },
           select: {
             ratings: { select: { averageScore: true } },
             decision: {
@@ -117,14 +121,12 @@ export default async function ManagementDashboard() {
       },
       orderBy: { name: "asc" },
     }),
-    session?.user
-      ? prisma.notification.findMany({
-          where: { userId: session.user.id, read: false },
+    prisma.notification.findMany({
+          where: { organizationId, userId: session.user.id, read: false },
           orderBy: { createdAt: "desc" },
           take: 5,
           select: { id: true, message: true, link: true, createdAt: true },
-        })
-      : Promise.resolve([] as { id: string; message: string; link: string | null; createdAt: Date }[]),
+        }),
   ]);
 
   const getDisplayStatus = (cycle: (typeof cycles)[number]) => computeCycleStatus(cycle, now);
@@ -331,7 +333,7 @@ export default async function ManagementDashboard() {
                         <td className="py-2.5 px-4 text-muted-foreground text-xs">{i + 1}</td>
                         <td className="px-4 font-medium text-foreground">
                           <Link
-                            href={`/admin/employees/${e.id}/assign`}
+                            href={`/workspace/hrms/employees/${e.id}/assign`}
                             className="hover:text-primary transition-colors"
                           >
                             {toTitleCase(e.name)}
@@ -439,7 +441,7 @@ export default async function ManagementDashboard() {
                       <tr key={c.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-3 px-4 font-medium text-foreground">
                           <Link
-                            href={`/admin/employees/${c.userId}/assign`}
+                            href={`/workspace/hrms/employees/${c.userId}/assign`}
                             className="hover:text-primary transition-colors"
                           >
                             {toTitleCase(c.user.name)}
@@ -567,7 +569,7 @@ export default async function ManagementDashboard() {
                       <tr key={emp.id} className="hover:bg-muted/40 transition-colors">
                         <td className="py-2.5 px-4 font-medium text-foreground">
                           <Link
-                            href={`/admin/employees/${emp.id}/assign`}
+                            href={`/workspace/hrms/employees/${emp.id}/assign`}
                             className="hover:text-primary transition-colors"
                           >
                             {toTitleCase(emp.name)}
@@ -596,7 +598,7 @@ export default async function ManagementDashboard() {
                         </td>
                         <td className="px-4">
                           <Link
-                            href={`/admin/employees/${emp.id}`}
+                            href={`/workspace/hrms/employees/${emp.id}`}
                             className="text-xs text-muted-foreground hover:text-primary transition-colors"
                           >
                             View →

@@ -18,6 +18,99 @@ enum Role {
   PARTNER
 }
 
+enum PlatformRole {
+  PLATFORM_SUPER_ADMIN
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum AccountRole {
+  ACCOUNT_OWNER
+  ACCOUNT_ADMIN
+}
+
+enum AccountStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  ARCHIVED
+}
+
+enum AccountMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
+enum InviteScopeType {
+  ACCOUNT
+  ORGANIZATION
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum OrganizationRole {
+  ORG_OWNER
+  ORG_ADMIN
+  MANAGEMENT
+  HR
+  MANAGER
+  TEAM_LEAD
+  EMPLOYEE
+  PARTNER_OR_DIRECTOR
+  APPRAISAL_ADMIN
+}
+
+enum OrganizationStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum OrganizationUserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum OrganizationAccessStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
 enum ReviewerRole {
   HR
   TL
@@ -166,16 +259,404 @@ enum KpiTaskEventType {
   ADMIN_OVERRIDE
 }
 
+model Account {
+  id             String        @id @default(cuid())
+  slug           String        @unique
+  name           String
+  status         AccountStatus @default(TRIAL)
+  ownerUserId    String?
+  ownerUser      User?         @relation("AccountOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organizations  Organization[]
+  memberships    AccountMembership[]
+  subscriptions  Subscription[]
+  modules        AccountModule[]
+  invites        Invite[]
+
+  @@index([status, createdAt])
+}
+
+model Plan {
+  id               String       @id @default(cuid())
+  key              String       @unique
+  name             String
+  priceMonthly     Decimal?     @db.Decimal(12, 2)
+  priceYearly      Decimal?     @db.Decimal(12, 2)
+  priceDisplay     String?
+  maxOrganizations Int?
+  maxEmployees     Int?
+  allowedModules   Json?
+  features         Json?
+  status           PlanStatus   @default(ACTIVE)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  subscriptions    Subscription[]
+  accountModules   AccountModule[]
+}
+
+model Subscription {
+  id         String             @id @default(cuid())
+  accountId  String
+  account    Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  planId     String
+  plan       Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status     SubscriptionStatus @default(TRIAL)
+  startedAt  DateTime?
+  endsAt     DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([accountId, status])
+  @@index([planId, status])
+}
+
+model AccountMembership {
+  id          String                  @id @default(cuid())
+  accountId   String
+  account     Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        AccountRole
+  status      AccountMembershipStatus @default(ACTIVE)
+  invitedById String?
+  invitedBy   User?                   @relation("AccountMembershipInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@unique([accountId, userId])
+  @@index([userId, status])
+  @@index([accountId, role, status])
+}
+
+model AccountModule {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  planId     String?
+  plan       Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  moduleId   String
+  module     Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  enabled    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([accountId, moduleId])
+  @@index([accountId, enabled])
+}
+
+model Invite {
+  id              String          @id @default(cuid())
+  scopeType       InviteScopeType
+  accountId       String?
+  account         Account?        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  organizationId  String?
+  organization    Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email           String
+  emailNormalized String
+  name            String?
+  accountRole     AccountRole?
+  organizationRole OrganizationRole?
+  branchId        String?
+  departmentId    String?
+  teamLeadId      String?
+  managerId       String?
+  reviewerId      String?
+  tokenHash       String          @unique
+  status          InviteStatus    @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  invitedById     String?
+  invitedBy       User?           @relation("InviteSentBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedUserId  String?
+  acceptedUser    User?           @relation("InviteAcceptedUser", fields: [acceptedUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([emailNormalized, status])
+  @@index([accountId, status])
+  @@index([organizationId, status])
+  @@index([scopeType, expiresAt])
+}
+
+model Organization {
+  id             String             @id @default(cuid())
+  accountId      String
+  account        Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  slug           String             @unique
+  name           String
+  legalName      String?
+  industry       String?
+  logoUrl        String?
+  primaryColor   String?
+  address        String?
+  contactEmail   String?
+  contactPhone   String?
+  status         OrganizationStatus @default(PENDING)
+  explicitlyAllowsPlatformDataAccess Boolean @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  branches       Branch[]
+  departments    Department[]
+  divisions      Division[]
+  designations   Designation[]
+  memberships    OrganizationUser[]
+  roleAssignments UserRoleAssignment[]
+  reporting      ReportingHierarchy[]
+  modules        OrganizationModule[]
+  access         OrganizationAccess?
+  settings       OrganizationSettings?
+  invites        Invite[]
+
+  @@index([accountId, status])
+  @@index([status, createdAt])
+}
+
+model Branch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  code           String?
+  address        String?
+  city           String?
+  state          String?
+  country        String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  departments    Department[]
+  memberships    OrganizationUser[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  name           String
+  code           String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  divisions      Division[]
+  designations   Designation[]
+  memberships    OrganizationUser[]
+
+  @@unique([organizationId, branchId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+  @@index([branchId])
+}
+
+model Division {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  name           String
+  code           String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  memberships    OrganizationUser[]
+
+  @@unique([organizationId, departmentId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+  @@index([departmentId])
+}
+
+model Designation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  name           String
+  code           String?
+  level          Int?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  memberships    OrganizationUser[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+}
+
+model OrganizationUser {
+  id             String                 @id @default(cuid())
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  departmentId   String?
+  department     Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  divisionId     String?
+  division       Division?              @relation(fields: [divisionId], references: [id], onDelete: SetNull)
+  designationId  String?
+  designation    Designation?           @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  status         OrganizationUserStatus @default(ACTIVE)
+  joinedAt       DateTime               @default(now())
+  invitedById    String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  roleAssignments UserRoleAssignment[]
+
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@index([organizationId, status])
+  @@index([branchId])
+  @@index([departmentId])
+}
+
+model UserRoleAssignment {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membershipId   String?
+  membership     OrganizationUser? @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role           OrganizationRole
+  branchId       String?
+  departmentId   String?
+  createdAt      DateTime         @default(now())
+  createdById    String?
+
+  @@unique([organizationId, userId, role, branchId, departmentId])
+  @@index([organizationId, role])
+  @@index([userId, role])
+  @@index([membershipId])
+}
+
+model ReportingHierarchy {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       User         @relation("HierarchyEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  teamLeadId     String?
+  teamLead       User?        @relation("HierarchyTeamLead", fields: [teamLeadId], references: [id], onDelete: SetNull)
+  managerId      String?
+  manager        User?        @relation("HierarchyManager", fields: [managerId], references: [id], onDelete: SetNull)
+  managementId   String?
+  management     User?        @relation("HierarchyManagement", fields: [managementId], references: [id], onDelete: SetNull)
+  active         Boolean      @default(true)
+  effectiveFrom  DateTime     @default(now())
+  effectiveTo    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, active])
+  @@index([employeeId, active])
+  @@index([teamLeadId])
+  @@index([managerId])
+  @@index([managementId])
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizations OrganizationModule[]
+  accountModules AccountModule[]
+}
+
+model OrganizationModule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  moduleId       String
+  module         Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  enabled        Boolean      @default(false)
+  enabledAt      DateTime?
+  enabledById    String?
+  disabledAt     DateTime?
+  disabledById   String?
+  settings       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, moduleId])
+  @@index([organizationId, enabled])
+}
+
+model OrganizationAccess {
+  id             String                   @id @default(cuid())
+  organizationId String                   @unique
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  status         OrganizationAccessStatus @default(TRIAL)
+  planName       String?
+  seatsLimit     Int?
+  startsAt       DateTime?
+  renewsAt       DateTime?
+  expiresAt      DateTime?
+  suspendedAt    DateTime?
+  notes          String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model OrganizationSettings {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  timezone       String       @default("Asia/Kolkata")
+  locale         String       @default("en-IN")
+  dateFormat     String       @default("dd/MM/yyyy")
+  appraisalSettings Json?
+  branding       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
+  emailNormalized String @unique
   passwordHash  String
   passkeyHash   String?
   passkeySetupRequired Boolean @default(true)
   googleLoginAllowed   Boolean @default(false)
   name          String
+  status        UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
   role          Role
   secondaryRole Role?
+  platformRole  PlatformRole?
+  organizationId String @default("default-org")
+  activeOrganizationId String?
+  branchId      String?
+  departmentId  String?
+  divisionId    String?
+  designationId String?
+  teamLeadId    String?
   department    String?
   kpiDepartmentId String?
   kpiDepartment   KpiDepartment? @relation("UserKpiDepartment", fields: [kpiDepartmentId], references: [id], onDelete: SetNull)
@@ -264,13 +745,53 @@ model User {
   employeeOtRecords      EmployeeOt[]     @relation("EmployeeOtRecords")
   otApprovals            EmployeeOt[]     @relation("OtApprovedBy")
   employeeLopRecords     EmployeeLop[]    @relation("EmployeeLopRecords")
+  ownedAccounts          Account[]        @relation("AccountOwner")
+  accountMemberships     AccountMembership[]
+  accountMembershipInvites AccountMembership[] @relation("AccountMembershipInvitedBy")
+  organizationMemberships OrganizationUser[]
+  organizationRoles       UserRoleAssignment[]
+  hierarchyAsEmployee     ReportingHierarchy[] @relation("HierarchyEmployee")
+  hierarchyAsTeamLead     ReportingHierarchy[] @relation("HierarchyTeamLead")
+  hierarchyAsManager      ReportingHierarchy[] @relation("HierarchyManager")
+  hierarchyAsManagement   ReportingHierarchy[] @relation("HierarchyManagement")
+  invitesSent            Invite[]         @relation("InviteSentBy")
+  acceptedInvites        Invite[]         @relation("InviteAcceptedUser")
+
+  // HRMS relations
+  policiesCreated        Policy[]              @relation("PolicyCreatedBy")
+  employeeDocuments      EmployeeDocument[]    @relation("EmployeeDocuments")
+  offerTemplatesCreated  OfferLetterTemplate[] @relation("OfferTemplateCreatedBy")
+  loans                  Loan[]               @relation("EmployeeLoans")
+  loansApproved          Loan[]               @relation("LoanApprovedBy")
+  advances               Advance[]            @relation("EmployeeAdvances")
+  advancesApproved       Advance[]            @relation("AdvanceApprovedBy")
+  announcementsCreated   Announcement[]       @relation("AnnouncementCreatedBy")
+  employeeOfMonthWins    EmployeeOfMonth[]    @relation("EmployeeOfMonthWinners")
+  employeeOfMonthAwarded EmployeeOfMonth[]    @relation("EmployeeOfMonthAwardedBy")
+
+  // Attendance expansion relations
+  employeeShifts         EmployeeShift[]      @relation("EmployeeShifts")
+  shiftsAssigned         EmployeeShift[]      @relation("ShiftAssignedBy")
+  leaveBalances          LeaveBalance[]       @relation("EmployeeLeaveBalances")
+  leaveRequests          LeaveRequest[]       @relation("EmployeeLeaveRequests")
+  leaveApprovals         LeaveRequest[]       @relation("LeaveApprovedBy")
+  permissionRequests     PermissionRequest[]  @relation("EmployeePermissionRequests")
+  permissionApprovals    PermissionRequest[]  @relation("PermissionApprovedBy")
+  workReports            WorkReport[]         @relation("EmployeeWorkReports")
 
   @@index([role, active])
+  @@index([status, active])
+  @@index([organizationId, role, active])
+  @@index([organizationId, employeeNumber])
+  @@index([branchId])
+  @@index([departmentId])
+  @@index([teamLeadId])
   @@index([kpiDepartmentId])
 }
 
 model KpiDepartment {
   id        String   @id @default(cuid())
+  organizationId String @default("default-org")
   name      String
   parentId  String?
   parent    KpiDepartment?  @relation("KpiDepartmentTree", fields: [parentId], references: [id], onDelete: Cascade)
@@ -286,12 +807,14 @@ model KpiDepartment {
   criteria  KpiCriterion[]
   criteriaAsDivision KpiCriterion[] @relation("KpiCriterionDivision")
 
-  @@unique([parentId, name])
+  @@unique([organizationId, parentId, name])
+  @@index([organizationId, active])
   @@index([parentId, active, sortOrder])
 }
 
 model KpiTemplate {
   id           String        @id @default(cuid())
+  organizationId String      @default("default-org")
   departmentId String
   department   KpiDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   name         String
@@ -304,10 +827,12 @@ model KpiTemplate {
   reviews KpiReview[]
 
   @@index([departmentId, active])
+  @@index([organizationId, active])
 }
 
 model KpiTemplateItem {
   id           String      @id @default(cuid())
+  organizationId String    @default("default-org")
   templateId   String
   template     KpiTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   parentItemId String?
@@ -327,11 +852,13 @@ model KpiTemplateItem {
   reviewItems KpiReviewItem[]
 
   @@index([templateId, active, sortOrder])
+  @@index([organizationId])
   @@index([parentItemId, sortOrder])
 }
 
 model KpiReview {
   id                       String          @id @default(cuid())
+  organizationId           String          @default("default-org")
   userId                   String
   user                     User            @relation("KpiReviewEmployee", fields: [userId], references: [id], onDelete: Cascade)
   departmentId             String
@@ -357,13 +884,15 @@ model KpiReview {
   items KpiReviewItem[]
   kpiTasks KpiTask[]
 
-  @@unique([userId, month])
+  @@unique([organizationId, userId, month])
   @@index([month, status])
+  @@index([organizationId, month, status])
   @@index([departmentId, month])
 }
 
 model KpiReviewItem {
   id                    String           @id @default(cuid())
+  organizationId        String           @default("default-org")
   reviewId              String
   review                KpiReview        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   templateItemId         String?
@@ -392,12 +921,14 @@ model KpiReviewItem {
   sortOrder             Int              @default(0)
 
   @@index([reviewId, sortOrder])
+  @@index([organizationId])
   @@index([parentItemId, sortOrder])
   @@index([approvalStatus])
 }
 
 model EmployeeSalary {
   id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
   userId         String   @unique
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   grossAnnum     Decimal  @default(0) @db.Decimal(12, 2)
@@ -410,10 +941,13 @@ model EmployeeSalary {
   fixedAllowance Decimal  @default(0) @db.Decimal(12, 2)
   stipend        Decimal  @default(0) @db.Decimal(12, 2)
   updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model SalaryRevision {
   id                  String   @id @default(cuid())
+  organizationId      String   @default("default-org")
   userId              String
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   status              String   // "Approved" | "Pending" | "Rejected"
@@ -434,10 +968,14 @@ model SalaryRevision {
   createdAt           DateTime @default(now())
 
   @@index([userId, effectiveFrom])
+  @@index([organizationId, effectiveFrom])
 }
 
 model AppraisalCycle {
   id               String      @id @default(cuid())
+  organizationId   String      @default("default-org")
+  branchId         String?
+  departmentId     String?
   userId           String
   user             User        @relation("EmpCycles", fields: [userId], references: [id])
   type             CycleType
@@ -450,6 +988,9 @@ model AppraisalCycle {
   ratingDeadline   DateTime?
   claimedById      String?
   claimedBy        User?       @relation("CycleClaimedBy", fields: [claimedById], references: [id])
+  managerId        String?
+  teamLeadId       String?
+  reportingToId    String?
   claimedAt        DateTime?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -468,12 +1009,16 @@ model AppraisalCycle {
   reschedules         MeetingReschedule[]
 
   @@index([userId, status])
+  @@index([organizationId, status, startDate])
+  @@index([organizationId, branchId, departmentId])
+  @@index([organizationId, createdAt])
   @@index([startDate])
   @@index([status, claimedById])
 }
 
 model SelfAssessment {
   id             String                 @id @default(cuid())
+  organizationId String                 @default("default-org")
   cycleId        String                 @unique
   cycle          AppraisalCycle         @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   answers        Json
@@ -483,10 +1028,13 @@ model SelfAssessment {
   locked         Boolean                @default(false)
   editCount      Int                    @default(0)
   status         SelfAssessmentStatus   @default(DRAFT)
+
+  @@index([organizationId])
 }
 
 model CycleAssignment {
   id                      String               @id @default(cuid())
+  organizationId          String               @default("default-org")
   cycleId                 String
   cycle                   AppraisalCycle       @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   reviewerId              String
@@ -499,11 +1047,13 @@ model CycleAssignment {
   assignedBy              User                 @relation("AssignedBy", fields: [assignedById], references: [id])
 
   @@unique([cycleId, role])
+  @@index([organizationId])
   @@index([reviewerId])
 }
 
 model Rating {
   id           String         @id @default(cuid())
+  organizationId String       @default("default-org")
   cycleId      String
   cycle        AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   reviewerId   String
@@ -520,11 +1070,13 @@ model Rating {
   disagreement       RatingDisagreement?
 
   @@unique([cycleId, role])
+  @@index([organizationId])
   @@index([reviewerId])
 }
 
 model DateVote {
   id        String         @id @default(cuid())
+  organizationId String    @default("default-org")
   cycleId   String
   cycle     AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   voterId   String
@@ -533,11 +1085,13 @@ model DateVote {
   createdAt DateTime       @default(now())
 
   @@unique([cycleId, voterId])
+  @@index([organizationId])
   @@index([cycleId, date])
 }
 
 model MOM {
   id        String         @id @default(cuid())
+  organizationId String    @default("default-org")
   cycleId   String
   cycle     AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   /// Role perspective that owns this record: "ADMIN" | "MANAGEMENT" | "HR"
@@ -549,11 +1103,13 @@ model MOM {
   updatedAt DateTime       @updatedAt
 
   @@unique([cycleId, role])
+  @@index([organizationId])
   @@index([cycleId])
 }
 
 model AppraisalDecision {
   id                String         @id @default(cuid())
+  organizationId    String         @default("default-org")
   cycleId           String         @unique
   cycle             AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   averagedRating    Float?
@@ -568,10 +1124,13 @@ model AppraisalDecision {
   decidedById       String
   decidedBy         User           @relation("DecidedBy", fields: [decidedById], references: [id])
   decidedAt         DateTime       @default(now())
+
+  @@index([organizationId])
 }
 
 model IncrementSlab {
   id          String  @id @default(cuid())
+  organizationId String @default("default-org")
   label       String
   grade       String  @default("")
   minRating   Float
@@ -582,10 +1141,12 @@ model IncrementSlab {
   decisions AppraisalDecision[]
 
   @@index([minRating, maxRating])
+  @@index([organizationId, minRating, maxRating])
 }
 
 model ExtensionRequest {
   id            String          @id @default(cuid())
+  organizationId String         @default("default-org")
   cycleId       String
   cycle         AppraisalCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   requesterId   String
@@ -597,10 +1158,13 @@ model ExtensionRequest {
   decidedBy     User?           @relation("ExtDecider", fields: [decidedById], references: [id])
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+
+  @@index([organizationId, status])
 }
 
 model Notification {
   id             String    @id @default(cuid())
+  organizationId String    @default("default-org")
   userId         String
   user           User      @relation(fields: [userId], references: [id])
   type           String
@@ -623,12 +1187,14 @@ model Notification {
   retriggerLogs  MessageRetriggerLog[]
 
   @@index([userId, read])
+  @@index([organizationId, createdAt])
   @@index([userId, dismissed])
   @@index([userId, critical, dismissed])
 }
 
 model LoginChallenge {
   id        String   @id @default(cuid())
+  organizationId String @default("default-org")
   tokenHash String   @unique
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -639,10 +1205,12 @@ model LoginChallenge {
   createdAt DateTime @default(now())
 
   @@index([userId, expiresAt])
+  @@index([organizationId, expiresAt])
 }
 
 model PasswordResetToken {
   id        String   @id @default(cuid())
+  organizationId String @default("default-org")
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash String   @unique
@@ -651,10 +1219,12 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId, expiresAt])
+  @@index([organizationId, expiresAt])
 }
 
 model PasskeyResetRequest {
   id          String   @id @default(cuid())
+  organizationId String @default("default-org")
   userId      String
   user        User     @relation("PasskeyResetUser", fields: [userId], references: [id], onDelete: Cascade)
   status      String   @default("PENDING")
@@ -665,11 +1235,13 @@ model PasskeyResetRequest {
   reason      String?
 
   @@index([status, requestedAt])
+  @@index([organizationId, status])
   @@index([userId, status])
 }
 
 model MessageRetriggerLog {
   id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
   actorId        String
   actor          User     @relation("MessageRetriggerActor", fields: [actorId], references: [id])
   recipientId    String
@@ -682,11 +1254,13 @@ model MessageRetriggerLog {
   createdAt      DateTime @default(now())
 
   @@index([actorId, createdAt])
+  @@index([organizationId, createdAt])
   @@index([recipientId, createdAt])
 }
 
 model AuditLog {
   id        String          @id @default(cuid())
+  organizationId String     @default("default-org")
   cycleId   String?
   cycle     AppraisalCycle? @relation(fields: [cycleId], references: [id])
   actorId   String
@@ -697,12 +1271,15 @@ model AuditLog {
   createdAt DateTime        @default(now())
 
   @@index([cycleId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action, createdAt])
 }
 
 /// Security and access trail for login attempts plus session lifecycle events.
 /// userId is nullable so failed login attempts for unknown/inactive users remain traceable.
 model SecurityEvent {
   id           String   @id @default(cuid())
+  organizationId String @default("default-org")
   userId       String?
   user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   email        String?
@@ -715,6 +1292,7 @@ model SecurityEvent {
   createdAt    DateTime @default(now())
 
   @@index([event, outcome, createdAt])
+  @@index([organizationId, createdAt])
   @@index([userId, createdAt])
   @@index([email, createdAt])
   @@index([sessionToken, createdAt])
@@ -723,6 +1301,7 @@ model SecurityEvent {
 /// Tracks each authenticated user session for admin monitoring.
 model UserSession {
   id          String    @id @default(cuid())
+  organizationId String @default("default-org")
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// JWT session token identifier (sub claim or random token)
@@ -738,15 +1317,22 @@ model UserSession {
   location    String?
 
   @@index([userId, status])
+  @@index([organizationId, status])
   @@index([status, lastSeenAt])
 }
 
 /// Admin-configurable key/value settings store.
 model SystemSetting {
-  key       String   @id
+  id        String   @id @default(cuid())
+  organizationId String @default("default-org")
+  key       String
   value     String
   updatedAt DateTime @updatedAt
   updatedById String?
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@index([key])
 }
 
 /// Admin-editable override for criteria category questions.
@@ -754,16 +1340,21 @@ model SystemSetting {
 /// questions replaces that category's default question list.
 model CriteriaOverride {
   id           String   @id @default(cuid())
-  categoryName String   @unique
+  organizationId String @default("default-org")
+  categoryName String
   questions    Json     // string[]
   maxPoints    Int?     // override default maxPoints; null = use default
   updatedAt    DateTime @updatedAt
   updatedById  String
   updatedBy    User     @relation(fields: [updatedById], references: [id])
+
+  @@unique([organizationId, categoryName])
+  @@index([organizationId])
 }
 
 model Ticket {
   id          String         @id @default(cuid())
+  organizationId String      @default("default-org")
   raisedById  String
   raisedBy    User           @relation("TicketRaiser", fields: [raisedById], references: [id])
   assigneeId  String?
@@ -780,11 +1371,13 @@ model Ticket {
   comments    TicketComment[]
 
   @@index([raisedById, status])
+  @@index([organizationId, status, createdAt])
   @@index([status, createdAt])
 }
 
 model TicketComment {
   id        String   @id @default(cuid())
+  organizationId String @default("default-org")
   ticketId  String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   authorId  String
@@ -793,12 +1386,14 @@ model TicketComment {
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
+  @@index([organizationId, createdAt])
 }
 
 /// Arrear record for a cycle — computed when meeting is late (>7 days after self-assessment submitted).
 /// Locked once approved by management.
 model Arrear {
   id            String        @id @default(cuid())
+  organizationId String       @default("default-org")
   cycleId       String        @unique
   cycle         AppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   userId        String
@@ -827,12 +1422,14 @@ model Arrear {
   updatedAt     DateTime      @updatedAt
 
   @@index([userId, status])
+  @@index([organizationId, status])
   @@index([cycleId])
 }
 
 /// Reschedule record when a meeting does not occur on the scheduled date.
 model MeetingReschedule {
   id             String           @id @default(cuid())
+  organizationId String           @default("default-org")
   cycleId        String
   cycle          AppraisalCycle   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
@@ -852,12 +1449,14 @@ model MeetingReschedule {
   createdAt      DateTime         @default(now())
 
   @@index([cycleId, createdAt])
+  @@index([organizationId, createdAt])
 }
 
 /// Reviewer evaluation of their own submitted rating (Accurate/Overrated/Underrated).
 /// Defines negotiation ceiling for management.
 model RatingDisagreement {
   id             String          @id @default(cuid())
+  organizationId String         @default("default-org")
   ratingId       String          @unique
   rating         Rating          @relation(fields: [ratingId], references: [id], onDelete: Cascade)
   cycleId        String
@@ -875,12 +1474,14 @@ model RatingDisagreement {
   updatedAt      DateTime        @updatedAt
 
   @@index([cycleId])
+  @@index([organizationId])
 }
 
 /// Post-comment review layer — reviewer can submit a revised rating per criterion
 /// without overwriting the original Rating record.
 model RatingReview {
   id           String   @id @default(cuid())
+  organizationId String @default("default-org")
   ratingId     String
   rating       Rating   @relation(fields: [ratingId], references: [id], onDelete: Cascade)
   cycleId      String
@@ -895,6 +1496,7 @@ model RatingReview {
   updatedAt    DateTime @updatedAt
 
   @@unique([ratingId, criteriaName])
+  @@index([organizationId])
   @@index([cycleId])
 }
 
@@ -902,6 +1504,7 @@ model RatingReview {
 /// TL approves criteria for their department before tasks can be created under them.
 model KpiCriterion {
   id             String             @id @default(cuid())
+  organizationId String             @default("default-org")
   name           String
   description    String?
   departmentId   String
@@ -926,12 +1529,14 @@ model KpiCriterion {
   tasks KpiTask[]
 
   @@index([departmentId, status, approvalStatus])
+  @@index([organizationId, status, approvalStatus])
   @@index([divisionId])
 }
 
 /// TL-created task instance under an approved KpiCriterion for one employee in one monthly review.
 model KpiTask {
   id                  String        @id @default(cuid())
+  organizationId      String        @default("default-org")
   name                String
   description         String?
   criterionId         String
@@ -961,6 +1566,7 @@ model KpiTask {
   events KpiTaskEvent[]
 
   @@index([criterionId])
+  @@index([organizationId, status])
   @@index([reviewId, status])
   @@index([assignedToId, status])
 }
@@ -968,6 +1574,7 @@ model KpiTask {
 /// Audit trail for every status change on a KpiTask.
 model KpiTaskEvent {
   id        String           @id @default(cuid())
+  organizationId String      @default("default-org")
   taskId    String
   task      KpiTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
   actorId   String
@@ -981,12 +1588,14 @@ model KpiTaskEvent {
   metadata  Json?
 
   @@index([taskId, timestamp])
+  @@index([organizationId, timestamp])
 }
 
 /// Singleton record for admin-configured working hours, breaks, and holidays.
 /// id is always "default".
 model WorkingCalendar {
   id            String   @id @default("default")
+  organizationId String  @default("default-org")
   workStartTime String   @default("10:00")
   workEndTime   String   @default("17:30")
   timezone      String   @default("Asia/Kolkata")
@@ -1000,6 +1609,8 @@ model WorkingCalendar {
   updatedAt     DateTime @updatedAt
   updatedById   String?
   updatedBy     User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1029,6 +1640,7 @@ enum OtDayType {
 /// Stores standard hours/day, OT rate per hour, and comp-off slab breakpoints.
 model OtSettings {
   id                 String   @id @default("default")
+  organizationId     String   @default("default-org")
   standardHoursPerDay Decimal @default(8) @db.Decimal(4, 2)
   otRatePerHour      Decimal  @default(100) @db.Decimal(10, 2)
   /// JSON: [{minHours: number, compOffDays: number}] sorted ascending
@@ -1037,23 +1649,28 @@ model OtSettings {
   graceMinutes       Int      @default(15)
   updatedAt          DateTime @updatedAt
   updatedById        String?
+
+  @@index([organizationId])
 }
 
 /// Company + public holiday calendar used for OT/comp-off eligibility checks.
 model Holiday {
   id          String      @id @default(cuid())
+  organizationId String   @default("default-org")
   holidayDate DateTime    @db.Date
   holidayName String
   holidayType HolidayType
   createdAt   DateTime    @default(now())
 
-  @@unique([holidayDate, holidayType])
+  @@unique([organizationId, holidayDate, holidayType])
   @@index([holidayDate])
+  @@index([organizationId, holidayDate])
 }
 
 /// Raw biometric attendance import record per employee per date.
 model AttendanceLog {
   id                   String   @id @default(cuid())
+  organizationId       String   @default("default-org")
   employeeId           String
   employee             User     @relation("AttendanceLogs", fields: [employeeId], references: [id], onDelete: Cascade)
   attendanceDate       DateTime @db.Date
@@ -1070,14 +1687,16 @@ model AttendanceLog {
 
   ot EmployeeOt?
 
-  @@unique([employeeId, attendanceDate])
+  @@unique([organizationId, employeeId, attendanceDate])
   @@index([attendanceDate])
+  @@index([organizationId, attendanceDate])
   @@index([employeeId, attendanceDate])
 }
 
 /// Calculated OT / Comp-Off record per employee per attendance date.
 model EmployeeOt {
   id               String          @id @default(cuid())
+  organizationId   String          @default("default-org")
   attendanceLogId  String          @unique
   attendanceLog    AttendanceLog   @relation(fields: [attendanceLogId], references: [id], onDelete: Cascade)
   employeeId       String
@@ -1105,6 +1724,7 @@ model EmployeeOt {
   updatedAt        DateTime        @updatedAt
 
   @@index([employeeId, attendanceDate])
+  @@index([organizationId, attendanceDate])
   @@index([approvalStatus])
   @@index([attendanceDate])
 }
@@ -1112,6 +1732,7 @@ model EmployeeOt {
 /// LOP (Loss of Pay) days per employee per payroll month.
 model EmployeeLop {
   id           String   @id @default(cuid())
+  organizationId String @default("default-org")
   employeeId   String
   employee     User     @relation("EmployeeLopRecords", fields: [employeeId], references: [id], onDelete: Cascade)
   payrollMonth DateTime @db.Date  // first day of month
@@ -1121,6 +1742,336 @@ model EmployeeLop {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@unique([employeeId, payrollMonth])
+  @@unique([organizationId, employeeId, payrollMonth])
   @@index([payrollMonth])
+  @@index([organizationId, payrollMonth])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HRMS MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DocumentType {
+  OFFER_LETTER
+  ID_PROOF
+  ONBOARDING
+  CONTRACT
+  OTHER
+}
+
+enum AudienceType {
+  ORG
+  DEPARTMENT
+  DIVISION
+}
+
+enum LoanStatus {
+  ACTIVE
+  CLOSED
+  CANCELLED
+}
+
+enum AdvanceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REPAID
+}
+
+enum PolicyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PermissionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// HR policy document (handbook, SOPs, code of conduct, etc.)
+model Policy {
+  id             String       @id @default(cuid())
+  organizationId String       @default("default-org")
+  title          String
+  category       String
+  body           String       @db.Text
+  version        Int          @default(1)
+  status         PolicyStatus @default(DRAFT)
+  effectiveFrom  DateTime?    @db.Date
+  archivedAt     DateTime?
+  createdById    String?
+  createdBy      User?        @relation("PolicyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+}
+
+/// Employee-linked documents (offer letters, IDs, onboarding files).
+model EmployeeDocument {
+  id           String       @id @default(cuid())
+  organizationId String     @default("default-org")
+  employeeId   String
+  employee     User         @relation("EmployeeDocuments", fields: [employeeId], references: [id], onDelete: Cascade)
+  type         DocumentType
+  fileUrl      String
+  issuedAt     DateTime?    @db.Date
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+
+  @@index([employeeId, type])
+  @@index([organizationId])
+}
+
+/// Offer letter HTML template with variable token definitions.
+model OfferLetterTemplate {
+  id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
+  name           String
+  bodyHtml       String   @db.Text
+  variables      Json
+  createdById    String?
+  createdBy      User?    @relation("OfferTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+}
+
+/// Employee loan record.
+model Loan {
+  id             String     @id @default(cuid())
+  organizationId String     @default("default-org")
+  employeeId     String
+  employee       User       @relation("EmployeeLoans", fields: [employeeId], references: [id], onDelete: Cascade)
+  principal      Decimal    @db.Decimal(12, 2)
+  interestRate   Decimal    @default(0) @db.Decimal(5, 2)
+  tenureMonths   Int
+  startMonth     DateTime   @db.Date
+  status         LoanStatus @default(ACTIVE)
+  remarks        String?
+  approvedById   String?
+  approvedBy     User?      @relation("LoanApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  repayments     LoanRepayment[]
+
+  @@index([employeeId, status])
+  @@index([organizationId])
+}
+
+/// Monthly loan repayment deduction.
+model LoanRepayment {
+  id           String   @id @default(cuid())
+  loanId       String
+  loan         Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  payrollMonth DateTime @db.Date
+  amount       Decimal  @db.Decimal(12, 2)
+  paid         Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([loanId, payrollMonth])
+  @@index([payrollMonth])
+}
+
+/// Short-term salary advance request.
+model Advance {
+  id             String        @id @default(cuid())
+  organizationId String        @default("default-org")
+  employeeId     String
+  employee       User          @relation("EmployeeAdvances", fields: [employeeId], references: [id], onDelete: Cascade)
+  amount         Decimal       @db.Decimal(12, 2)
+  reason         String?
+  status         AdvanceStatus @default(PENDING)
+  approvedById   String?
+  approvedBy     User?         @relation("AdvanceApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  repayFromMonth DateTime?     @db.Date
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([employeeId, status])
+  @@index([organizationId])
+}
+
+/// Organisation/department/division announcement.
+model Announcement {
+  id             String       @id @default(cuid())
+  organizationId String       @default("default-org")
+  title          String
+  body           String       @db.Text
+  audience       AudienceType @default(ORG)
+  targetId       String?
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  createdById    String?
+  createdBy      User?        @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, audience])
+  @@index([publishedAt])
+}
+
+/// Monthly Employee of the Month record.
+model EmployeeOfMonth {
+  id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
+  month          DateTime @db.Date
+  employeeId     String
+  employee       User     @relation("EmployeeOfMonthWinners", fields: [employeeId], references: [id], onDelete: Cascade)
+  citation       String?
+  awardedById    String?
+  awardedBy      User?    @relation("EmployeeOfMonthAwardedBy", fields: [awardedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, month])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENDANCE EXPANSION — SHIFT & LEAVE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Shift definition (e.g. Day, Night, General).
+model Shift {
+  id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
+  name           String
+  startTime      String
+  endTime        String
+  weeklyOff      Json
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignments    EmployeeShift[]
+
+  @@index([organizationId, active])
+}
+
+/// Employee shift assignment with effective date range.
+model EmployeeShift {
+  id            String    @id @default(cuid())
+  employeeId    String
+  employee      User      @relation("EmployeeShifts", fields: [employeeId], references: [id], onDelete: Cascade)
+  shiftId       String
+  shift         Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+  assignedById  String?
+  assignedBy    User?     @relation("ShiftAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+
+  @@index([employeeId, effectiveFrom])
+}
+
+/// Leave type master (Casual, Sick, Earned, etc.).
+model LeaveType {
+  id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
+  code           String
+  name           String
+  paid           Boolean  @default(true)
+  defaultQuota   Decimal  @default(0) @db.Decimal(5, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  balances       LeaveBalance[]
+  requests       LeaveRequest[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+}
+
+/// Annual leave balance ledger per employee per leave type.
+model LeaveBalance {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    User      @relation("EmployeeLeaveBalances", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId String
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  year        Int
+  opening     Decimal   @default(0) @db.Decimal(5, 2)
+  accrued     Decimal   @default(0) @db.Decimal(5, 2)
+  used        Decimal   @default(0) @db.Decimal(5, 2)
+  balance     Decimal   @default(0) @db.Decimal(5, 2)
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([employeeId, year])
+}
+
+/// Employee leave application.
+model LeaveRequest {
+  id           String             @id @default(cuid())
+  organizationId String           @default("default-org")
+  employeeId   String
+  employee     User               @relation("EmployeeLeaveRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId  String
+  leaveType    LeaveType          @relation(fields: [leaveTypeId], references: [id])
+  fromDate     DateTime           @db.Date
+  toDate       DateTime           @db.Date
+  days         Decimal            @db.Decimal(5, 2)
+  reason       String?
+  status       LeaveRequestStatus @default(PENDING)
+  approvedById String?
+  approvedBy   User?              @relation("LeaveApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+  remarks      String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([employeeId, status])
+  @@index([organizationId, fromDate])
+  @@index([fromDate])
+}
+
+/// Short permission slip (half-day / hour-level absence).
+model PermissionRequest {
+  id           String                 @id @default(cuid())
+  organizationId String               @default("default-org")
+  employeeId   String
+  employee     User                   @relation("EmployeePermissionRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime               @db.Date
+  fromTime     String
+  toTime       String
+  minutes      Int
+  reason       String?
+  status       PermissionRequestStatus @default(PENDING)
+  approvedById String?
+  approvedBy   User?                  @relation("PermissionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([employeeId, date])
+  @@index([organizationId, date])
+}
+
+model WorkReport {
+  id             String   @id @default(cuid())
+  organizationId String   @default("default-org")
+  userId         String
+  user           User     @relation("EmployeeWorkReports", fields: [userId], references: [id], onDelete: Cascade)
+  weekStart      DateTime
+  summary        String
+  accomplishments String?
+  blockers       String?
+  nextWeek       String?
+  submittedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, weekStart])
+  @@index([organizationId, weekStart])
 }

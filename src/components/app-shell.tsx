@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getCachedSession } from "@/lib/auth";
 import { ROLE_HOME } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
@@ -13,11 +14,15 @@ import { ContextualTips } from "@/components/contextual-tips";
 import { InactivityGuard } from "@/components/inactivity-guard";
 import { AppHeader } from "@/components/app-header";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { getOrganizationLogoUrl } from "@/lib/organization-branding";
+import { resolvePlatformHome } from "@/lib/platform-setup";
+import { getSessionTimeoutMinutes } from "@/lib/session";
+import { getEnabledModuleKeys, getUserOrganizationMemberships } from "@/lib/tenant";
 
 const getSimulationActive = unstable_cache(
-  async () => {
+  async (organizationId: string) => {
     const lastSimLog = await prisma.auditLog.findFirst({
-      where: { action: "SIMULATION_MODE" },
+      where: { organizationId, action: "SIMULATION_MODE" },
       orderBy: { createdAt: "desc" },
       select: { after: true },
     });
@@ -29,9 +34,8 @@ const getSimulationActive = unstable_cache(
 );
 
 const getTimeoutMinutes = unstable_cache(
-  async () => {
-    const setting = await prisma.systemSetting.findUnique({ where: { key: "SESSION_TIMEOUT_MINUTES" } });
-    return setting ? parseInt(setting.value, 10) : 10;
+  async (organizationId: string) => {
+    return getSessionTimeoutMinutes(organizationId);
   },
   ["session-timeout-minutes"],
   { revalidate: 5 }
@@ -48,32 +52,64 @@ const roleColors: Record<string, string> = {
   PARTNER: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
 };
 
-const LOGO_SRC = "/api/logo?v=2";
-
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user) return null;
   const { id, name, role, secondaryRole } = session.user;
+  const activeOrganizationId = session.user.activeOrganizationId;
+  const platformState = session.user.platformRole === "PLATFORM_SUPER_ADMIN"
+    ? await resolvePlatformHome(session.user)
+    : null;
+  const homeHref = platformState?.homePath ?? ROLE_HOME[role];
+
+  if (platformState?.needsSetup) {
+    redirect(platformState.homePath);
+  }
+
+  if (!activeOrganizationId) {
+    redirect("/platform/setup");
+  }
 
   const isAdmin = role === "ADMIN" || secondaryRole === "ADMIN";
-  const [timeoutMinutes, isSimulationActive] = await Promise.all([
-    getTimeoutMinutes(),
-    isAdmin ? getSimulationActive() : Promise.resolve(false),
+  const [timeoutMinutes, isSimulationActive, organization, memberships, enabledModules, persistentNotifications] = await Promise.all([
+    getTimeoutMinutes(activeOrganizationId),
+    isAdmin ? getSimulationActive(activeOrganizationId) : Promise.resolve(false),
+    prisma.organization.findUnique({
+      where: { id: activeOrganizationId },
+      select: { name: true, logoUrl: true, primaryColor: true },
+    }),
+    getUserOrganizationMemberships(id),
+    getEnabledModuleKeys(activeOrganizationId),
+    prisma.notification.findMany({
+      where: { organizationId: activeOrganizationId, userId: id, critical: true, dismissed: false },
+      orderBy: [{ urgent: "desc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        type: true,
+        message: true,
+        link: true,
+        createdAt: true,
+        urgent: true,
+        important: true,
+      },
+    }),
   ]);
-
-  const persistentNotifications = await prisma.notification.findMany({
-    where: { userId: id, critical: true, dismissed: false },
-    orderBy: [{ urgent: "desc" }, { createdAt: "asc" }],
-    select: {
-      id: true,
-      type: true,
-      message: true,
-      link: true,
-      createdAt: true,
-      urgent: true,
-      important: true,
-    },
-  });
+  const organizationName = organization?.name ?? session.user.organizationName ?? "Organization";
+  const logoSrc = getOrganizationLogoUrl(organization?.logoUrl);
+  const organizationOptions = memberships
+    .filter((membership) =>
+      session.user.accountId
+        ? membership.organization.accountId === session.user.accountId
+        : true,
+    )
+    .map((membership) => ({
+      id: membership.organization.id,
+      name: membership.organization.name,
+      slug: membership.organization.slug,
+      logoUrl: membership.organization.logoUrl,
+      status: membership.organization.status,
+      roles: membership.roleAssignments.map((assignment) => assignment.role),
+    }));
 
   const initial = name?.charAt(0)?.toUpperCase() ?? "?";
 
@@ -84,20 +120,24 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         role={role}
         secondaryRole={secondaryRole}
         name={name ?? ""}
-        homeHref={ROLE_HOME[role]}
+        homeHref={homeHref}
+        organizationId={activeOrganizationId}
+        organizationName={organizationName}
+        logoSrc={logoSrc}
+        enabledModules={enabledModules}
       />
 
       {/* ── Mobile layout ── */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar sticky top-0 z-40 shadow-sm">
-          <Link href={ROLE_HOME[role]} className="flex items-center gap-2.5">
+          <Link href={homeHref} className="flex items-center gap-2.5">
             <div className="size-8 rounded-[10px] overflow-hidden bg-muted shadow-sm flex items-center justify-center">
-              <Image src={LOGO_SRC} alt="Adarsh Shipping" width={32} height={32} className="object-contain" unoptimized />
+              <Image src={logoSrc} alt={organizationName} width={32} height={32} className="object-contain" unoptimized />
             </div>
             <div>
-              <div className="font-bold text-foreground text-sm leading-tight">Adarsh Shipping</div>
-              <div className="text-[10px] text-muted-foreground">Appraisal Portal</div>
+              <div className="font-bold text-foreground text-sm leading-tight">{organizationName}</div>
+              <div className="text-[10px] text-muted-foreground">Performance Platform</div>
             </div>
           </Link>
 
@@ -110,6 +150,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
               userRole={role}
               userInitial={initial}
               roleColorClass={roleColors[role]}
+              enabledModules={enabledModules}
+              homeHref={homeHref}
+              organizationId={activeOrganizationId}
             />
           </div>
         </header>
@@ -125,7 +168,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <AppHeader userName={name ?? ""} sessionToken={session.user.sessionToken} />
+        <AppHeader
+          userName={name ?? ""}
+          organizationName={organizationName}
+          sessionToken={session.user.sessionToken}
+          enabledModules={enabledModules}
+          organizationOptions={organizationOptions}
+          accountName={session.user.accountName ?? null}
+          showAccountActions={
+            session.user.accountRole === "ACCOUNT_OWNER" ||
+            session.user.accountRole === "ACCOUNT_ADMIN"
+          }
+        />
 
         {/* Main content */}
         <main className="min-h-0 flex-1 overflow-auto overflow-x-hidden p-4 md:p-6">

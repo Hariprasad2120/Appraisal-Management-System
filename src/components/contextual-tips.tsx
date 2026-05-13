@@ -167,7 +167,7 @@ const TIP_SETS: TipSet[] = [
 
   // Admin employees
   {
-    match: (p) => p.startsWith("/admin/employees") && !p.includes("/assign"),
+    match: (p) => p.startsWith("/workspace/hrms/employees") && !p.includes("/assign"),
     tips: [
       {
         title: "Creating a cycle",
@@ -182,7 +182,7 @@ const TIP_SETS: TipSet[] = [
 
   // Admin assign reviewers
   {
-    match: (p) => p.includes("/admin/employees/") && p.includes("/assign"),
+    match: (p) => p.includes("/workspace/hrms/employees/") && p.includes("/assign"),
     tips: [
       {
         title: "Required reviewer roles",
