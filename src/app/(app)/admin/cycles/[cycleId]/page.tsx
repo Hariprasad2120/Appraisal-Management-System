@@ -1,4 +1,3 @@
-
 import { notFound } from "next/navigation";
 import { getCachedSession as auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";

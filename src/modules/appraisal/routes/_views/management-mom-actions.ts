@@ -232,7 +232,7 @@ export async function saveMomManagementAction(input: z.infer<typeof schema>): Pr
         userId: cycle.userId,
         type: "MOM_RECORDED",
         message: `Your appraisal meeting has been concluded. Final increment: ₹${finalAmount.toLocaleString("en-IN")}/yr. Your salary has been updated.${arrearCreated ? " Arrear details will be shared after management review." : ""}`,
-        link: "/ams/employee",
+        link: "/employee",
         persistent: true,
         critical: true,
       },

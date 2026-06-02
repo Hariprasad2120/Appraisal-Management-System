@@ -31,14 +31,14 @@ function getAppraisalNav(
   if (role === "ADMIN") {
     return [
       dashboard,
-      { href: "/ams/admin/appraisals", label: "Appraisals", icon: UserCheck, group: "Appraisal" },
-      { href: "/ams/admin/cycles", label: "All Cycles", icon: ClipboardList, group: "Appraisal" },
-      { href: "/ams/admin/mom", label: "Minutes of Meeting", icon: Building2, group: "Appraisal" },
-      { href: "/ams/admin/slabs", label: "Increment Slabs", icon: Layers, group: "Appraisal" },
-      { href: "/ams/admin/extensions", label: "Extensions", icon: Calendar, group: "Appraisal" },
-      { href: "/ams/admin/criteria", label: "Criteria Questions", icon: ListChecks, group: "Appraisal" },
-      { href: "/ams/admin/kpi", label: "Department KPI", icon: BarChart3, group: "Appraisal" },
-      { href: "/ams/admin/users", label: "User Management", icon: Users, group: "Appraisal" },
+      { href: "/admin/appraisals", label: "Appraisals", icon: UserCheck, group: "Appraisal" },
+      { href: "/admin/cycles", label: "All Cycles", icon: ClipboardList, group: "Appraisal" },
+      { href: "/admin/mom", label: "Minutes of Meeting", icon: Building2, group: "Appraisal" },
+      { href: "/admin/slabs", label: "Increment Slabs", icon: Layers, group: "Appraisal" },
+      { href: "/admin/extensions", label: "Extensions", icon: Calendar, group: "Appraisal" },
+      { href: "/admin/criteria", label: "Criteria Questions", icon: ListChecks, group: "Appraisal" },
+      { href: "/admin/kpi", label: "Department KPI", icon: BarChart3, group: "Appraisal" },
+      { href: "/admin/users", label: "User Management", icon: Users, group: "Appraisal" },
       { href: "/history", label: "History", icon: History, group: "Appraisal" },
       ...personalNav,
     ];
@@ -47,11 +47,11 @@ function getAppraisalNav(
   if (role === "MANAGEMENT") {
     return [
       dashboard,
-      { href: "/ams/management/mom", label: "Minutes of Meeting", icon: Building2, group: "Appraisal" },
-      { href: "/ams/management/salary", label: "Salary Calculator", icon: Wallet, group: "Appraisal" },
-      { href: "/ams/management/slabs", label: "Increment Slabs", icon: Layers, group: "Appraisal" },
-      { href: "/ams/management/arrears", label: "Arrear Approvals", icon: TrendingUp, group: "Appraisal" },
-      { href: "/ams/management/kpi", label: "KPI Reports", icon: BarChart3, group: "Appraisal" },
+      { href: "/management/mom", label: "Minutes of Meeting", icon: Building2, group: "Appraisal" },
+      { href: "/management/salary", label: "Salary Calculator", icon: Wallet, group: "Appraisal" },
+      { href: "/management/slabs", label: "Increment Slabs", icon: Layers, group: "Appraisal" },
+      { href: "/management/arrears", label: "Arrear Approvals", icon: TrendingUp, group: "Appraisal" },
+      { href: "/management/kpi", label: "KPI Reports", icon: BarChart3, group: "Appraisal" },
       { href: "/history", label: "History", icon: History, group: "Appraisal" },
       ...personalNav,
     ];
@@ -59,13 +59,13 @@ function getAppraisalNav(
 
   if (APPRAISAL_ROLES_REVIEWER.includes(role)) {
     return [
-      { href: "/ams/reviewer", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/reviewer", label: "Dashboard", icon: LayoutDashboard },
       ...(role === "HR"
-        ? [{ href: "/ams/reviewer/mom", label: "Minutes of Meeting", icon: Building2, group: "Appraisal" }]
+        ? [{ href: "/reviewer/mom", label: "Minutes of Meeting", icon: Building2, group: "Appraisal" }]
         : []),
       { href: "/assignments", label: "All Assignments", icon: ClipboardList, group: "Appraisal" },
       ...(role === "TL"
-        ? [{ href: "/ams/reviewer/kpi", label: "Team KPI", icon: BarChart3, group: "Appraisal" }]
+        ? [{ href: "/reviewer/kpi", label: "Team KPI", icon: BarChart3, group: "Appraisal" }]
         : []),
       { href: "/history", label: "Appraisal History", icon: History, group: "Appraisal" },
       ...personalNav,
@@ -82,7 +82,7 @@ function getAppraisalNav(
 
   if (role === "PARTNER") {
     return [
-      { href: "/ams/partner", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/partner", label: "Dashboard", icon: LayoutDashboard },
       { href: "/hrms/employees", label: "Employees", icon: Users, group: "Partner" },
       { href: "/history", label: "History", icon: History, group: "Partner" },
       ...personalNav,
@@ -103,14 +103,14 @@ function canAccessAppraisal(role: Role, secondaryRole?: Role | null): boolean {
 
 function defaultAppraisalLanding(role: Role, _secondaryRole?: Role | null): string {
   switch (role) {
-    case "ADMIN": return "/ams/admin";
-    case "MANAGEMENT": return "/ams/management";
+    case "ADMIN": return "/admin";
+    case "MANAGEMENT": return "/management";
     case "MANAGER":
     case "HR":
     case "TL":
-    case "REVIEWER": return "/ams/reviewer";
-    case "PARTNER": return "/ams/partner";
-    default: return "/ams/employee";
+    case "REVIEWER": return "/reviewer";
+    case "PARTNER": return "/partner";
+    default: return "/employee";
   }
 }
 
@@ -122,12 +122,15 @@ export const appraisalModule: ModuleConfig = {
   description: "Cycles, reviews, ratings, salary revisions, and appraisal operations.",
   availability: "live",
   icon: Star,
-  basePath: "/ams",
+  basePath: "/appraisal",
   accentClass: "bg-primary/10 text-primary",
   badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   pathPrefixes: [
-    "/ams",
-    "/workspace/ams",
+    "/admin",
+    "/management",
+    "/reviewer",
+    "/employee",
+    "/partner",
   ],
   permissions: {
     "cycles.view": ["ADMIN", "MANAGEMENT", "PARTNER"],

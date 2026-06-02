@@ -128,7 +128,7 @@ export async function shiftDeadlinesAction(days: number): Promise<Result> {
   }
 
   revalidatePath("/appraisal/simulation");
-  revalidatePath("/ams/admin");
+  revalidatePath("/admin");
   revalidatePath("/appraisal");
   return { ok: true };
 }
@@ -303,7 +303,7 @@ export async function deleteAllCyclesAction(): Promise<Result & { deleted?: numb
 
   revalidatePath("/appraisal/cycles");
   revalidatePath("/appraisal/simulation");
-  revalidatePath("/ams/admin");
+  revalidatePath("/admin");
   revalidatePath("/appraisal");
   revalidatePath("/appraisal");
 

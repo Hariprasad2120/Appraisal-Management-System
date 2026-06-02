@@ -88,7 +88,7 @@ export default async function MyAppraisalPage({
           ))}
           {(role === "ADMIN" || isAdminRole) && (
             <Link
-              href="/ams/admin/cycles"
+              href="/admin/cycles"
               className="ml-auto self-end pb-2 text-xs text-primary hover:underline"
             >
               All org cycles →

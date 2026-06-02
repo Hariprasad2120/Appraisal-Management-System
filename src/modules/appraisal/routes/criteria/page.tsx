@@ -47,7 +47,7 @@ export default async function CriteriaPage({
       <FadeIn delay={0.03}>
         <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 w-fit">
           <a
-            href="/ams/admin/criteria?tab=self"
+            href="/admin/criteria?tab=self"
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === "self"
                 ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
@@ -57,7 +57,7 @@ export default async function CriteriaPage({
             Self-Assessment ({selfCategories.length})
           </a>
           <a
-            href="/ams/admin/criteria?tab=reviewer"
+            href="/admin/criteria?tab=reviewer"
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === "reviewer"
                 ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"

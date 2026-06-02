@@ -372,7 +372,7 @@ export async function fastForwardSelfAssessmentAction(cycleId: string): Promise<
   await syncCycleStatus(cycleId);
   revalidatePath(`/workspace/hrms/employees/${cycle.userId}/assign`);
   revalidatePath(`/reviewer/${cycleId}`);
-  revalidatePath("/ams/reviewer");
-  revalidatePath("/ams/employee");
+  revalidatePath("/reviewer");
+  revalidatePath("/employee");
   return { ok: true };
 }
