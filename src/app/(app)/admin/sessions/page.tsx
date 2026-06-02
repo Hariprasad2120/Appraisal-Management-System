@@ -1,19 +1,14 @@
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { FadeIn } from "@/components/motion-div";
 import { SessionsDashboard } from "./sessions-dashboard";
 import { MonitorCheck } from "lucide-react";
-import { getSessionTimeoutMinutes } from "@/lib/session";
 
 export default async function SessionsPage() {
   const session = await auth();
   if (!session?.user) return null;
   if (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN") {
-    redirect("/");
-  }
-  const activeOrganizationId = session.user.activeOrganizationId;
-  if (!activeOrganizationId) {
     redirect("/");
   }
 
@@ -23,35 +18,26 @@ export default async function SessionsPage() {
   const cutoff = new Date(renderNow);
   cutoff.setMinutes(cutoff.getMinutes() - 2);
 
-  const [activeSessions, historySessions, securityEvents, timeoutMinutes, orgAdminAssignment] = await Promise.all([
+  const [activeSessions, historySessions, securityEvents, timeoutSetting] = await Promise.all([
     prisma.userSession.findMany({
-      where: { organizationId: activeOrganizationId, status: "ACTIVE", lastSeenAt: { gte: cutoff } },
+      where: { status: "ACTIVE", lastSeenAt: { gte: cutoff } },
       include: { user: { select: { id: true, name: true, email: true, role: true } } },
       orderBy: { lastSeenAt: "desc" },
     }),
     prisma.userSession.findMany({
-      where: { organizationId: activeOrganizationId },
       orderBy: { loginAt: "desc" },
       take: 100,
       include: { user: { select: { id: true, name: true, email: true, role: true } } },
     }),
     prisma.securityEvent.findMany({
-      where: { organizationId: activeOrganizationId },
       orderBy: { createdAt: "desc" },
       take: 100,
       include: { user: { select: { id: true, name: true, email: true, role: true } } },
     }),
-    getSessionTimeoutMinutes(activeOrganizationId),
-    prisma.userRoleAssignment.findFirst({
-      where: {
-        userId: session.user.id,
-        organizationId: activeOrganizationId,
-        membership: { status: "ACTIVE" },
-        role: { in: ["ORG_OWNER", "ORG_ADMIN"] },
-      },
-      select: { id: true },
-    }),
+    prisma.systemSetting.findUnique({ where: { key: "SESSION_TIMEOUT_MINUTES" } }),
   ]);
+
+  const timeoutMinutes = timeoutSetting ? parseInt(timeoutSetting.value, 10) : 10;
 
   const mapSession = (s: typeof activeSessions[0]) => ({
     id: s.id,
@@ -114,7 +100,6 @@ export default async function SessionsPage() {
           securityEvents={securityEvents.map(mapSecurityEvent)}
           renderedAt={renderNow.toISOString()}
           timeoutMinutes={timeoutMinutes}
-          canEditTimeout={Boolean(orgAdminAssignment)}
         />
       </FadeIn>
     </div>

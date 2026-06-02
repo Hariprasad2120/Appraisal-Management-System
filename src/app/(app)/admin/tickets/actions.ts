@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getCachedSession as auth } from "@/lib/auth";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
+import { auth } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -16,16 +15,14 @@ export async function updateTicketStatusAction(
   if (!session?.user || (session.user.role !== "ADMIN" && session.user.secondaryRole !== "ADMIN")) {
     return { ok: false, error: "Forbidden" };
   }
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
-  const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, organizationId } });
+  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
   if (!ticket) return { ok: false, error: "Ticket not found" };
 
   await prisma.ticket.update({ where: { id: ticketId }, data: { status } });
 
   await prisma.notification.create({
     data: {
-      organizationId,
       userId: ticket.raisedById,
       type: "TICKET_STATUS",
       message: `Your ticket "${ticket.title}" status updated to: ${status.replace("_", " ")}`,
@@ -52,14 +49,12 @@ export async function adminAddCommentAction(input: z.infer<typeof commentSchema>
 
   const parsed = commentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid input" };
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
-  const ticket = await prisma.ticket.findFirst({ where: { id: parsed.data.ticketId, organizationId } });
+  const ticket = await prisma.ticket.findUnique({ where: { id: parsed.data.ticketId } });
   if (!ticket) return { ok: false, error: "Not found" };
 
   await prisma.ticketComment.create({
     data: {
-      organizationId,
       ticketId: parsed.data.ticketId,
       authorId: session.user.id,
       message: parsed.data.message,
@@ -68,7 +63,6 @@ export async function adminAddCommentAction(input: z.infer<typeof commentSchema>
 
   await prisma.notification.create({
     data: {
-      organizationId,
       userId: ticket.raisedById,
       type: "TICKET_COMMENT",
       message: `Admin replied to your ticket: "${ticket.title}"`,

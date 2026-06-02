@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { isAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
@@ -106,7 +106,7 @@ export default async function AdminArrearsPage() {
                         <div className="flex items-center gap-2">
                           <User className="size-3.5 text-slate-400 shrink-0" />
                           <Link
-                            href={`/workspace/hrms/employees/${arrear.user.id}/assign`}
+                            href={`/admin/employees/${arrear.user.id}/assign`}
                             className="text-sm font-medium text-slate-900 transition-colors hover:text-primary hover:underline dark:text-white"
                           >
                             {arrear.user.name}

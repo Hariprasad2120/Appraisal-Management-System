@@ -78,7 +78,7 @@ export function ArrearApprovalCard({ arrear }: ArrearCardProps) {
             <div className="flex items-center gap-2">
               <User className="size-4 text-slate-400" />
               <Link
-                href={`/workspace/hrms/employees/${arrear.user.id}/assign`}
+                href={`/admin/employees/${arrear.user.id}/assign`}
                 className="font-semibold text-slate-900 transition-colors hover:text-primary hover:underline dark:text-white"
               >
                 {arrear.user.name}

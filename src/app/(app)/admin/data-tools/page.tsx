@@ -13,7 +13,7 @@ export default function AdminDataToolsPage() {
         <h2 className="text-sm font-semibold">Safe database reset</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           The reset script deletes appraisal data and all non-admin users while preserving or recreating
-          <span className="font-medium text-foreground"> {process.env.ADARSH_ACCOUNT_OWNER_EMAIL ?? "hr@adarshshipping.in"}</span>.
+          <span className="font-medium text-foreground"> hr@adarshshipping.in</span>.
         </p>
         <pre className="mt-4 overflow-x-auto rounded-lg bg-muted p-3 text-xs">
 {`$env:CONFIRM_RESET="KEEP_ONLY_ADMIN"

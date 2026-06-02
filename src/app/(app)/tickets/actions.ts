@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getCachedSession as auth } from "@/lib/auth";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
+import { auth } from "@/lib/auth";
 
 const createSchema = z.object({
   title: z.string().min(5).max(200),
@@ -26,11 +25,9 @@ export async function createTicketAction(input: z.infer<typeof createSchema>): P
 
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid input" };
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
-  await prisma.ticket.create({
+  const ticket = await prisma.ticket.create({
     data: {
-      organizationId,
       raisedById: session.user.id,
       title: parsed.data.title,
       description: parsed.data.description,
@@ -40,11 +37,10 @@ export async function createTicketAction(input: z.infer<typeof createSchema>): P
   });
 
   // Notify all admins
-  const admins = await prisma.user.findMany({ where: { organizationId, role: "ADMIN", active: true } });
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN", active: true } });
   for (const admin of admins) {
     await prisma.notification.create({
       data: {
-        organizationId,
         userId: admin.id,
         type: "TICKET_CREATED",
         message: `New ${parsed.data.priority} priority ticket: "${parsed.data.title}" from ${session.user.name ?? "a user"}`,
@@ -66,9 +62,8 @@ export async function addTicketCommentAction(input: z.infer<typeof commentSchema
 
   const parsed = commentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid input" };
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
-  const ticket = await prisma.ticket.findFirst({ where: { id: parsed.data.ticketId, organizationId } });
+  const ticket = await prisma.ticket.findUnique({ where: { id: parsed.data.ticketId } });
   if (!ticket) return { ok: false, error: "Ticket not found" };
 
   // Only ticket raiser or admin can comment
@@ -79,7 +74,6 @@ export async function addTicketCommentAction(input: z.infer<typeof commentSchema
 
   await prisma.ticketComment.create({
     data: {
-      organizationId,
       ticketId: parsed.data.ticketId,
       authorId: session.user.id,
       message: parsed.data.message,
@@ -91,7 +85,6 @@ export async function addTicketCommentAction(input: z.infer<typeof commentSchema
   if (notifyUserId) {
     await prisma.notification.create({
       data: {
-        organizationId,
         userId: notifyUserId,
         type: "TICKET_COMMENT",
         message: `Admin replied to your ticket: "${ticket.title}"`,

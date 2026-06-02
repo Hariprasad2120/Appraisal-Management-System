@@ -1,13 +1,11 @@
 import NextAuth, { type DefaultSession } from "next-auth";
-import { cache } from "react";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import type { AccountRole, PlatformRole, Role } from "@/generated/prisma/enums";
-import { getActiveOrganizationForUser, getEnabledModuleKeys, getPrimaryAccountContextForUser } from "@/lib/tenant";
-import { randomBytes } from "crypto";
+import type { Role } from "@/generated/prisma/enums";
+import { createHash, randomBytes } from "crypto";
 
 if (process.env.NODE_ENV === "production") {
   for (const key of ["NEXTAUTH_URL", "AUTH_URL"] as const) {
@@ -22,14 +20,6 @@ declare module "next-auth" {
       id: string;
       role: Role;
       secondaryRole: Role | null;
-      platformRole: PlatformRole | null;
-      accountId: string | null;
-      accountRole: AccountRole | null;
-      accountName: string | null;
-      activeOrganizationId: string | null;
-      organizationSlug: string;
-      organizationName: string;
-      enabledModules: string[];
       sessionToken: string;
     } & DefaultSession["user"];
   }
@@ -40,23 +30,18 @@ declare module "@auth/core/jwt" {
     id: string;
     role: Role;
     secondaryRole: Role | null;
-    platformRole: PlatformRole | null;
-    accountId: string | null;
-    accountRole: AccountRole | null;
-    accountName: string | null;
-    activeOrganizationId: string | null;
-    organizationSlug: string;
-    organizationName: string;
-    enabledModules: string[];
     sessionToken: string;
-    refreshedAt: number;
   }
 }
 
 const credsSchema = z.object({
-  email: z.email().transform((value) => value.toLowerCase().trim()),
-  password: z.string().min(1),
+  challengeToken: z.string().min(32),
+  passkey: z.string().regex(/^\d{4}$|^\d{6}$/),
 });
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 function getClientIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -108,8 +93,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        challengeToken: { label: "Challenge", type: "text" },
+        passkey: { label: "Passkey", type: "password" },
       },
       authorize: async (credentials, req) => {
         const request = req as unknown as Request;
@@ -126,15 +111,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           return null;
         }
-        const { email, password } = parsed.data;
-        const user = await prisma.user.findUnique({
-          where: { email },
+        const { challengeToken, passkey } = parsed.data;
+        const challenge = await prisma.loginChallenge.findUnique({
+          where: { tokenHash: hashToken(challengeToken) },
+          include: { user: true },
         });
+        const email = challenge?.user.email ?? null;
+        if (!challenge || challenge.usedAt || challenge.expiresAt < new Date()) {
+          await recordLoginAttempt({
+            email,
+            outcome: "FAILED",
+            reason: "INVALID_OR_EXPIRED_CHALLENGE",
+            ipAddress,
+            userAgent,
+          });
+          return null;
+        }
+
+        const user = challenge.user;
         if (!user) {
           await recordLoginAttempt({
             email,
             outcome: "FAILED",
             reason: "USER_NOT_FOUND",
+            ipAddress,
+            userAgent,
+          });
+          return null;
+        }
+        if (!user.passkeyHash || user.passkeySetupRequired) {
+          await recordLoginAttempt({
+            userId: user.id,
+            email,
+            outcome: "FAILED",
+            reason: "PASSKEY_SETUP_REQUIRED",
             ipAddress,
             userAgent,
           });
@@ -151,24 +161,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           return null;
         }
-        if (user.status && user.status !== "ACTIVE") {
+        const ok = await bcrypt.compare(passkey, user.passkeyHash);
+        if (!ok) {
           await recordLoginAttempt({
             userId: user.id,
             email,
             outcome: "FAILED",
-            reason: `USER_STATUS_${user.status}`,
-            ipAddress,
-            userAgent,
-          });
-          return null;
-        }
-        const passwordOk = await bcrypt.compare(password, user.passwordHash);
-        if (!passwordOk) {
-          await recordLoginAttempt({
-            userId: user.id,
-            email,
-            outcome: "FAILED",
-            reason: "INVALID_PASSWORD",
+            reason: "INVALID_PASSKEY",
             ipAddress,
             userAgent,
           });
@@ -176,16 +175,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const sessionToken = randomBytes(32).toString("hex");
-        const activeOrganization = await getActiveOrganizationForUser(
-          user.id,
-          user.activeOrganizationId ?? user.organizationId,
-        );
-        const activeOrganizationId = activeOrganization?.id ?? null;
-        const organizationSlug = activeOrganization?.slug ?? "";
-        const organizationName = activeOrganization?.name ?? (user.platformRole === "PLATFORM_SUPER_ADMIN" ? "Platform" : "No organization access");
-        const securityOrganizationId = activeOrganizationId ?? user.organizationId;
-        const enabledModules = await getEnabledModuleKeys(activeOrganizationId);
-        const accountContext = await getPrimaryAccountContextForUser(user.id, activeOrganizationId);
 
         // Close any stale ACTIVE sessions for this user
         const staleSessions = await prisma.userSession.updateMany({
@@ -193,9 +182,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           data: { status: "LOGGED_OUT", logoutAt: new Date() },
         });
 
+        await prisma.loginChallenge.update({
+          where: { id: challenge.id },
+          data: { usedAt: new Date() },
+        });
+
         await prisma.userSession.create({
           data: {
-            organizationId: securityOrganizationId,
             userId: user.id,
             token: sessionToken,
             ipAddress,
@@ -208,7 +201,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ...(staleSessions.count > 0
               ? [{
                   userId: user.id,
-                  organizationId: securityOrganizationId,
                   email: user.email,
                   event: "SESSION_ENDED",
                   outcome: "SUCCESS",
@@ -219,7 +211,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               : []),
             {
               userId: user.id,
-              organizationId: securityOrganizationId,
               email: user.email,
               event: "LOGIN_ATTEMPT",
               outcome: "SUCCESS",
@@ -229,7 +220,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
             {
               userId: user.id,
-              organizationId: securityOrganizationId,
               email: user.email,
               event: "SESSION_STARTED",
               outcome: "SUCCESS",
@@ -240,14 +230,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ],
         });
 
-        const loginNotifications = await prisma.systemSetting.findFirst({
+        const loginNotifications = await prisma.systemSetting.findUnique({
           where: { key: "LOGIN_ACTIVITY_NOTIFICATIONS" },
         });
 
         if (loginNotifications?.value !== "false") {
           await prisma.notification.create({
             data: {
-              organizationId: securityOrganizationId,
               userId: user.id,
               type: "LOGIN_ACTIVITY",
               message: `New login to your account from ${describeUserAgent(userAgent)}${ipAddress ? ` at ${ipAddress}` : ""}.`,
@@ -265,14 +254,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           secondaryRole: user.secondaryRole ?? null,
-          platformRole: user.platformRole ?? null,
-          accountId: accountContext?.account.id ?? null,
-          accountRole: accountContext?.accountRole ?? null,
-          accountName: accountContext?.account.name ?? null,
-          activeOrganizationId,
-          organizationSlug,
-          organizationName,
-          enabledModules,
           sessionToken,
         };
       },
@@ -295,69 +276,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!email || !verified) return false;
       const approved = await prisma.user.findUnique({
         where: { email },
-        select: { active: true, googleLoginAllowed: true },
+        select: { id: true, active: true, googleLoginAllowed: true },
       });
-      return Boolean(approved?.active && approved.googleLoginAllowed);
+      if (!approved?.active || !approved.googleLoginAllowed) return false;
+      const challengeToken = randomBytes(32).toString("hex");
+      await prisma.loginChallenge.create({
+        data: {
+          userId: approved.id,
+          provider: "google",
+          tokenHash: hashToken(challengeToken),
+          redirectTo: "/",
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+      return `/login?challenge=${challengeToken}&provider=google`;
     },
-    jwt: async ({ token, user, trigger }) => {
+    jwt: async ({ token, user }) => {
       if (user) {
         token.id = (user as { id: string }).id;
         token.role = (user as { role: Role }).role;
         token.secondaryRole = (user as { secondaryRole: Role | null }).secondaryRole ?? null;
-        token.platformRole = (user as { platformRole: PlatformRole | null }).platformRole ?? null;
-        token.accountId = (user as { accountId: string | null }).accountId ?? null;
-        token.accountRole = (user as { accountRole: AccountRole | null }).accountRole ?? null;
-        token.accountName = (user as { accountName: string | null }).accountName ?? null;
-        token.activeOrganizationId = (user as { activeOrganizationId: string | null }).activeOrganizationId ?? null;
-        token.organizationSlug = (user as { organizationSlug: string }).organizationSlug;
-        token.organizationName = (user as { organizationName: string }).organizationName;
-        token.enabledModules = (user as { enabledModules: string[] }).enabledModules ?? [];
         token.sessionToken = (user as { sessionToken: string }).sessionToken;
-        token.refreshedAt = Date.now();
-        return token;
       }
-
-      // Short-circuit: skip DB on most requests — only refresh every 10 minutes or on explicit trigger
-      const TOKEN_REFRESH_MS = 10 * 60 * 1000;
-      const needsRefresh =
-        trigger === "update" ||
-        !token.refreshedAt ||
-        Date.now() - token.refreshedAt > TOKEN_REFRESH_MS;
-
-      if (!needsRefresh || !token.id) return token;
-
-      const currentUser = await prisma.user.findUnique({
-        where: { id: token.id },
-        select: {
-          role: true,
-          secondaryRole: true,
-          platformRole: true,
-          status: true,
-          activeOrganizationId: true,
-          organizationId: true,
-        },
-      });
-      if (!currentUser || currentUser.status !== "ACTIVE") return token;
-
-      const orgId = currentUser.activeOrganizationId ?? currentUser.organizationId;
-      const [activeOrganization, accountContext, enabledModules] = await Promise.all([
-        getActiveOrganizationForUser(token.id, orgId),
-        getPrimaryAccountContextForUser(token.id, orgId),
-        getEnabledModuleKeys(orgId),
-      ]);
-
-      token.role = currentUser.role;
-      token.secondaryRole = currentUser.secondaryRole ?? null;
-      token.platformRole = currentUser.platformRole ?? null;
-      token.accountId = accountContext?.account.id ?? null;
-      token.accountRole = accountContext?.accountRole ?? null;
-      token.accountName = accountContext?.account.name ?? null;
-      token.activeOrganizationId = activeOrganization?.id ?? null;
-      token.organizationSlug = activeOrganization?.slug ?? "";
-      token.organizationName = activeOrganization?.name ?? "Platform";
-      token.enabledModules = enabledModules;
-      token.refreshedAt = Date.now();
-
       return token;
     },
     session: async ({ session, token }) => {
@@ -365,20 +305,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.secondaryRole = token.secondaryRole ?? null;
-        session.user.platformRole = token.platformRole ?? null;
-        session.user.accountId = token.accountId ?? null;
-        session.user.accountRole = token.accountRole ?? null;
-        session.user.accountName = token.accountName ?? null;
-        session.user.activeOrganizationId = token.activeOrganizationId ?? null;
-        session.user.organizationSlug = token.organizationSlug;
-        session.user.organizationName = token.organizationName;
-        session.user.enabledModules = token.enabledModules ?? [];
         session.user.sessionToken = token.sessionToken;
       }
       return session;
     },
   },
 });
-
-// Memoize per-request so multiple RSC components share one JWT decode + callback
-export const getCachedSession = cache(auth);

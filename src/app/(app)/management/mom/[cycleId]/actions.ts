@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { getSystemDate } from "@/lib/system-date";
 import { isArrearEligible, computeArrearPeriod, computeArrearAmount } from "@/lib/arrears";
 

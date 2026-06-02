@@ -1,16 +1,13 @@
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { AdminTicketPanel } from "./admin-ticket-panel";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 export default async function AdminTicketsPage() {
   const session = await auth();
   if (!session?.user) return null;
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
   const tickets = await prisma.ticket.findMany({
-    where: { organizationId },
     orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     include: {
       raisedBy: { select: { name: true, role: true, department: true } },

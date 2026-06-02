@@ -52,7 +52,6 @@ type Props = {
   securityEvents: SecurityEvent[];
   renderedAt: string;
   timeoutMinutes: number;
-  canEditTimeout: boolean;
 };
 
 function formatDuration(ms: number): string {
@@ -96,7 +95,7 @@ function formatEventLabel(event: string): string {
   return event.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function SessionsDashboard({ initialActive, history, securityEvents, renderedAt, timeoutMinutes, canEditTimeout }: Props) {
+export function SessionsDashboard({ initialActive, history, securityEvents, renderedAt, timeoutMinutes }: Props) {
   const [active, setActive] = useState<ActiveSession[]>(initialActive);
   const [nowMs, setNowMs] = useState(() => new Date(renderedAt).getTime());
   const [newTimeout, setNewTimeout] = useState<string>(String(timeoutMinutes));
@@ -187,7 +186,6 @@ export function SessionsDashboard({ initialActive, history, securityEvents, rend
               max={480}
               value={newTimeout}
               onChange={(e) => setNewTimeout(e.target.value)}
-              disabled={!canEditTimeout}
               className="w-20 h-9 rounded-lg border border-border bg-input px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
             <span className="text-sm text-muted-foreground">minutes</span>
@@ -195,15 +193,13 @@ export function SessionsDashboard({ initialActive, history, securityEvents, rend
           <Button
             size="sm"
             onClick={saveTimeout}
-            disabled={savingTimeout || !canEditTimeout}
+            disabled={savingTimeout}
             className="h-9 bg-[#008993] hover:bg-[#00cec4] text-white text-xs font-semibold"
           >
             {savingTimeout ? "Saving…" : timeoutSaved ? "Saved ✓" : "Save"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            {canEditTimeout
-              ? "Warning appears during the final 20% of idle time, capped at 2 minutes. Changes apply after the next page load."
-              : "Only organization admins can change this timeout. The warning appears during the final 20% of idle time, capped at 2 minutes."}
+            Warning appears during the final 20% of idle time, capped at 2 minutes. Changes apply after the next page load.
           </p>
         </div>
       </div>

@@ -6,13 +6,12 @@ import {
   ClipboardList,
   Users,
 } from "lucide-react";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { toTitleCase } from "@/lib/utils";
 import { getSystemDate } from "@/lib/system-date";
 import { getCycleStageInfo } from "@/lib/workflow";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 function assignmentRoute(
   assignment: {
@@ -60,9 +59,8 @@ export default async function AssignmentsPage() {
   if (!session?.user) return null;
 
   const now = await getSystemDate();
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const assignments = await prisma.cycleAssignment.findMany({
-    where: { organizationId, reviewerId: session.user.id },
+    where: { reviewerId: session.user.id },
     orderBy: { assignedAt: "desc" },
     include: {
       cycle: {

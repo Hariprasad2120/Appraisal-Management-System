@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 // GET /api/notifications/admin — audit trail for admin panel
 export async function GET(req: NextRequest) {
@@ -14,11 +13,9 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1"));
   const limit = 50;
   const skip = (page - 1) * limit;
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
   const [notifications, total] = await Promise.all([
     prisma.notification.findMany({
-      where: { organizationId },
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
@@ -26,7 +23,7 @@ export async function GET(req: NextRequest) {
         user: { select: { id: true, name: true, role: true, email: true } },
       },
     }),
-    prisma.notification.count({ where: { organizationId } }),
+    prisma.notification.count(),
   ]);
 
   return NextResponse.json({
@@ -50,10 +47,9 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json() as { id?: string; important?: boolean };
   if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
-  await prisma.notification.updateMany({
-    where: { id: body.id, organizationId },
+  await prisma.notification.update({
+    where: { id: body.id },
     data: { important: body.important ?? true },
   });
 

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { isManagement } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
@@ -77,7 +77,7 @@ export default async function ManagementReschedulePage({
                   <div key={c.id} className="px-4 py-3 flex items-center justify-between text-sm">
                     <div>
                       <Link
-                        href={`/workspace/hrms/employees/${c.user.id}/assign`}
+                        href={`/admin/employees/${c.user.id}/assign`}
                         className="font-medium transition-colors hover:text-primary hover:underline"
                       >
                         {c.user.name}
@@ -116,7 +116,7 @@ export default async function ManagementReschedulePage({
               <CardTitle className="text-base">
                 Reschedule:{" "}
                 <Link
-                  href={`/workspace/hrms/employees/${selectedCycle.user.id}/assign`}
+                  href={`/admin/employees/${selectedCycle.user.id}/assign`}
                   className="transition-colors hover:text-primary hover:underline"
                 >
                   {selectedCycle.user.name}
@@ -157,7 +157,7 @@ export default async function ManagementReschedulePage({
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-0.5 min-w-0">
                         <Link
-                          href={`/workspace/hrms/employees/${r.cycle.user.id}/assign`}
+                          href={`/admin/employees/${r.cycle.user.id}/assign`}
                           className="font-medium transition-colors hover:text-primary hover:underline"
                         >
                           {r.cycle.user.name}

@@ -1,4 +1,4 @@
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { decidePasskeyResetAction, forcePasskeyResetAction } from "./actions";

@@ -7,26 +7,20 @@ import { getAppraisalEligibility, autoCycleType } from "@/lib/appraisal-eligibil
 import { Calendar, Users, Clock, CalendarDays } from "lucide-react";
 import { AppraisalCalendar } from "@/components/appraisal-calendar";
 import { AppraisalsMonthFilter } from "./appraisals-month-filter";
-import { getCachedSession as auth } from "@/lib/auth";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 export default async function AppraisalsPage() {
-  const session = await auth();
-  if (!session?.user) return null;
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const [allUsers, activeCycles] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId, role: { notIn: ["MANAGEMENT", "PARTNER"] }, active: true },
+      where: { role: { notIn: ["MANAGEMENT", "PARTNER"] }, active: true },
       orderBy: { name: "asc" },
       include: {
         salary: { select: { grossAnnum: true } },
         cyclesAsEmployee: {
           where: {
-            organizationId,
             OR: [
               { status: { notIn: ["CLOSED", "DECIDED"] } },
               {
@@ -41,7 +35,7 @@ export default async function AppraisalsPage() {
       },
     }),
     prisma.appraisalCycle.findMany({
-      where: { organizationId, status: { notIn: ["CLOSED", "DECIDED"] } },
+      where: { status: { notIn: ["CLOSED", "DECIDED"] } },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { startDate: "asc" },
     }),
@@ -283,7 +277,7 @@ function AppraisalRow({
   const cycle = u.cyclesAsEmployee.find((c) => !["CLOSED", "DECIDED"].includes(c.status));
   const cycleType = autoCycleType(u.joiningDate, now);
   const gross = u.salary ? Number(u.salary.grossAnnum) : null;
-  const href = `/workspace/hrms/employees/${u.id}/assign`;
+  const href = `/admin/employees/${u.id}/assign`;
 
   return (
     <tr className="hover:bg-muted/30 transition-colors cursor-pointer group/row">

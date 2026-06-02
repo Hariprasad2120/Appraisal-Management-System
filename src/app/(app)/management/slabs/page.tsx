@@ -1,4 +1,4 @@
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeIn } from "@/components/motion-div";
 import { GRADE_BANDS } from "@/lib/criteria";

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { getSalaryTier } from "@/lib/criteria";
 import { getSystemDate } from "@/lib/system-date";
 import { isManagementReviewOpen } from "@/lib/workflow";

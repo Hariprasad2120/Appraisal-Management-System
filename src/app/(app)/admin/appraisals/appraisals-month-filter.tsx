@@ -73,7 +73,7 @@ export function AppraisalsMonthFilter({ rows }: { rows: Row[] }) {
             filtered.map((r) => (
               <Link
                 key={r.id}
-                href={`/workspace/hrms/employees/${r.id}/assign`}
+                href={`/admin/employees/${r.id}/assign`}
                 className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
               >
                 <div className="min-w-0">

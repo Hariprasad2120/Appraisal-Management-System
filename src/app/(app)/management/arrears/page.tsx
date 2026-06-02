@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { isManagement } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";

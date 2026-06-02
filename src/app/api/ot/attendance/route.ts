@@ -80,12 +80,7 @@ export async function POST(req: NextRequest) {
 
   let inserted = 0;
   let skipped = 0;
-  const skippedDetails: Array<{
-    row: number;
-    employeeId: string;
-    reason: string;
-    payload: typeof logs[number];
-  }> = [];
+  const skippedDetails: any[] = [];
 
   for (let i = 0; i < logs.length; i++) {
     const log = logs[i];
@@ -114,12 +109,12 @@ export async function POST(req: NextRequest) {
         permissionMins: log.permissionMins ?? 0,
       });
       inserted++;
-    } catch (e: unknown) {
+    } catch (e: any) {
       skipped++;
       skippedDetails.push({
         row: i + 1,
         employeeId: log.employeeId,
-        reason: e instanceof Error ? e.message : "Prisma or Database error",
+        reason: e.message || "Prisma or Database error",
         payload: log
       });
     }

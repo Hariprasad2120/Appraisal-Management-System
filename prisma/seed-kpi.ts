@@ -19,16 +19,10 @@ if (!connectionString) throw new Error("DATABASE_URL not set");
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 async function upsertSetting(key: string, value: string) {
-  const existing = await prisma.systemSetting.findFirst({
-    where: { organizationId: "default-org", key },
-    select: { id: true },
-  });
-  if (existing) {
-    await prisma.systemSetting.update({ where: { id: existing.id }, data: { value } });
-    return;
-  }
-  await prisma.systemSetting.create({
-    data: { organizationId: "default-org", key, value },
+  await prisma.systemSetting.upsert({
+    where: { key },
+    create: { key, value },
+    update: { value },
   });
 }
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/motion-div";
@@ -66,7 +66,7 @@ export default async function ManagementMomListPage() {
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold text-slate-900 dark:text-white">
                               <Link
-                                href={`/workspace/hrms/employees/${cycle.user.id}/assign`}
+                                href={`/admin/employees/${cycle.user.id}/assign`}
                                 className="transition-colors hover:text-primary hover:underline"
                               >
                                 {toTitleCase(cycle.user.name)}
@@ -133,7 +133,7 @@ export default async function ManagementMomListPage() {
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-slate-900 dark:text-white">
                             <Link
-                              href={`/workspace/hrms/employees/${cycle.user.id}/assign`}
+                              href={`/admin/employees/${cycle.user.id}/assign`}
                               className="transition-colors hover:text-primary hover:underline"
                             >
                               {toTitleCase(cycle.user.name)}

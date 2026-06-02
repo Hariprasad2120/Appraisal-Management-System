@@ -18,18 +18,16 @@ const roleColors: Record<Role, string> = {
   PARTNER: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
 };
 
+const LOGO_SRC = "/api/logo?v=2";
+
 type Props = {
   role: Role;
   secondaryRole?: Role | null;
   name: string;
   homeHref: string;
-  organizationId: string;
-  organizationName: string;
-  logoSrc: string;
-  enabledModules?: string[] | null;
 };
 
-export function SidebarShell({ role, secondaryRole, name, homeHref, organizationId, organizationName, logoSrc, enabledModules }: Props) {
+export function SidebarShell({ role, secondaryRole, name, homeHref }: Props) {
   const initial = name?.charAt(0)?.toUpperCase() ?? "?";
 
   return (
@@ -49,18 +47,18 @@ export function SidebarShell({ role, secondaryRole, name, homeHref, organization
           <Link
             href={homeHref}
             className="relative flex h-10 w-full items-center overflow-hidden"
-            title={organizationName}
+            title="Adarsh Shipping"
           >
             <Image
-              src={logoSrc}
-              alt={organizationName}
+              src={LOGO_SRC}
+              alt="Adarsh Shipping"
               width={160}
               height={54}
               className="absolute left-0 h-9 w-auto max-w-[40px] object-contain opacity-100 transition-opacity duration-150 ease-out group-hover/sidebar:opacity-0"
               unoptimized
             />
             <Image
-              src={logoSrc}
+              src={LOGO_SRC}
               alt=""
               width={160}
               height={54}
@@ -72,13 +70,7 @@ export function SidebarShell({ role, secondaryRole, name, homeHref, organization
         </div>
 
         {/* Nav */}
-        <SidebarNav
-          role={role}
-          secondaryRole={secondaryRole}
-          enabledModules={enabledModules}
-          homeHref={homeHref}
-          organizationId={organizationId}
-        />
+        <SidebarNav role={role} secondaryRole={secondaryRole} />
 
         {/* User footer */}
         <div

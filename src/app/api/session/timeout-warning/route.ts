@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 function getClientIp(req: Request): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -17,11 +16,9 @@ export async function POST(req: Request) {
   const secondsLeft = Number(body.secondsLeft);
   const safeSecondsLeft = Number.isFinite(secondsLeft) ? Math.max(0, Math.ceil(secondsLeft)) : 60;
   const recentCutoff = new Date(Date.now() - 2 * 60 * 1000);
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
 
   const recentWarning = await prisma.notification.findFirst({
     where: {
-      organizationId,
       userId: session.user.id,
       type: "SESSION_TIMEOUT_WARNING",
       createdAt: { gte: recentCutoff },
@@ -33,7 +30,6 @@ export async function POST(req: Request) {
     await prisma.$transaction(async (tx) => {
       await tx.notification.create({
         data: {
-          organizationId,
           userId: session.user.id,
           type: "SESSION_TIMEOUT_WARNING",
           message: `Your session will expire in about ${safeSecondsLeft} seconds due to inactivity.`,
@@ -46,7 +42,6 @@ export async function POST(req: Request) {
 
       await tx.securityEvent.create({
         data: {
-          organizationId,
           userId: session.user.id,
           email: session.user.email ?? null,
           event: "SESSION_ACTIVITY",

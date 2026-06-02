@@ -1,4 +1,4 @@
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { SimulationPanel } from "./simulation-panel";

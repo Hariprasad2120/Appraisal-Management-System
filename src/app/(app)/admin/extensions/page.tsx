@@ -21,7 +21,7 @@ export default async function ExtensionsPage() {
 
   const employeeLink = (id: string, name: string, className?: string) => (
     <Link
-      href={`/workspace/hrms/employees/${id}/assign`}
+      href={`/admin/employees/${id}/assign`}
       className={`transition-colors hover:text-primary hover:underline ${className ?? ""}`}
     >
       {toTitleCase(name)}

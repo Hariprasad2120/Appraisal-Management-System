@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import * as XLSX from "xlsx";
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -12,14 +12,6 @@ type Row = Record<string, unknown>;
 
 const ROLES = new Set(["ADMIN", "HR", "EMPLOYEE", "REVIEWER", "MANAGER", "MANAGEMENT", "PARTNER"]);
 const ACCOUNT_STATUSES = new Set(["Pending", "Active", "Disabled"]);
-
-function requireImportDefaultPassword() {
-  const password = process.env.IMPORT_DEFAULT_PASSWORD?.trim();
-  if (!password) {
-    throw new Error("IMPORT_DEFAULT_PASSWORD must be set before importing fresh data.");
-  }
-  return password;
-}
 
 async function requireAdmin() {
   const session = await auth();
@@ -103,7 +95,7 @@ export async function importWorkbookAction(formData: FormData): Promise<ImportRe
     }
 
     const accessByEmployee = new Map(accessRows.map((row) => [required(row, "employee_id"), row]));
-    const defaultPasswordHash = await bcrypt.hash(requireImportDefaultPassword(), 10);
+    const defaultPasswordHash = await bcrypt.hash(process.env.IMPORT_DEFAULT_PASSWORD ?? "Welcome@12345", 10);
 
     let imported = 0;
     for (const row of users) {
@@ -121,7 +113,6 @@ export async function importWorkbookAction(formData: FormData): Promise<ImportRe
         where: { email: officialEmail },
         update: {
           name: required(row, "full_name"),
-          emailNormalized: officialEmail,
           role,
           department: required(row, "department"),
           designation: required(row, "designation"),
@@ -129,7 +120,6 @@ export async function importWorkbookAction(formData: FormData): Promise<ImportRe
           employmentType: required(row, "employment_type"),
           employeeStatus: required(row, "status"),
           active: accountStatus === "Active",
-          status: accountStatus === "Active" ? "ACTIVE" : "SUSPENDED",
           googleLoginAllowed: boolYes(access, "google_login_allowed"),
           passkeySetupRequired: boolYes(access, "force_passkey_setup") || boolYes(access, "passkey_required"),
           personalEmail: email(row, "personal_email") || null,
@@ -138,7 +128,6 @@ export async function importWorkbookAction(formData: FormData): Promise<ImportRe
         },
         create: {
           email: officialEmail,
-          emailNormalized: officialEmail,
           passwordHash: defaultPasswordHash,
           name: required(row, "full_name"),
           role,
@@ -148,7 +137,6 @@ export async function importWorkbookAction(formData: FormData): Promise<ImportRe
           employmentType: required(row, "employment_type"),
           employeeStatus: required(row, "status"),
           active: accountStatus === "Active",
-          status: accountStatus === "Active" ? "ACTIVE" : "SUSPENDED",
           googleLoginAllowed: boolYes(access, "google_login_allowed"),
           passkeySetupRequired: true,
           personalEmail: email(row, "personal_email") || null,
@@ -168,7 +156,7 @@ export async function importWorkbookAction(formData: FormData): Promise<ImportRe
     });
 
     revalidatePath("/admin/data-tools");
-    revalidatePath("/workspace/hrms/employees");
+    revalidatePath("/admin/employees");
     return { ok: true, message: `Imported ${imported} users from ${file.name}.` };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Import failed." };

@@ -1,18 +1,15 @@
-import { getCachedSession as auth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { FadeIn } from "@/components/motion-div";
 import { Bell } from "lucide-react";
 import { NotificationsPanel } from "./notifications-panel";
-import { DEFAULT_ORGANIZATION_ID } from "@/lib/tenant";
 
 export default async function NotificationsPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const organizationId = session.user.activeOrganizationId ?? DEFAULT_ORGANIZATION_ID;
-
   const notifications = await prisma.notification.findMany({
-    where: { organizationId, userId: session.user.id },
+    where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

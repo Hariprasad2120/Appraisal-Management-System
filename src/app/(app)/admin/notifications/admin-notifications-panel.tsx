@@ -227,7 +227,7 @@ export function AdminNotificationsPanel({ notifications: initial }: Props) {
                   {/* User */}
                   <div className="min-w-0">
                     <Link
-                      href={`/workspace/hrms/employees/${n.user.id}/assign`}
+                      href={`/admin/employees/${n.user.id}/assign`}
                       className="block truncate text-sm text-foreground transition-colors hover:text-primary hover:underline"
                     >
                       {n.user.name}
