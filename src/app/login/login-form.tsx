@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Loader2, AlertCircle, ArrowRight, Eye, EyeOff, KeyRound } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,6 @@ import {
   requestPasskeyResetAction,
   requestPasswordResetAction,
   setupPasskeyAction,
-  verifyPasskeyAction,
 } from "./actions";
 
 type Step = "password" | "passkey" | "setup" | "forgot-password" | "forgot-passkey";
@@ -84,16 +84,18 @@ export function LoginForm() {
     setErr(null);
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.set("challengeToken", challengeToken);
-      formData.set("passkey", passkey);
-      formData.set("callbackUrl", callbackUrl);
-      const res = await verifyPasskeyAction(formData);
-      if (!res.ok) {
-        setErr(res.message);
+      const result = await signIn("credentials", {
+        challengeToken,
+        passkey,
+        redirect: false,
+        redirectTo: callbackUrl,
+      });
+
+      if (result?.error) {
+        setErr("Invalid email or password. Please try again.");
         return;
       }
-      window.location.assign(res.redirectTo);
+      window.location.assign(result?.url ?? callbackUrl);
     } finally {
       setLoading(false);
     }
@@ -118,7 +120,17 @@ export function LoginForm() {
         setErr(res.message);
         return;
       }
-      window.location.assign(res.redirectTo);
+      const result = await signIn("credentials", {
+        challengeToken,
+        passkey,
+        redirect: false,
+        redirectTo: callbackUrl,
+      });
+      if (result?.error) {
+        setErr("Passkey saved, but sign in did not complete. Please try again.");
+        return;
+      }
+      window.location.assign(result?.url ?? callbackUrl);
     } finally {
       setLoading(false);
     }

@@ -15,6 +15,10 @@ type PasskeyResult =
   | { ok: true; redirectTo: string }
   | { ok: false; message: string };
 
+type SetupPasskeyResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 const passkeyPattern = /^\d{4}$|^\d{6}$/;
 
 function normalizeEmail(email: string) {
@@ -140,7 +144,7 @@ export async function verifyPasskeyAction(formData: FormData): Promise<PasskeyRe
   }
 }
 
-export async function setupPasskeyAction(formData: FormData): Promise<PasskeyResult> {
+export async function setupPasskeyAction(formData: FormData): Promise<SetupPasskeyResult> {
   const challengeToken = formData.get("challengeToken");
   const passkey = formData.get("passkey");
   const confirmPasskey = formData.get("confirmPasskey");
@@ -182,7 +186,7 @@ export async function setupPasskeyAction(formData: FormData): Promise<PasskeyRes
     }),
   ]);
 
-  return verifyPasskeyAction(formData);
+  return { ok: true };
 }
 
 export async function requestPasswordResetAction(formData: FormData) {
